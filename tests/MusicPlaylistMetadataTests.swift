@@ -57,7 +57,11 @@ private final class MetadataMusic: MusicTransport, MusicReadTransport, MusicWrit
             let payload: MusicReadPayload
             switch request {
             case .userPlaylists: payload = .init(songs: nil, playlists: [playlist], playlist: nil, complete: true)
-            case .playlistDetail: payload = .init(songs: songs, playlists: nil, playlist: playlist, complete: mode != .incomplete)
+            case .playlistDetail:
+                if MusicReadPurpose.metadataOnly {
+                    let verified=mode != .incomplete && mode != .changingDescription
+                    payload = .init(songs:nil,playlists:nil,playlist:playlist,complete:false,metadataVerified:verified ? true:nil)
+                } else {payload = .init(songs:songs,playlists:nil,playlist:playlist,complete:mode != .incomplete)}
             default: throw CredentialError.invalidInput
             }
             return .init(result: .init(state: .authorizedRead, session: .present, payload: payload), credential: try copy(secret))
@@ -82,6 +86,14 @@ private final class MetadataMusic: MusicTransport, MusicReadTransport, MusicWrit
     static func main() async throws {
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         var cases: [String] = []
+        let targetID=String(repeating:"a",count:32)
+        let metadata:[String:Any]=["playlist":["playlist_id":targetID,"name":"Large playlist","track_count":200001],"complete":false,"metadata_verified":true]
+        let raw:[String:Any]=["state":MusicReadState.authorizedRead.rawValue,"session":MusicReadSession.present.rawValue,"payload":metadata]
+        let decoded=try MusicReadProtocol.decode(raw,for:.playlistDetail(playlistID:targetID),verification:true,metadataOnly:true)
+        check(decoded.payload?.songs==nil && decoded.payload?.complete==false && decoded.payload?.metadataVerified==true,"metadata observation must not invent membership coverage")
+        do {_ = try MusicReadProtocol.decode(raw,for:.playlistDetail(playlistID:targetID));preconditionFailure("public read accepted metadata-only reply")}
+        catch CredentialError.uncertainLocalState {cases.append("metadata_only_protocol_is_private")}
+
         for intent in [MusicWriteRequest.Intent.updatePlaylistName, .updatePlaylistDescription] {
             for mode in [MetadataMusic.Mode.success, .lostAfterEffect, .lostBeforeEffect, .wrongValue, .reordered, .wrongTarget, .incomplete, .notDispatched] {
                 let repo = try FixtureRepository(), music = MetadataMusic(mode)
@@ -96,7 +108,7 @@ private final class MetadataMusic: MusicTransport, MusicReadTransport, MusicWrit
                 case .incomplete: expected = .incompleteRead
                 case .notDispatched: expected = .notDispatched
                 case .wrongValue, .lostBeforeEffect: expected = intent == .updatePlaylistName ? .targetMismatch : .readbackFailed
-                case .reordered: expected = .readbackFailed
+                case .reordered: expected = .verified
                 default: expected = .outcomeUnknown
                 }
                 check(first.state == expected, "\(intent)/\(mode): \(first.state)")
@@ -109,7 +121,7 @@ private final class MetadataMusic: MusicTransport, MusicReadTransport, MusicWrit
                     let result = try await owner.consumeWrite(repo.reference, request: conflict)
                     check(result.state == .requestConflict, "UUID changed value not rejected")
                     let saved = try journal.inspect()
-                    check(saved?.records[req.requestID.uuidString]?.contentDigest != nil, "ordered contents not persisted")
+                    check(saved?.schema==3 && saved?.records[req.requestID.uuidString]?.metadataFieldsOnly == true && saved?.records[req.requestID.uuidString]?.contentDigest == nil, "metadata scope must not assert observed membership")
                 }
                 cases.append("\(intent.rawValue)/\(mode)")
             }
@@ -160,6 +172,24 @@ private final class MetadataMusic: MusicTransport, MusicReadTransport, MusicWrit
             }
             preconditionFailure("ledger allowed digest mutation")
         } catch CredentialError.uncertainLocalState { cases.append("immutable_digest") }
+        // Historical records keep their original membership witness and are not reinterpreted.
+        do {
+            let repository=try FixtureRepository(),provider=MetadataMusic(.reordered)
+            let receipts=FileMusicWriteJournal(directory:root.appendingPathComponent("legacy-membership"))
+            let epoch=UUID(),request=try MusicWriteRequest(requestID:UUID(),intent:.updatePlaylistName,name:"Synthetic playlist",playlistID:provider.id,value:"Legacy renamed")
+            let original=["1","3"].map {MusicReadSong(songID:String(repeating:$0,count:32),name:"Synthetic song",url:nil,visible:true)}
+            let witness=try MusicWriteRequest.contentsDigest(original)
+            try receipts.transaction {ledger in
+                ledger.epochs[repository.reference.id.uuidString]=epoch
+                ledger.records[request.requestID.uuidString] = .init(request:request,reference:repository.reference.id,epoch:epoch,baseline:[provider.id],contentDigest:witness)
+            }
+            provider.title="Legacy renamed";provider.writes=1
+            let service=CredentialOnboarding(repository:repository,validator:FixtureValidator(),music:provider,writeJournal:receipts)
+            let result=try await service.consumeWrite(repository.reference,request:request)
+            check(result.state == .readbackFailed && provider.writes==1,"legacy membership receipt must retain its original witness without replay")
+            check(try receipts.inspect()?.schema==1,"legacy receipt cannot silently migrate to metadata-only semantics")
+            cases.append("legacy_membership_witness_preserved")
+        }
         for (intent, value) in [(MusicWriteRequest.Intent.updatePlaylistName, "-bad"), (.updatePlaylistDescription, "\u{0}"), (.updatePlaylistDescription, String(repeating: "x", count: 1001))] {
             do { _ = try MusicWriteRequest(requestID: UUID(), intent: intent, name: clear.name, playlistID: clear.playlistID, value: value);preconditionFailure("invalid value") }
             catch CredentialError.invalidInput { cases.append("invalid_value") }

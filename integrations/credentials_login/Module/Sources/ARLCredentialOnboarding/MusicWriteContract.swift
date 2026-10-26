@@ -155,7 +155,8 @@ struct MusicWriteRecord: Codable, Equatable, Sendable {
     let epoch: UUID
     let baseline: [String]
     var baselineSongIDs: [String]? = nil
-    var contentDigest: String? = nil // Exact ordered song IDs for metadata-only writes.
+    var contentDigest: String? = nil // Legacy metadata writes observed exact ordered song IDs.
+    var metadataFieldsOnly: Bool? = nil // Schema 3: attest only the requested metadata, without a membership claim.
     // Persisted before the effect. An interrupted pending record permits reads
     // only, including when the provider never actually received the effect.
     var effectDisposition: MusicEffectDisposition? = nil // Missing on historical records stays unknown.

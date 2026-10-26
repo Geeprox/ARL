@@ -33,6 +33,8 @@ import Foundation
         for args: [String: Any] in [[:], ["limit":500,"offset":100000]] {
             _ = try MusicLibraryReadRequest(toolName:"mio_netease_playlist_collected",argumentsJSON:JSONSerialization.data(withJSONObject:args))
         }
+        _ = try MusicLibraryReadRequest(toolName:"mio_netease_search_album",argumentsJSON:JSONSerialization.data(withJSONObject:["keyword":"Synthetic","offset":100000,"limit":20]))
+        try MusicReadRequest.playlistDetailPage(playlistID:String(repeating:"a",count:32),offset:100000).validate()
         _ = try MusicLibraryReadRequest(toolName:"mio_netease_playlist_get_tags",argumentsJSON:Data("{}".utf8))
         print("PASS: actual bridge/CLI fixtures decoded; \(invalid.count) invalid native inputs rejected, collection defaults/max/large offset and parameterless tags accepted; no real credentials/network")
     }

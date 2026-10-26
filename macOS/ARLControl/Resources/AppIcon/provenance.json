@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "asset": "ARL soft orange",
+  "origin": "user-approved existing image; deterministic extraction",
+  "original_preview_sha256": "06ae180632127b5c3897521a0cb07c2b87806d64f3237ac32b0e2895cba14b63",
+  "crop_xywh": [
+    79,
+    105,
+    650,
+    650
+  ],
+  "approved_crop_sha256": "23adf7bfb705e984b484a0c267abc58892c73ccf7f8335b67661bfbcd4f1104f",
+  "master_sha256": "5a541dd80dee29ea39a62bc8e725862afd9e37d3e2c39c6c2d79a304eca44989",
+  "icns_sha256": "4000f5bc9d2491ad3c77858e6e9c2a77f1db781cf5bd7fab34ced2da3439f78b",
+  "master_size": [
+    1024,
+    1024
+  ],
+  "master_alpha": true,
+  "native_tile_resample": 860,
+  "canvas_offset": [
+    82,
+    82
+  ],
+  "verification": {
+    "opaque_pixels_copied_exactly": 378155,
+    "source_size": [
+      650,
+      650
+    ],
+    "alpha_boundary": "original_peach_outline",
+    "canvas_label_and_external_shadow_removed": true,
+    "rgb_modified_inside_mask": 0,
+    "outline_rows": 628
+  },
+  "generator": "script/make_app_icon.py"
+}

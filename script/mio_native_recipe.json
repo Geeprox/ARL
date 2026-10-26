@@ -9,7 +9,7 @@
   "sources": [
     {
       "path": "integrations/mio_apple/Consumer.swift",
-      "sha256": "80e763941665671048ae8cbced7d1c5ab9d41ca227fff2ced229c362a3f68c1c"
+      "sha256": "660dda8c31a05a17963b8f9a37725305c731841b2644b3afa0bd76e1f77fe94b"
     },
     {
       "path": "integrations/mio_apple/Host.swift",
@@ -17,7 +17,7 @@
     },
     {
       "path": "integrations/mio_apple/MioReadCatalog.swift",
-      "sha256": "6b49f1e74241b418a68023f6f2924d6905adc62dac80b9f7a483f6500f4232b4"
+      "sha256": "5c81aec9121889ac5427e5ed861bc201b7f520855dab68be946819e6af4382b5"
     },
     {
       "path": "integrations/mio_apple/MioReadOwnerAdapter.swift",
@@ -85,7 +85,7 @@
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadWire.swift",
-      "sha256": "ab673a62f6e7311ea465067583e7177500e84018f6fa48c1447e4ea08e9a41fe"
+      "sha256": "96928e80b4b13494f69ba96901adb268f08fa66cf87c53f544939d63016a62c6"
     },
     {
       "path": "integrations/credential_read_owner/AppleCapability.swift",

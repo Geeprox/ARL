@@ -92,7 +92,8 @@ final class NotesDirectBackend {
         let folder = try folderRef(scope.folder), total = try count(note, folder)
         guard offset>=0,(1...50).contains(limit) else {throw AppleDirectFault("invalid_arguments")}
         var rows: [NotesDirectRow] = [], scanned = 0
-        for index in min(offset,total)..<min(total,offset+200) {
+        let start=min(offset,total),end=min(offset,total)+min(200,total-min(offset,total))
+        for index in start..<end {
             try scope.validate(); try check()
             let indexed = try AppleDirectDescriptor.indexed(note, index: index + 1, parent: folder)
             scanned += 1

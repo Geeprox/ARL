@@ -15,6 +15,7 @@ const cases=Object.keys(specs).map(operation=>({operation,scenario:'success'})).
  {operation:'artist_songs',scenario:'artist_bad_start'},{operation:'artist_songs',scenario:'artist_secret_message'},
  {operation:'album_collected',scenario:'contradictory_count'},
  {operation:'playlist_collected',scenario:'success',arguments:{},public_arguments:{}},
+ {operation:'search_album',scenario:'success',arguments:{...specs.search_album.arguments,offset:'100000'},public_arguments:{...specs.search_album.public_arguments,offset:100000}},
  {operation:'playlist_collected',scenario:'wrong_path'},
  {operation:'playlist_get_tags',scenario:'wrong_method'},
  {operation:'playlist_get_tags',scenario:'http403'},
@@ -25,10 +26,21 @@ for(const c of cases){
  const input={schema:1,operation:c.operation,call_id:call,credential,network_allowed:true,arguments:args};
  const p=cp.spawnSync(process.execPath,['--no-warnings','--experimental-loader',path.join(__dirname,'fixtures/NetEaseLibraryLoader.mjs'),path.join(__dirname,'fixtures/NetEaseLibraryBridgeChild.cjs'),candidate,path.join(runtime,'Bridge')],{input:JSON.stringify(input),env:{PATH:'/usr/bin:/bin',TMPDIR:'/tmp',LANG:'C',ARL_LIBRARY_SPECS:specFile,ARL_LIBRARY_OPERATION:c.operation,ARL_LIBRARY_SCENARIO:c.scenario,ARL_LIBRARY_ARGUMENTS:JSON.stringify(args)},encoding:'utf8',timeout:15000,maxBuffer:2097152});
  input.credential='';
- assert.equal(p.status,0,JSON.stringify({case:c,status:p.status,stderr:p.stderr?.slice(-1000)}));
+ assert.equal(p.status,0,JSON.stringify({case:c,status:p.status,stderr:p.stderr?.slice(-1000),events:p.stdout?.split('\n').filter(Boolean).map(line=>{try{const f=JSON.parse(line);return {event:f.event,code:f.code,reason:f.reason};}catch{return {invalid_frame:true}}})}));
  const frames=p.stdout.trim().split('\n').map(s=>JSON.parse(s,(_k,v,c)=>typeof v==='number'&&Number.isInteger(v)&&!Number.isSafeInteger(v)?JSON.rawJSON(c.source):v)),end=frames.filter(f=>f.event==='read_complete');p.stdout='';
  assert.equal(end.length,1,JSON.stringify({case:c,events:frames.map(f=>({event:f.event,kind:f.kind,code:f.code}))}));
- const result=end[0].result;
+ let result=end[0].result;
+ if(result===undefined){
+  const parts=frames.filter(f=>f.event==='read_result_part');assert(parts.length>0);
+  for(const [i,part] of parts.entries()){
+   assert.equal(part.part,i);assert.equal(part.parts,parts.length);assert.equal(part.sha256,end[0].result_sha256);
+   assert.equal(part.call_id,call);assert(Buffer.from(part.payload,'base64').length<=65536);
+  }
+  const bytes=Buffer.concat(parts.map(f=>Buffer.from(f.payload,'base64')));
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),end[0].result_sha256);
+  result=JSON.parse(bytes.toString('utf8'),(_k,v,c)=>typeof v==='number'&&Number.isInteger(v)&&!Number.isSafeInteger(v)?JSON.rawJSON(c.source):v);
+  bytes.fill(0);
+ }
  if(c.scenario==='success'){
   assert.equal(result.state,'authorized_read',JSON.stringify({case:c,result}));
   assert.equal(result.payload.complete,false);const r=result.payload.library;
@@ -48,7 +60,7 @@ for(const c of cases){
   assert.equal(result.payload.library.provider_record.fields.data.recordCount,0);
   assert.equal(result.payload.complete,false);
  } else if(c.scenario==='http403')assert.equal(result.state,'provider_rejected');
- else if(c.scenario==='oversize'){assert.equal(result.state,'contract_rejected');assert.equal(result.failure.reason,'response_too_large');assert.equal(result.failure.output_limit_bytes,262144);}
+ else if(c.scenario==='oversize'){assert.equal(result.state,'authorized_read');assert.equal(result.payload.complete,false);assert(frames.some(f=>f.event==='read_result_part'));assert.equal(result.payload.library.provider_record.fields.data.padding,'Z'.repeat(280000));assert.equal(result.payload.library.provider_record.fields.data.accessToken,undefined);}
  else assert.equal(result.state,'contract_rejected');
  fixtures.push({tool:'mio_netease_'+c.operation,arguments:c.public_arguments??specs[c.operation].public_arguments,operation:c.operation,result,correlation_id:call});
  reports.push({...c,state:result.state,reason:result.failure?.reason??null,child_closed:true});

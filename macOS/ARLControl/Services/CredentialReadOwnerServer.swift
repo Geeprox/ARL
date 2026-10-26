@@ -317,7 +317,7 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
             var pageOffset: Int?
             if ["mio_netease_playlist_list", "mio_netease_playlist_describe"].contains(request.tool), let value = args["offset"] {
                 guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
-                      number.doubleValue.rounded() == number.doubleValue, (0...99999).contains(number.doubleValue)
+                      number.doubleValue.rounded() == number.doubleValue, (0...9_007_199_254_740_991).contains(number.doubleValue)
                 else { throw OwnerReadFault.invalid }
                 pageOffset = number.intValue
             }

@@ -179,14 +179,15 @@ struct MusicRuntimeClient: MusicTransport, MusicReadTransport, MusicWriteTranspo
         let cancellation = MusicCancellation()
         let trace=MusicDiagnostics.current ?? MusicDiagnosticTrace(requestID: MusicReadRequestContext.requestID)
         let budget=MusicSearchReadDeadline.current
-        let verification=MusicReadPurpose.verification
+        let verification=MusicReadPurpose.verification, metadataOnly=MusicReadPurpose.metadataOnly
         return try await withTaskCancellationHandler {
             try await Task.detached {
                 try MusicDiagnostics.$current.withValue(trace) {
                 let reply = try MusicReadPurpose.$verification.withValue(verification) {
+                try MusicReadPurpose.$metadataOnly.withValue(metadataOnly) {
                 try MusicSearchReadDeadline.$current.withValue(budget) {
                     try executeWithCleanup(owned, operation: .status, readRequest: request, cancellation: cancellation, onLoginURL: { _ in })
-                } }
+                } } }
                 guard let result = reply.readResult else { reply.credential.clear(); throw CredentialError.uncertainLocalState }
                 return MusicReadRuntimeResult(result: result, credential: reply.credential)
                 }
@@ -245,8 +246,11 @@ struct MusicRuntimeClient: MusicTransport, MusicReadTransport, MusicWriteTranspo
         if let readRequest {
             try MusicEnvelope.validate(bytes, requireOfficial: true)
             request["arguments"] = readRequest.arguments
+            if MusicReadPurpose.metadataOnly {
+                var arguments=readRequest.arguments;arguments["metadata_only"]="true";request["arguments"]=arguments
+            }
             if MusicReadPurpose.verification {
-                var arguments = readRequest.arguments
+                var arguments = request["arguments"] as? [String:String] ?? readRequest.arguments
                 arguments["verification"] = "true"
                 request["arguments"] = arguments
             }
@@ -497,7 +501,7 @@ struct MusicRuntimeClient: MusicTransport, MusicReadTransport, MusicWriteTranspo
                             rawResult = raw
                         }
                         try MusicEnvelope.validate(data, requireOfficial: true)
-                        let readResult = try MusicReadProtocol.decode(rawResult, for: readRequest, correlationID: UUID(uuidString: callID),verification:MusicReadPurpose.verification)
+                        let readResult = try MusicReadProtocol.decode(rawResult, for: readRequest, correlationID: UUID(uuidString: callID),verification:MusicReadPurpose.verification,metadataOnly:MusicReadPurpose.metadataOnly)
                         result = .init(state: readResult.connectionState,
                                        credential: try CredentialInput(purpose: .neteaseMusic, data: data), readResult: readResult)
                     } else {

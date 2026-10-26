@@ -1038,7 +1038,6 @@ public actor CredentialOnboarding {
                 _ = finishMusicOperation(); return .init(.outcomeUnknown, request: request)
             }
             var baselineSongIDs: [String]?
-            var metadataDigest: String?
             let preflightStarted = ProcessInfo.processInfo.systemUptime
             let owned = try await writeReadStep(reference, request: .userPlaylists)
             guard owned.state == .authorizedRead, owned.providerResult == nil, let payload = owned.payload else {
@@ -1062,8 +1061,8 @@ public actor CredentialOnboarding {
                 guard playlists.contains(where: { $0.playlistID == request.playlistID && $0.name == request.name }) else {
                     _ = finishMusicOperation(); return .init(payload.complete ? .targetMismatch : .incompleteRead, request: request)
                 }
-                let before = try await writeReadStep(reference, request: .playlistDetail(playlistID: request.playlistID!))
-                guard before.state == .authorizedRead, before.providerResult == nil, let detail = before.payload, detail.complete, detail.songs != nil else {
+                let before = try await writeReadStep(reference, request: .playlistDetail(playlistID: request.playlistID!), metadataOnly: request.isMetadataUpdate)
+                guard before.state == .authorizedRead, before.providerResult == nil, let detail = before.payload, request.isMetadataUpdate ? (detail.metadataVerified == true || detail.complete) : (detail.complete && detail.songs != nil) else {
                     _ = finishMusicOperation(); return musicReadStopped(.incompleteRead, request: request, read: before, stage: "preflight")
                 }
                 guard detail.playlist?.playlistID == request.playlistID, detail.playlist?.name == request.name else {
@@ -1082,9 +1081,9 @@ public actor CredentialOnboarding {
                 }
                 if request.isMetadataUpdate {
                     guard request.intent != .updatePlaylistDescription ||
-                        (MusicWriteRequest.playlistDescription(detail.playlist) != nil && MusicWriteRequest.playlistDescription(detail.playlist) == MusicWriteRequest.playlistDescription(verified.playlist))
+                        MusicWriteRequest.playlistDescription(verified.playlist) != nil
                     else { _ = finishMusicOperation(); return .init(.incompleteRead, request: request, readbackState: "description_unavailable_or_changed") }
-                    metadataDigest = try MusicWriteRequest.contentsDigest(verified.songs!)
+                    // This operation changes metadata; it makes no membership-preservation claim.
                 }
                 if request.intent == .appendSong, let matched = verified.songs?.first(where: { song in
                     song.songID == request.songID || cloudResource.map { target in MusicCloudResource(song)?.sameFileIdentity(as: target.resource) == true } == true
@@ -1107,7 +1106,7 @@ public actor CredentialOnboarding {
                   cloudResource.map({ musicSearchNow() >= $0.observedAt && musicSearchNow() - $0.observedAt <= 90 }) ?? true else {
                 _ = finishMusicOperation(); return .init(.incompleteRead, request: request)
             }
-            var record = MusicWriteRecord(request: request, reference: reference.id, epoch: epoch, baseline: playlists.map(\.playlistID), baselineSongIDs: baselineSongIDs, contentDigest: metadataDigest, cloudResource: cloudResource)
+            var record = MusicWriteRecord(request: request, reference: reference.id, epoch: epoch, baseline: playlists.map(\.playlistID), baselineSongIDs: baselineSongIDs, contentDigest: nil, metadataFieldsOnly: request.isMetadataUpdate ? true:nil, cloudResource: cloudResource)
             try Task.checkCancellation()
             let lease = try repository.lease(reference); defer { lease.secret.clear() }
             if recovering {
@@ -1216,13 +1215,13 @@ public actor CredentialOnboarding {
             retry.reconciled = result; retries.records[requestID.uuidString] = retry
         }
     }
-    private func writeReadStep(_ reference: CredentialReference, request: MusicReadRequest) async throws -> MusicReadResult {
+    private func writeReadStep(_ reference: CredentialReference, request: MusicReadRequest, metadataOnly: Bool = false) async throws -> MusicReadResult {
         guard let musicReads else { throw CredentialError.deploymentNotApproved }
         try Task.checkCancellation()
         let lease = try repository.lease(reference); defer { lease.secret.clear() }
         musicProcessBarrier = musicReads as? any MusicProcessBarrier
         let reply = try await MusicReadPurpose.$verification.withValue(true) {
-            try await musicReads.sendRead(lease.secret, request: request)
+            try await MusicReadPurpose.$metadataOnly.withValue(metadataOnly) {try await musicReads.sendRead(lease.secret, request: request)}
         }; defer { reply.credential.clear() }
         guard finishMusicOperation(releaseSlot: false) else { throw MusicReadRuntimeFailure.cleanupUnproven }
         _ = try commitMusicLease(reference, input: reply.credential, result: .init(reply.result.connectionState), expectedGeneration: lease.metadata.generation)
@@ -1250,7 +1249,7 @@ public actor CredentialOnboarding {
             target = candidates[0].playlistID
         }
         guard let target else { return unknown }
-        let read = try await writeReadStep(reference, request: .playlistDetail(playlistID: target))
+        let read = try await writeReadStep(reference, request: .playlistDetail(playlistID: target), metadataOnly: record.metadataFieldsOnly == true)
         guard read.state == .authorizedRead, read.providerResult == nil, let payload = read.payload else {
             return .init(.readbackFailed, request: request, playlistID: target, providerResult: record.providerResult,
                          readbackFailure: read.failure, readbackProviderResult: read.providerResult ?? read.failure?.providerResult ?? read.payload?.pagination?.terminalObservations?.last, readbackState: read.state.rawValue)
@@ -1258,11 +1257,11 @@ public actor CredentialOnboarding {
         guard payload.playlist?.playlistID == target, payload.playlist?.name == (request.intent == .updatePlaylistName ? request.value : request.name) else {
             return .init(.targetMismatch, request: request, providerResult: record.providerResult, readbackState: "target_mismatch")
         }
-        guard payload.complete, (request.intent == .createPlaylist || payload.songs != nil) else {
+        guard record.metadataFieldsOnly == true ? (payload.metadataVerified == true || payload.complete) : (payload.complete && (request.intent == .createPlaylist || payload.songs != nil)) else {
             return musicReadStopped(.incompleteRead, request: request, read: read, stage: "readback", providerResult: record.providerResult)
         }
         if request.isMetadataUpdate {
-            guard try MusicWriteRequest.contentsDigest(payload.songs!) == record.contentDigest else {
+            guard try record.metadataFieldsOnly == true || MusicWriteRequest.contentsDigest(payload.songs!) == record.contentDigest else {
                 return .init(.readbackFailed, request: request, providerResult: record.providerResult, readbackState: "playlist_contents_changed")
             }
             if request.intent == .updatePlaylistDescription {

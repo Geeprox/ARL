@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1072,
+  "source_files": 1074,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -10,7 +10,7 @@
   "reviewed_pattern_matches": [
     {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "ecd4afeef01d7b8e1787e3f6050ab78dc384f5e8546f8d9450a23728d491576b",
+      "sha256": "68d425d49132c71cc94a691e73efad29e60e4eb70222773534f11079141c2cf4",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -908,7 +908,7 @@
     },
     {
       "path": "script/export_public_source.py",
-      "sha256": "706c22d6550f9a8120e7e2787ba0db8746f5656c7ff5f8e5689c9e9cfd4b948e",
+      "sha256": "2f071e6adc7c6aecf1dbb1b5e773d46e8617b3dd4e71273a4b8d3de63b4a6646",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }

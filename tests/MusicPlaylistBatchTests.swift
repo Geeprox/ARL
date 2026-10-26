@@ -58,7 +58,9 @@ private final class BatchMusic: MusicTransport, MusicReadTransport, MusicWriteTr
                 if writes > 0 { postEffectCreatedReads += 1 }
                 if writes > 0 && createdReadFails { return .init(result:.init(state:.providerUnavailable,session:.present,payload:nil),credential:try copy(secret)) }
                 payload = .init(songs:nil,playlists:writes > 0 && !createdTargetAvailable ? []:[p],playlist:nil,complete:writes > 0 ? createdComplete : true)
-            case .playlistDetail: payload = .init(songs:songs.map{.init(songID:$0,name:"Synthetic song",url:nil,visible:true)},playlists:nil,playlist:p,complete:mode != .incomplete)
+            case .playlistDetail:
+                if MusicReadPurpose.metadataOnly {payload = .init(songs:nil,playlists:nil,playlist:p,complete:false,metadataVerified:mode == .incomplete ? nil:true)}
+                else {payload = .init(songs:songs.map{.init(songID:$0,name:"Synthetic song",url:nil,visible:true)},playlists:nil,playlist:p,complete:mode != .incomplete)}
             default: throw CredentialError.invalidInput
             }
             return .init(result:.init(state:.authorizedRead,session:.present,payload:payload),credential:try copy(secret))
@@ -101,7 +103,7 @@ private final class BatchMusic: MusicTransport, MusicReadTransport, MusicWriteTr
                 let owner=CredentialOnboarding(repository:repo,validator:FixtureValidator(),music:music,writeJournal:journal)
                 let req=try MusicWriteRequest(requestID:UUID(),intent:intent,name:"Synthetic playlist",playlistID:music.id,songIDs:intent == .updatePlaylistTags ? nil:wanted,tags:intent == .updatePlaylistTags ? ["流行","摇滚"]:nil)
                 let first=try await owner.consumeWrite(repo.reference,request:req)
-                let expected: MusicWriteResult.State = mode == .incomplete ? .incompleteRead : mode == .notDispatched ? .notDispatched : [.success,.lostAfter].contains(mode) ? .verified : .readbackFailed
+                let expected: MusicWriteResult.State = mode == .incomplete ? .incompleteRead : mode == .notDispatched ? .notDispatched : ([.success,.lostAfter].contains(mode) || intent == .updatePlaylistTags && mode == .damagedExisting) ? .verified : .readbackFailed
                 precondition(first.state == expected,"\(intent)/\(mode): \(first.state)")
                 let calls=music.writes
                 let persisted=try FileMusicWriteJournal(directory:directory).inspect()!
@@ -130,11 +132,11 @@ private final class BatchMusic: MusicTransport, MusicReadTransport, MusicWriteTr
             let owner=CredentialOnboarding(repository:repo,validator:FixtureValidator(),music:music,writeJournal:journal)
             let req=try MusicWriteRequest(requestID:UUID(),intent:.updatePlaylistTags,name:"Synthetic playlist",playlistID:music.id,tags:["华语","流行"])
             let result=try await owner.consumeWrite(repo.reference,request:req)
-            let verified=["detail_null_created_tags","lost_after_effect","partial_inventory_target_present"].contains(scenario)
+            let verified=["detail_null_created_tags","lost_after_effect","partial_inventory_target_present","contents_changed"].contains(scenario)
             let expected: MusicWriteResult.State = verified ? .verified : scenario == "created_missing" ? .targetMismatch : .readbackFailed
             precondition(result.state == expected,"tag source \(scenario): \(result.state)")
             if verified { precondition(result.readbackState == "verified_tags_from_created" && result.readbackProviderResult?.fields["tags"] == .array([.text("华语"),.text("流行")])) }
-            if scenario == "known_detail_conflict" || scenario == "contents_changed" { precondition(music.postEffectCreatedReads == 0) }
+            if scenario == "known_detail_conflict" { precondition(music.postEffectCreatedReads == 0) }
             let calls=music.writes
             _=try await owner.reconcileWrite(repo.reference,requestID:req.requestID)
             precondition(music.writes == calls,"tag reconciliation resent effect")

@@ -343,7 +343,7 @@ function fitPlaylistReadFrame(data) {
     pagination:{...page,state:'budget_exhausted',items:count,next_offset:page.offset+count}}}});
   let low=1,high=rows.length-1,best=0;
   while(low<=high){const count=Math.floor((low+high)/2);
-    if(page.offset+count<=99999&&size(candidate(count))<=MAX*2){best=count;low=count+1;}else high=count-1;
+    if(Number.isSafeInteger(page.offset+count)&&size(candidate(count))<=MAX*2){best=count;low=count+1;}else high=count-1;
   }
   check(best>0,'response_limit');
   return candidate(best);
@@ -1080,6 +1080,9 @@ function observeCloudMetadata(reply) {
 }
 // END CLOUD_METADATA_OBSERVATION
 
+function requiredReadStages(operation,metadataOnly=false) {
+  return operation==='playlist_detail'&&!metadataOnly?['playlist_detail','tracks']:[operation];
+}
 function projectReadManifestReply(reply) {
   check(readContext&&readOperations.has(readContext.operation)&&!readContext.isWrite,'invalid_manifest');
   check(object(reply)&&object(reply.manifests)&&Object.keys(reply.manifests).length<=128,'invalid_manifest');
@@ -1088,7 +1091,7 @@ function projectReadManifestReply(reply) {
   // Build the exact command we consume. Unused provider annotations, defaults
   // and transforms are neither interpreted nor passed to Commander.
   const result={notices:[],manifests:{root:{methods:[],sub_resources:[]}}};
-  const selected=readContext.operation==='playlist_detail'?['playlist_detail','tracks']:[readContext.operation];
+  const selected=requiredReadStages(readContext.operation,readContext.metadataOnly);
   for(const operation of selected) {
     const spec=READ_SPECS[operation];
     const groups=root.sub_resources.filter(row=>object(row)&&row.name===spec.group);
@@ -1202,7 +1205,7 @@ function validateManifests(cache) {
   const all=cache.manifests,root=all.root;
   check(object(root)&&Array.isArray(root.sub_resources),'invalid_manifest_root');
   const selected={};
-  for(const operation of (readContext.operation==='playlist_detail'?['playlist_detail','tracks']:[readContext.operation])) {
+  for(const operation of (requiredReadStages(readContext.operation,readContext.metadataOnly))) {
     const spec=READ_SPECS[operation];
     const groups=root.sub_resources.filter(row=>object(row)&&row.name===spec.group);
     check(groups.length===1&&typeof groups[0].path==='string'&&groups[0].path.length<=128,'ambiguous_read_group');
@@ -1600,7 +1603,7 @@ function validateLibraryArguments(operation,args) {
     else {
       check(/^(0|[1-9][0-9]{0,15})$/.test(value)&&Number.isSafeInteger(Number(value)),'invalid_read_arguments');
       if(key==='limit')check(Number(value)>=1&&Number(value)<=(operation==='playlist_collected'?500:100),'invalid_read_arguments');
-      if(key==='offset'&&operation!=='playlist_collected')check(Number(value)<=99999,'invalid_read_arguments');
+      if(key==='offset')check(Number.isSafeInteger(Number(value)),'invalid_read_arguments');
     }
   }
   if(operation==='artist_songs')check(Number(args.startTime)<=Number(args.endTime),'invalid_read_arguments');
@@ -1659,6 +1662,15 @@ function projectReadValue(raw,operation,offset=0) {
   return {items,total,hasMore,complete:hasMore===false||total===offset+items.length};
 }
 // BEGIN BOUNDED_PAGINATION: the production command loop calls this exact helper.
+async function collectPlaylistMetadata(invoke) {
+  const before=await invoke('playlist_detail'),after=await invoke('playlist_detail');
+  const description=row=>{const fields=row.provider_record?.fields??{};
+    const values=['describe','description','desc'].filter(k=>Object.hasOwn(fields,k)).map(k=>fields[k]===null?'':fields[k]);
+    return values.length&&values.every(v=>typeof v==='string'&&v===values[0])?values[0]:null;};
+  const witness=row=>({playlist_id:row.playlist_id,name:row.name,description:description(row)});
+  check(JSON.stringify(witness(before))===JSON.stringify(witness(after)),'playlist_metadata_changed');
+  return after;
+}
 async function collectMusicPages(fetchPage,{kind,pageSize,maxPages=Infinity,maxItems=Infinity,maxBytes=98304,expectedTotal=null,withinBudget=()=>true,startOffset=0}) {
   async function sweep() {
     const items=[],seen=new Set(),observations=[];let total=expectedTotal,pages=0,itemBytes=2;
@@ -1769,7 +1781,10 @@ function installReadCommandBoundary(commander) {
     const verificationBudget=readContext.verification?{maxBytes:Infinity}:{};
     if(readContext.operation==='user_playlists')readContext.results.user_playlists=await collectMusicPages(offset=>invoke('user_playlists',offset),
       {kind:'playlist',pageSize:50,...verificationBudget,withinBudget,startOffset:Number(readContext.arguments.offset||'0')});
-    else if(readContext.operation==='playlist_detail') {
+    else if(readContext.operation==='playlist_detail'&&readContext.metadataOnly) {
+      readContext.results.playlist_detail=await collectPlaylistMetadata(invoke);
+      readContext.results.metadata_verified=true;
+    } else if(readContext.operation==='playlist_detail') {
       const before=await invoke('playlist_detail');readContext.results.playlist_detail=before;
       readContext.validatedPlaylist=true;readContext.validatedPlaylistTrackCount=before.track_count??null;
       readContext.results.tracks=await collectMusicPages(offset=>invoke('tracks',offset),
@@ -1909,6 +1924,8 @@ function finish(request) {
       if(libraryOperations.has(readContext.operation)&&results[readContext.operation])payload={library:results[readContext.operation],complete:false};
       if(readContext.operation==='cloud_songs'&&results.cloud_songs)payload=results.cloud_songs;
       if(readContext.operation==='user_playlists'&&results.user_playlists)payload={playlists:results.user_playlists.items,complete:results.user_playlists.complete,pagination:results.user_playlists.pagination};
+      if(readContext.operation==='playlist_detail'&&results.playlist_detail&&results.metadata_verified===true)
+        payload={playlist:results.playlist_detail,complete:false,metadata_verified:true};
       if(readContext.operation==='playlist_detail'&&results.playlist_detail&&results.tracks) {
         const count=results.playlist_detail.track_count;
         if(results.tracks.total!==null&&count!==undefined&&results.tracks.total!==count)readFailure('contract_rejected',{reason:'result_schema_invalid',stage:'projection',localCode:READ_CONTRACT_CODES.inconsistent_result_total,httpStatus:readContext.activeHTTPStatus});
@@ -1990,9 +2007,14 @@ try {
       check(['user_playlists','playlist_detail'].includes(request.operation)&&request.arguments.verification==='true'&&!pageOffset,'invalid_read_arguments');
       delete request.arguments.verification;
     }
+    const metadataOnly=Object.hasOwn(request.arguments,'metadata_only');
+    if(metadataOnly){
+      check(verification&&request.operation==='playlist_detail'&&request.arguments.metadata_only==='true'&&!pageOffset,'invalid_read_arguments');
+      delete request.arguments.metadata_only;
+    }
     if(libraryOperations.has(request.operation))validateLibraryArguments(request.operation,request.arguments);
     check(keys(request.arguments,libraryOperations.has(request.operation)?Object.keys(request.arguments):batchOperations.has(request.operation)?['playlist_id',request.operation==='playlist_update_tags'?'tags':'song_ids']:metadataOperations.has(request.operation)?['playlist_id','value']:request.operation==='playlist_cover'?['playlist_id','image_path','image_sha256','image_bytes']:request.operation==='playlist_create'?['name']:request.operation==='playlist_append'?['playlist_id','song_id']:request.operation==='search'?(pageOffset?['keyword','offset']:['keyword']):request.operation==='cloud_songs'?['cursor','limit'].filter(k=>Object.hasOwn(request.arguments,k)):request.operation==='playlist_detail'?(pageOffset?['playlist_id','offset']:['playlist_id']):request.operation==='user_playlists'&&pageOffset?['offset']:[]),'invalid_read_arguments');
-    if(['user_playlists','playlist_detail'].includes(request.operation)&&pageOffset)check(typeof request.arguments.offset==='string'&&/^(0|[1-9][0-9]{0,4})$/.test(request.arguments.offset),'invalid_read_offset');
+    if(['user_playlists','playlist_detail'].includes(request.operation)&&pageOffset)check(typeof request.arguments.offset==='string'&&/^(0|[1-9][0-9]*)$/.test(request.arguments.offset)&&Number.isSafeInteger(Number(request.arguments.offset)),'invalid_read_offset');
     if(request.operation==='playlist_create') {readText(request.arguments.name,400);check([...request.arguments.name].length<=100&&request.arguments.name===request.arguments.name.trim()&&!request.arguments.name.startsWith('-'),'invalid_playlist_name');}
     if(request.operation==='playlist_cover') {
       request.arguments.playlist_id=readID(request.arguments.playlist_id);
@@ -2024,7 +2046,7 @@ try {
     if(request.operation==='cloud_songs'&&Object.hasOwn(request.arguments,'limit'))check(typeof request.arguments.limit==='string'&&/^(?:[1-9]|[1-4][0-9]|50)$/.test(request.arguments.limit),'invalid_read_arguments');
     if(request.operation==='cloud_songs'&&Object.hasOwn(request.arguments,'cursor'))check(validCloudCursor(request.arguments.cursor),'invalid_read_arguments');
     if(request.operation==='playlist_detail')request.arguments.playlist_id=readID(request.arguments.playlist_id);
-    readContext={verification,cover:request.operation==='playlist_cover'?{image:request.coverImage,md5:crypto.createHash('md5').update(request.coverImage).digest('hex'),tokenCount:0,receipts:[],offset:0,chunkAttempts:0}:null,isWrite,effectAttempted:false,operation:request.operation,arguments:request.arguments,results:{},refreshAttempted:false,refreshRejected:false,
+    readContext={verification,metadataOnly,cover:request.operation==='playlist_cover'?{image:request.coverImage,md5:crypto.createHash('md5').update(request.coverImage).digest('hex'),tokenCount:0,receipts:[],offset:0,chunkAttempts:0}:null,isWrite,effectAttempted:false,operation:request.operation,arguments:request.arguments,results:{},refreshAttempted:false,refreshRejected:false,
       refreshCount:0,discoveryCount:0,consumeCount:0,failure:null,pageDeadline:performance.now()+25000};
   }
   check(typeof request.credential==='string'&&request.credential.length<=MAX*2,'invalid_credential_envelope');

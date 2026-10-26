@@ -60,10 +60,11 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
             try validate(ledger)
             let previous = ledger
             let result = try body(&ledger)
-            if previous.schema == 2 || ledger.records.values.contains(where: { $0.cloudResource != nil }) { ledger.schema = 2 }
+            if previous.schema == 3 || ledger.records.values.contains(where: { $0.metadataFieldsOnly == true }) {ledger.schema = 3}
+            else if previous.schema == 2 || ledger.records.values.contains(where: { $0.cloudResource != nil }) { ledger.schema = 2 }
             for (key, old) in previous.records {
                 guard let current = ledger.records[key], current.request == old.request, current.reference == old.reference,
-                      current.epoch == old.epoch, current.baseline == old.baseline, current.baselineSongIDs == old.baselineSongIDs, current.contentDigest == old.contentDigest, current.cloudResource == old.cloudResource,
+                      current.epoch == old.epoch, current.baseline == old.baseline, current.baselineSongIDs == old.baselineSongIDs, current.contentDigest == old.contentDigest, current.metadataFieldsOnly == old.metadataFieldsOnly, current.cloudResource == old.cloudResource,
                       old.result == nil || current.result == old.result else { throw CredentialError.uncertainLocalState }
             }
             // Validate the mutated value before persisting or allowing an effect.
@@ -106,19 +107,19 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
         }
     }
     private func validate(_ ledger: MusicWriteLedger) throws {
-    guard [1,2].contains(ledger.schema), ledger.records.count <= 512, ledger.epochs.count <= 512,
+    guard [1,2,3].contains(ledger.schema), ledger.records.count <= 512, ledger.epochs.count <= 512,
           ledger.records.allSatisfy({ $0.key == $0.value.request.requestID.uuidString })
     else { throw CredentialError.uncertainLocalState }
     var parents = Set<UUID>(), files = Set<String>()
     for record in ledger.records.values {
         try record.request.validate()
-        guard record.request.isMetadataUpdate ? record.contentDigest?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil : record.contentDigest == nil
+        guard record.request.isMetadataUpdate ? (record.metadataFieldsOnly == true ? ledger.schema == 3 && record.contentDigest == nil : record.metadataFieldsOnly == nil && record.contentDigest?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil) : record.contentDigest == nil && record.metadataFieldsOnly == nil
         else { throw CredentialError.uncertainLocalState }
         guard record.request.isSongListUpdate ? record.baselineSongIDs.map({ $0.allSatisfy(MusicReadProtocol.validID) && Set($0).count == $0.count }) == true : record.baselineSongIDs == nil else { throw CredentialError.uncertainLocalState }
         guard record.result?.matchedSongID.map({ record.cloudResource != nil && MusicReadProtocol.validID($0) }) ?? true else { throw CredentialError.uncertainLocalState }
         if let cloud = record.cloudResource {
             try cloud.resource.validate(); try cloud.selectedResource.validate()
-            guard ledger.schema == 2, record.request.intent == .appendSong,
+            guard ledger.schema >= 2, record.request.intent == .appendSong,
                   cloud.selectedResource.sameFileIdentity(as: cloud.resource), cloud.observedAt.isFinite,
                   let parent = ledger.records[cloud.supersedesRequestID.uuidString], parent.cloudResource == nil,
                   parent.request.intent == .appendSong, parent.reference == record.reference, parent.epoch == record.epoch,

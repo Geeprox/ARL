@@ -73,7 +73,7 @@ class Session:
    except (Cancelled,Fault):raise
    if b'\n' in self.buffer:
     raw,_,tail=self.buffer.partition(b'\n');self.buffer=bytearray(tail);self.messages+=1
-    if len(raw)>PROVIDER_FRAME_BYTES or self.messages>2048:raise Fault('invalid_provider_response')
+    if len(raw)>PROVIDER_FRAME_BYTES:raise Fault('invalid_provider_response')
     from .wire import strict_json
     try:d=strict_json(raw)
     except (ValueError,Fault):raise Fault('invalid_provider_response') from None

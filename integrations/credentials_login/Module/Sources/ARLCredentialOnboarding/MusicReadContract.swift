@@ -4,6 +4,7 @@ import CoreFoundation
 /// Only the owner write/recovery path selects compact membership verification.
 enum MusicReadPurpose {
     @TaskLocal static var verification = false
+    @TaskLocal static var metadataOnly = false
 }
 
 /// The signed owner accepts only these bounded reads. No command, URL, HOME,
@@ -46,7 +47,7 @@ public enum MusicReadRequest: Sendable, Equatable {
         }
     }
     func validate() throws {
-        guard (0...99999).contains(paginationOffset) else { throw CredentialError.invalidInput }
+        guard (0...9_007_199_254_740_991).contains(paginationOffset) else { throw CredentialError.invalidInput }
         switch self {
         case .library(let request): try request.validate()
         case .search(let keyword, let offset):
@@ -278,6 +279,7 @@ public struct MusicCloudPage: Codable, Sendable, Equatable {
 public struct MusicReadPayload: Codable, Sendable, Equatable {
     public let songs: [MusicReadSong]?
     public var library: MusicLibraryReadPayload? = nil
+    public var metadataVerified: Bool? = nil
     public let playlists: [MusicReadPlaylist]?
     public let playlist: MusicReadPlaylist?
     /// Two identical bounded list sweeps reached explicit ends. This is
@@ -286,9 +288,10 @@ public struct MusicReadPayload: Codable, Sendable, Equatable {
     public let pagination: MusicReadPagination?
     public let searchPage: MusicSearchPage?
     public let cloudPage: MusicCloudPage?
-    enum CodingKeys: String, CodingKey { case songs, library, playlists, playlist, complete, pagination, searchPage = "search_page", cloudPage = "cloud_page" }
+    enum CodingKeys: String, CodingKey { case songs, library, metadataVerified = "metadata_verified", playlists, playlist, complete, pagination, searchPage = "search_page", cloudPage = "cloud_page" }
     init(songs: [MusicReadSong]?, playlists: [MusicReadPlaylist]?, playlist: MusicReadPlaylist?, complete: Bool,
-         pagination: MusicReadPagination? = nil, searchPage: MusicSearchPage? = nil, cloudPage: MusicCloudPage? = nil) {
+         pagination: MusicReadPagination? = nil, searchPage: MusicSearchPage? = nil, cloudPage: MusicCloudPage? = nil, metadataVerified: Bool? = nil) {
+        self.metadataVerified = metadataVerified
         self.cloudPage = cloudPage
         self.songs = songs; self.playlists = playlists; self.playlist = playlist
         self.complete = complete; self.pagination = pagination; self.searchPage = searchPage
@@ -510,7 +513,7 @@ enum MusicReadProtocol {
         else { try require(integer(raw["offset"]) == offset) }
         let next = integer(raw["next_offset"])
         if let value = raw["next_offset"], !(value is NSNull) {
-            try require(next == offset + count && count > 0 && next! <= 99999 && state == .budgetExhausted && !complete)
+            try require(next == offset + count && count > 0 && state == .budgetExhausted && !complete)
             try require(raw["total"] is NSNull || integer(raw["total"])! > next!)
         }
         try require(complete == (state == .stableObserved))
@@ -524,7 +527,7 @@ enum MusicReadProtocol {
                 guard let f = row["fields"] as? [String: Any], integer(f["http_status"]) == 200, integer(f["code"]) == 200,
                       f["sub_code"] as? String == "10007" || integer(f["sub_code"]) == 10007,
                       f["path"] as? String == "/openapi/music/basic/playlist/song/list/get/v3", f["method"] as? String == "GET",
-                      let endOffset = integer(f["offset"]), (0...99999).contains(endOffset),
+                      let endOffset = integer(f["offset"]), endOffset >= 0,
                       ["terminal_empty","empty_page_count_conflict"].contains(f["classification"] as? String ?? "")
                 else { throw CredentialError.uncertainLocalState }
                 try require(endOffset <= offset + count)
@@ -605,7 +608,7 @@ enum MusicReadProtocol {
                      nextStep:nextStep,outputBytes:outputBytes,outputLimitBytes:outputLimit,providerStatus: try raw["provider_status"].map{try providerStatus($0,resourceMissing:reason == .providerResourceMissing)},
                      providerResult: try raw["provider_result"].map { try providerRecord($0) })
     }
-    static func decode(_ raw: [String: Any], for request: MusicReadRequest, correlationID: UUID? = nil, verification: Bool = false) throws -> MusicReadResult {
+    static func decode(_ raw: [String: Any], for request: MusicReadRequest, correlationID: UUID? = nil, verification: Bool = false, metadataOnly: Bool = false) throws -> MusicReadResult {
         try request.validate()
         let fieldSet = Set(raw.keys).subtracting(["provider_result"])
         try require(fieldSet == ["state","session","payload"] || fieldSet == ["state","session","payload","failure"])
@@ -703,6 +706,13 @@ enum MusicReadProtocol {
             result = .init(songs: nil, playlists: playlists, playlist: nil, complete: complete,
                            pagination: try pagination(payload["pagination"], count: playlists.count, complete: complete, offset: request.paginationOffset))
         case .playlistDetail(let id), .playlistDetailPage(let id, _):
+            if metadataOnly {
+                try require(!complete && Set(payload.keys)==["playlist","complete","metadata_verified"] && bool(payload["metadata_verified"])==true)
+                guard let row=payload["playlist"] as? [String:Any] else{throw CredentialError.uncertainLocalState}
+                let item=try playlist(row);try require(item.playlistID==id.lowercased())
+                result = .init(songs:nil,playlists:nil,playlist:item,complete:false,metadataVerified:true)
+                break
+            }
             try require(Set(payload.keys) == ["playlist","songs","complete","pagination"])
             guard let row = payload["playlist"] as? [String: Any], let rows = payload["songs"] as? [[String: Any]]
             else { throw CredentialError.uncertainLocalState }
@@ -774,7 +784,7 @@ public struct MusicLibraryReadRequest: Sendable, Equatable {
                 guard value.count<=100,MusicReadProtocol.validText(value,limit:400),!value.hasPrefix("-") else {throw CredentialError.invalidInput}
             }
             if key=="limit" {guard let n=Int(value),(1...(operation == .playlistCollected ? 500 : 100)).contains(n) else {throw CredentialError.invalidInput}}
-            if key=="offset" {guard let n=Int64(value),n>=0,n <= (operation == .playlistCollected ? 9_007_199_254_740_991 : 99999) else {throw CredentialError.invalidInput}}
+            if key=="offset" {guard let n=Int64(value),n>=0,n <= 9_007_199_254_740_991 else {throw CredentialError.invalidInput}}
         }
         if let start=parameters["startTime"].flatMap(Int64.init),let end=parameters["endTime"].flatMap(Int64.init),start>end {throw CredentialError.invalidInput}
     }

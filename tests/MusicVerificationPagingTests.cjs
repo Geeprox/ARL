@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const file=path.resolve(__dirname,'../integrations/service_runtime/netease_bridge.cjs');
 const source=fs.readFileSync(file,'utf8').split('\ntry {\n  const request=readRequest();')[0];
-const api=new Function('require','__dirname',source+'\nreturn {collectMusicPages,projectItem,projectCloudSongs,context:value=>{readContext=value;}};')(require,path.dirname(file));
+const api=new Function('require','__dirname',source+'\nreturn {READ_SPECS,projectReadManifestReply,requiredReadStages,collectMusicPages,collectPlaylistMetadata,projectItem,projectCloudSongs,context:value=>{readContext=value;}};')(require,path.dirname(file));
 const id=i=>i.toString(16).padStart(32,'0');
 const records=Array.from({length:32},(_,i)=>({encryptedId:id(i+1),name:'Song '+i,
  ar:[{name:'Artist'}],al:{name:'Album'},extraBusinessField:'x'.repeat(4000)}));
@@ -22,6 +22,26 @@ async function collect(items,extra={}) {
  assert(compact.every(r=>!Object.hasOwn(r,'provider_record')));
  const verified=await collect(compact,{maxBytes:Infinity});
  assert.equal(verified.complete,true);assert.equal(verified.items.length,32);
+ assert.deepEqual(api.requiredReadStages('playlist_detail',true),['playlist_detail']);
+ assert.deepEqual(api.requiredReadStages('playlist_detail',false),['playlist_detail','tracks']);
+ const spec=api.READ_SPECS.playlist_detail;
+ const catalog={manifests:{root:{methods:[],sub_resources:[{name:spec.group,path:spec.group}]},
+  [spec.group]:{methods:[{name:spec.method??'detail',path:spec.path,http_method:spec.httpMethod??'GET',auth_required:true,auth_provider:'netease',parameters:[{name:'playlistId',type:'string',in:'query',required:true}]}],sub_resources:[]}}};
+ api.context({operation:'playlist_detail',metadataOnly:true,isWrite:false,arguments:{playlist_id:id(999)}});
+ assert.equal(api.projectReadManifestReply(catalog).manifests[spec.group].methods.length,1);
+ api.context({operation:'playlist_detail',metadataOnly:false,isWrite:false,arguments:{playlist_id:id(999)}});
+ assert.throws(()=>api.projectReadManifestReply(catalog));
+ const wrongAuth=structuredClone(catalog);wrongAuth.manifests[spec.group].methods[0].auth_required=false;
+ api.context({operation:'playlist_detail',metadataOnly:true,isWrite:false,arguments:{playlist_id:id(999)}});
+ assert.throws(()=>api.projectReadManifestReply(wrongAuth));
+ let metadataCalls=0;
+ const metadata={playlist_id:id(999),name:'Name',track_count:200001,provider_record:{fields:{describe:'Description'}}};
+ const observed=await api.collectPlaylistMetadata(async operation=>{assert.equal(operation,'playlist_detail');metadataCalls++;return metadata;});
+ assert.equal(observed.track_count,200001);assert.equal(metadataCalls,2);
+ let emptyDescriptionRead=0;
+ await api.collectPlaylistMetadata(async()=>({...metadata,provider_record:{fields:{describe:emptyDescriptionRead++===0?null:''}}}));
+ let changed=false;
+ await assert.rejects(()=>api.collectPlaylistMetadata(async()=>({ ...metadata,name:(changed=!changed)?'Before':'After'})),/playlist_metadata_changed/);
  const large=Array.from({length:1101},(_,i)=>({song_id:id(i+1),name:'Song'}));
  assert.equal((await collect(large,{maxBytes:Infinity})).complete,true);
  const continuation=await api.collectMusicPages(async offset=>({items:compact.slice(offset),total:32,hasMore:false}),

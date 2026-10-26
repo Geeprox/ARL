@@ -158,6 +158,14 @@ import Darwin
         } while true
         try expect(reconstructed==long.plaintext,"long UTF8 note is losslessly readable")
         _ = try AppleDirectDescriptor.indexed(0x6e6f7465,index:201,parent:.null())
+        let far=Fixture()
+        let paging=NotesDirectBackend(send:{event,params in
+            if event==0x636e7465,params[0x6b6f636c]?.typeCodeValue==0x6e6f7465 {return .init(int32:5)}
+            return try far.send(event,params)
+        },check:{})
+        let empty=try paging.search(far.scope(),query:"",offset:Int.max,limit:50)
+        try expect(empty.notes.isEmpty && empty.scanned==0 && empty.next_offset==nil,"out-of-range offset ends safely without integer overflow")
+
         let changedBody = Fixture(), q = changedBody.proposal(), bodyHome = try home("body")
         changedBody.html = "<div><b>Synthetic</b></div><div>Changed</div>"; changedBody.plaintext = "Synthetic\nChanged\n"
         try rejects("revision_changed", consumed: false) {

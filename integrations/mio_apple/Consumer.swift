@@ -13,7 +13,7 @@ func validateMioBaseDescriptors(_ tools:[[String:Any]])throws {
           digest(try jsonBytes(Array(tools.prefix(14))))=="27a13fea4e9273a7c128853f1fe9eee3c10dc34a8d84edddf33f645845d06f2a"
     else{throw ReviewFault("legacy_schema_changed")}
     if tools.count==20 {
-        guard digest(try jsonBytes(Array(tools.suffix(6))))=="f5b7a32cb7d77ae41b839385f8a03cd068705fe6e4896e0d27bf2a9327778ad6"
+        guard digest(try jsonBytes(Array(tools.suffix(6))))=="7b8155d81eab9a50cdde83d025a713b12ba3eb9cbee23b897e6cd0e68e48678b"
         else{throw ReviewFault("legacy_schema_changed")}
     }
 }

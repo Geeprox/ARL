@@ -44,13 +44,14 @@ OMIT_FILES={
 HISTORICAL=re.compile(r'(?i)(?:handoff|evidence|verification|approval|provenance|baseline|source-manifest|source-ownership|checkpoint|build-inputs|key-repair|upstream-pins|superseded|deployment-|update-plan|milestone|installed|source-reconciliation|copy-update)')
 SOURCE={'.py','.swift','.c','.h','.cjs','.mjs','.sh','.plist','.entitlements','.toml','.json','.md','.txt','.html','.css','.js','.svg','.yaml','.yml','.patch','.modulemap'}
 DOCS_WITH_PRIVATE_CONTEXT={'docs/FRIDAY-PLANNING-HANDOFF.md','docs/TAOBAO-INSTALLED-VERIFICATION.md','docs/product/MOMENTS-LOCAL-ARCHIVE.md'}
+PUBLIC_SOURCE_RECORDS={'macOS/ARLControl/Resources/AppIcon/provenance.json'}
 
 def selected(name):
  p=Path(name)
  if name in OMIT_FILES or name in DOCS_WITH_PRIVATE_CONTEXT or name.startswith(OMIT_PREFIXES):return False
  if any(part in {'__pycache__','node_modules','dist','module-cache'} or part.endswith('.app') for part in p.parts):return False
- if p.suffix in {'.json','.md'} and HISTORICAL.search(p.name) and name!='OPEN-SOURCE-REVIEW.md':return False
- return p.suffix in SOURCE or p.name in {'.gitignore','LICENSE','LICENSE.proposed','NOTICE','build.sh'} or name.startswith('macOS/ARLControl/Resources/AppIcon/') and p.suffix in {'.png','.icns'}
+ if p.suffix in {'.json','.md'} and HISTORICAL.search(p.name) and name not in PUBLIC_SOURCE_RECORDS|{'OPEN-SOURCE-REVIEW.md'}:return False
+ return p.suffix in SOURCE or p.name in {'.gitignore','LICENSE','LICENSE.proposed','NOTICE','build.sh','Build.command'} or name.startswith('macOS/ARLControl/Resources/AppIcon/') and p.suffix in {'.png','.icns'}
 
 def export(output):
  output=output.resolve()

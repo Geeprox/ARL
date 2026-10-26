@@ -23,6 +23,16 @@ class PayloadBoundaryTests(unittest.TestCase):
             result=self.receive({'method':'item/completed','params':{'text':inner}})
             self.assertEqual(json.loads(result['params']['text'])['text'],text)
 
+    def test_many_valid_notifications_follow_deadline_not_a_lifetime_counter(self):
+        session=Session.__new__(Session)
+        session.buffer=bytearray(b'{"method":"turn/progress","params":{}}\n'*2500)
+        session.messages=0;session.context=None;session.observer=None;session.deadline=time.monotonic()+5
+        for _ in range(2500):self.assertEqual(session.receive()['method'],'turn/progress')
+        self.assertEqual(session.messages,2500)
+        session.buffer.extend(b'{"method":"turn/progress"}\n');session.deadline=time.monotonic()-1
+        with self.assertRaises(Fault) as caught:session.receive()
+        self.assertEqual(caught.exception.code,'provider_deadline_exceeded')
+
     def test_codex_still_bounds_the_actual_provider_frame(self):
         with self.assertRaises(Fault):
             self.receive({'text':'a'*(PROVIDER_FRAME_BYTES+1)})
