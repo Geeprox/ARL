@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arl-runtime"
+version = "0.1.2"
+description = "Local, headless Agent Runtime Layer"
+requires-python = ">=3.9"
+dependencies = []
+
+[project.scripts]
+arl = "arl.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["arl*"]

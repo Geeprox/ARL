@@ -1,0 +1,290 @@
+{
+  "code": 200,
+  "subCode": null,
+  "message": null,
+  "data": {
+    "recordCount": 21,
+    "records": [
+      {
+        "encryptedId": "00000000000000000000000000000001",
+        "name": "Synthetic song 1",
+        "originalId": "1000",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000002",
+        "name": "Synthetic song 2",
+        "originalId": "1001",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000003",
+        "name": "Synthetic song 3",
+        "originalId": "1002",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000004",
+        "name": "Synthetic song 4",
+        "originalId": "1003",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000005",
+        "name": "Synthetic song 5",
+        "originalId": "1004",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000006",
+        "name": "Synthetic song 6",
+        "originalId": "1005",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000007",
+        "name": "Synthetic song 7",
+        "originalId": "1006",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000008",
+        "name": "Synthetic song 8",
+        "originalId": "1007",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000009",
+        "name": "Synthetic song 9",
+        "originalId": "1008",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000a",
+        "name": "Synthetic song 10",
+        "originalId": "1009",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000b",
+        "name": "Synthetic song 11",
+        "originalId": "1010",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000c",
+        "name": "Synthetic song 12",
+        "originalId": "1011",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000d",
+        "name": "Synthetic song 13",
+        "originalId": "1012",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000e",
+        "name": "Synthetic song 14",
+        "originalId": "1013",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "0000000000000000000000000000000f",
+        "name": "Synthetic song 15",
+        "originalId": "1014",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000010",
+        "name": "Synthetic song 16",
+        "originalId": "1015",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000011",
+        "name": "Synthetic song 17",
+        "originalId": "1016",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000012",
+        "name": "Synthetic song 18",
+        "originalId": "1017",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000013",
+        "name": "Synthetic song 19",
+        "originalId": "1018",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      },
+      {
+        "encryptedId": "00000000000000000000000000000014",
+        "name": "Synthetic song 20",
+        "originalId": "1019",
+        "artists": [
+          {
+            "name": "Synthetic artist"
+          }
+        ],
+        "album": {
+          "name": "Synthetic album"
+        },
+        "visible": true
+      }
+    ]
+  }
+}

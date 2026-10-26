@@ -1,0 +1,24 @@
+{
+  "source": "https://developer.music.163.com/st/developer/document?docId=b175e0d52550427cbb7cd4735a9de765",
+  "source_sha256": "44086b7f6c78713fe6181240df7bf1cb3f3b1dec4f0670615c239afabed71feb",
+  "provenance": "Official public response example, allowlisted song metadata; test mutations are synthetic, not live account evidence.",
+  "song": {
+    "id": "1CE4E2A5D6869390649E6FF192436A5F",
+    "name": "陈酒新茶令",
+    "duration": 243487,
+    "artists": [],
+    "fullArtists": [
+      {
+        "id": null,
+        "name": "Assen捷&东篱"
+      }
+    ],
+    "album": {
+      "id": "0E5E42FD4DD36BC27098853AE9BBF2CE",
+      "name": "原创作品集"
+    },
+    "originCoverType": 1,
+    "visible": true,
+    "playFlag": true
+  }
+}

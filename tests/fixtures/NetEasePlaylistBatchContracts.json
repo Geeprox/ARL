@@ -1,0 +1,119 @@
+{
+  "source": "actual official HTTP200 manifest already fetched by the completed public collected read; no new provider call",
+  "at_utc": "2026-10-22T07:39:02.830Z",
+  "record_id": "fbeecd57-1c86-4dc5-87c6-5765c0f20d70",
+  "record_sha256": "a02e8eb1d664ebfea8e3b6a99e1e9760b3033d0bd53dd80444acab908d6c0320",
+  "manifest_body_sha256": "fbf15e3ed06aca9c07d571a1176d82ea1e18cb047ce4807fc8a42c4010805e9b",
+  "business_log_file": "business-1792653821-86761A9E-E3A9-431E-9CEC-D8F8D13DC9B5.jsonl.noindex",
+  "runtime_call_id": "8A8547FF-DF01-4465-A806-D1F62426D176",
+  "methods": {
+    "add": {
+      "name": "add",
+      "description": "向歌单批量添加歌曲",
+      "path": "/openapi/music/basic/playlist/song/batch/like",
+      "parameters": [
+        {
+          "name": "playlistId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密歌单ID，必须是加密ID",
+          "hidden": false
+        },
+        {
+          "name": "songIdList",
+          "in": "query",
+          "type": "array",
+          "required": true,
+          "description": "加密歌曲ID列表, 使用JSON数组字符串格式，如[\"AIHWIHE\"]",
+          "hidden": false
+        }
+      ],
+      "http_method": "POST",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    },
+    "remove": {
+      "name": "remove",
+      "description": "从歌单批量删除歌曲",
+      "path": "/openapi/music/basic/playlist/song/batch/delete",
+      "parameters": [
+        {
+          "name": "playlistId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密歌单ID",
+          "hidden": false
+        },
+        {
+          "name": "songIdList",
+          "in": "query",
+          "type": "array",
+          "required": true,
+          "description": "加密歌曲ID列表，上限 500",
+          "hidden": false
+        }
+      ],
+      "http_method": "POST",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    },
+    "reorder": {
+      "name": "reorder",
+      "description": "调整歌单歌曲顺序",
+      "path": "/openapi/music/basic/playlist/track/order/update",
+      "parameters": [
+        {
+          "name": "playlistId",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "加密歌单ID",
+          "hidden": false
+        },
+        {
+          "name": "trackIds",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "加密歌曲ID列表（JSON数组），需按目标顺序传入，如 [\"encId1\",\"encId2\"]，注意必须包含歌单下的所有歌曲ID，否则可能导致更新后歌曲顺序异常",
+          "hidden": false
+        }
+      ],
+      "http_method": "POST",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    },
+    "updateTags": {
+      "name": "updateTags",
+      "description": "更新歌单标签",
+      "path": "/openapi/music/basic/playlist/tags/update",
+      "parameters": [
+        {
+          "name": "playlistId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密歌单ID",
+          "hidden": false
+        },
+        {
+          "name": "tags",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "标签JSON数组，1~3个标签，如 [\"流行\",\"摇滚\"]",
+          "hidden": false
+        }
+      ],
+      "http_method": "POST",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    }
+  }
+}

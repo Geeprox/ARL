@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "status": "LIVE_OFFICIAL_PUBLIC_IDENTITY_ROUTE_AND_NECESSARY_NATIVE_PASS_INSTALL_PENDING",
+  "official_app_version": "3.0.0",
+  "catalog_sha256": "b8cc2b59a0a1fadcc2fea9b24d2143a9d3a24f632488fb5538b6f1a0a67deec2",
+  "qualified_host": "detail.tmall.com",
+  "observed_url": "https://detail.tmall.com/item.htm?id=954227509625",
+  "observed_product_id": "954227509625",
+  "known_url_navigation_calls": 1,
+  "title_reads": 2,
+  "known_url_actual_identity_source": "actual_current_tab_after_navigation_to_prior_observed_known_url",
+  "known_url_receipt_identity_source_label_note": "Probe reused its reconciliation label; tool_counts record the independent known-URL navigation. The raw receipt is retained unchanged.",
+  "fields_verified": [
+    "product_id",
+    "url",
+    "title"
+  ],
+  "unknown_fields": [
+    "price",
+    "SKU",
+    "other_details",
+    "login"
+  ],
+  "ordinary_click": "ONE_TIMEOUT_RETAINED_NO_REPLAY",
+  "scan_scope_qualified_for_account_pages": false,
+  "filtered_scan_original_state_corrected": true,
+  "new_public_entry": "taobao_get_product",
+  "new_connector_entry": "mio_taobao_get_product",
+  "cart_read_descriptor_published": false,
+  "new_native_validation": "PASS_37_PRODUCT_77_SEARCH_MIO_UI_TYPECHECK_SECOND_RELEASED",
+  "old_12_native_validation": "PASS_155_UI_TYPECHECK_SECOND_RELEASED",
+  "evidence_sha256": {
+    "PUBLIC-CARD-SCAN.json": "0f4784173407ee6464cc4941d41b5ae6eb96a0039514c9ddb7970ebe455b7f30",
+    "PUBLIC-CARD-SCAN-R2.json": "53366e22e770a14d3164c1565d35f9ed4e6dca4aef67f9aa93562cae775ba275",
+    "PUBLIC-CARD-SCAN-R2-CORRECTION.json": "c3d70305e83c75993e91fd7135b243361367296e162278ba6ecaf94f15e6a851",
+    "PUBLIC-CARD-STRUCTURE.json": "686ef663b9326b5bf17c18fcb9ab449a97a13518c9784ab4d42355b4db9ae934",
+    "PUBLIC-DETAIL-IDENTITY.json": "818d3ad59a1543719256f2db1807bda5d8e5619df98a1277102dee846d82c4f8",
+    "PUBLIC-DETAIL-AFTER-CLICK.json": "329e339d3229a5c03c724474165aee97158279b8e462bbd52fb1025357befbe3",
+    "PUBLIC-DETAIL-KNOWN-URL.json": "5c4f970ee55b76f53b8582a57bacca1d1402163ab061755c09042fec8bef4f4e"
+  },
+  "fixture_sha256": "90e5dd1a926f3830a4d59427bec630c6f2998c671b2fd3e2d436e1a78f605f38",
+  "canonical_writes": 0,
+  "service_restarts": 0,
+  "cart_order_payment_calls": 0,
+  "credentials_read": 0,
+  "native_validation": {
+    "finished_at_utc": "2026-10-10T05:03:06.724000+00:00",
+    "source_commit_at_compile": "e99b14b281bccfd69ffec74ff4eafaad148e7533",
+    "compiled_source_bytes_changed_after": false,
+    "workers": 1,
+    "steps_passed": [
+      "compile-public-product",
+      "test-public-product",
+      "compile-search",
+      "test-search",
+      "typecheck-ui"
+    ],
+    "actual_product_checks": 37,
+    "actual_search_Mio_checks": 77,
+    "old_155_repeated": false,
+    "stage_plan_sha256": "57014ccc4e6d10fe33c51839a15f91746e32e2b8e6c469eb06af9df3926c27cb",
+    "runner_sha256": "221a1e4d7db7d9968a7c128c4b9f3a1d528fd01877c145a1246160104dfbdd93",
+    "results_sha256": "20a25422403fc1456ed2779f6727c9979fe127ff615eaf6fe543f7b3ed74a707",
+    "second_release_sha256": "51664b40c03fee6380835c964f479d9be8c3fc2ac86a4c14595e721604bbde74",
+    "pending": 0,
+    "installed_ARL_Mio_acceptance": "NOT_RUN"
+  }
+}

@@ -1,0 +1,639 @@
+[
+  {
+    "description": "【旧DOM兼容工具】将商品加入购物车。TaoClaw 商品卡加购和需要用户选择规格的场景，必须优先调用 request_sku_selection 打开官方 SKU 面板，由面板承接规格选择和加购；不要在新面板链路后继续调用本工具。【仅兼容场景】只有系统明确允许页面 DOM 自动化、且已经有完整 sku/skuVids/skuId 参数时，才可使用本工具。【工具约束】执行加购必须使用此工具,严禁使用 click_element 等其他工具替代或重试;调用失败后必须停止流程并告知用户,禁止自动兖底。【SKU参数要求】sku 参数必须与页面 SKU 维度完全匹配。skuVids 为推荐参数，可与 sku 同时传入实现精准定位。新链路不要自行构造这些参数，需由 request_sku_selection 官方 SKU 面板回传。【成功响应】返回 success=true 表示加购成功。【错误处理-SKU未指定】返回 needsSkuSelection=true 时，表示未指定规格，请调用 request_sku_selection 打开官方 SKU 面板，不要用文本询问用户。【错误处理-SKU无货】返回 needsSkuSelection=true 且 disabledSkuValues 有值时,表示指定规格无货,必须告知用户并让其重新选择。【错误处理-SKU未找到】返回 needsSkuSelection=true 且 skuNotFound=true 时,表示指定规格不存在,必须告知用户并让其重新选择。【错误处理-流程终止】返回其他错误时,必须告知用户失败原因并立即停止加购流程,严禁重试或使用其他工具。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "itemId": {
+          "description": "商品 ID（可选）。如果提供，会先导航到该商品详情页",
+          "type": "string"
+        },
+        "quantity": {
+          "description": "商品数量，默认 1。传入大于 1 时将尝试先修改数量输入框再执行加购。",
+          "type": "number"
+        },
+        "sku": {
+          "description": "SKU 属性值数组，必须与页面 SKU 维度数量完全匹配。例如页面有「颜色」「尺码」两个维度，则 sku 必须是 [\"黑色\", \"XL\"]。新链路应来自 request_sku_selection 用户选择结果。",
+          "type": "array"
+        },
+        "skuId": {
+          "description": "SKU 组合 ID（如 6057166340427）。传入后会自动反查对应 specVids 并执行。",
+          "type": "string"
+        },
+        "skuVids": {
+          "description": "【推荐】SKU 规格 vid 数组，用于精准选择 SKU。新链路应来自 request_sku_selection 用户选择结果中的 skuVids。例如 [\"28341\", \"28314\"]。建议与 sku 参数同时传入。",
+          "type": "array"
+        },
+        "skuid": {
+          "description": "skuId 的别名（兼容 skuid 写法）。",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "add_to_cart"
+  },
+  {
+    "description": "点击页面元素。index=scan_page_elements 返回的序号（精确，优先）；text=文本关键词（模糊）。SKU/加购/购买/结算/支付等交易操作禁止用本工具，必须改用 request_sku_selection 官方 SKU 面板。点击后自动检测页面 DOM 变化，通过 pageChanges.added/removed 返回（可感知弹窗、确认框）。元素禁用时返回 disabled=true 不执行点击，此时禁止重试同一元素，应告知用户或寻找替代方案。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "description": "scan_page_elements 返回的元素序号",
+          "type": "number"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "text": {
+          "description": "文本关键词（模糊匹配）",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "click_element"
+  },
+  {
+    "description": "关闭当前任务页（首页除外）。任务完成后调用；若需让用户查看该页则不调用。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "close_page"
+  },
+  {
+    "description": "获取用户最近浏览历史。type: product/search/shop。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "type": {
+          "description": "product/search/shop",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "get_browse_history"
+  },
+  {
+    "description": "获取当前活动标签页的 URL 和标题",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "get_current_tab"
+  },
+  {
+    "description": "向输入框填入文本（支持 input/textarea/contenteditable）。index=元素序号；placeholder=占位符关键词；scope=CSS 选择器限定范围；submit=true 自动回车。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "description": "scan_page_elements 返回的序号",
+          "type": "number"
+        },
+        "placeholder": {
+          "description": "placeholder 关键词（模糊匹配）",
+          "type": "string"
+        },
+        "scope": {
+          "description": "CSS 选择器，限定查找范围",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "submit": {
+          "description": "输入后按回车提交，默认 false",
+          "type": "boolean"
+        },
+        "text": {
+          "description": "要输入的文本",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "input_text"
+  },
+  {
+    "description": "诊断当前页面 DOM，输出可交互元素和弹窗信息。订单确认页与交易按钮不支持通过本工具检查或操作。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "inspect_page"
+  },
+  {
+    "description": "统一键盘操作工具。通过 action 选择行为：\n- action=press：触发单次键盘事件（支持 keydown/keyup/keypress + 修饰键），用于快捷键、表单提交。\n- action=sequence：连续触发按键序列，支持 text（文本自动拆字）或 sequence（精细数组），用于输入或复合操作。\n- action=hold：长按指定键 duration 毫秒（keydown → 保持 → keyup），可选 repeatEvents 模拟键盘自重复。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "description": "press=单次触发；sequence=序列输入；hold=长按",
+          "type": "string"
+        },
+        "altKey": {
+          "description": "[press/hold] 是否同时按住 Alt",
+          "type": "boolean"
+        },
+        "ctrlKey": {
+          "description": "[press/hold] 是否同时按住 Ctrl",
+          "type": "boolean"
+        },
+        "delay": {
+          "description": "[press] 触发后延迟（毫秒）",
+          "type": "number"
+        },
+        "duration": {
+          "description": "[hold] 长按持续时间（毫秒），默认 500",
+          "type": "number"
+        },
+        "eventType": {
+          "description": "[press] 事件类型，默认 keydown",
+          "type": "string"
+        },
+        "interval": {
+          "description": "[sequence] 按键间隔（毫秒），默认 50",
+          "type": "number"
+        },
+        "key": {
+          "description": "[press/hold/sequence item] 按键名，如 \"Enter\"、\"ArrowUp\"、\"a\"",
+          "type": "string"
+        },
+        "keyCode": {
+          "description": "[press/hold] 按键 keyCode（与 key 二选一）",
+          "type": "number"
+        },
+        "metaKey": {
+          "description": "[press/hold] 是否同时按住 Meta/Command",
+          "type": "boolean"
+        },
+        "repeatEvents": {
+          "description": "[hold] 是否在长按期间重复触发 keydown",
+          "type": "boolean"
+        },
+        "repeatInterval": {
+          "description": "[hold] 重复触发 keydown 的间隔（毫秒），默认 50",
+          "type": "number"
+        },
+        "sequence": {
+          "description": "[sequence] 按键序列数组（与 text 二选一）",
+          "type": "array"
+        },
+        "shiftKey": {
+          "description": "[press/hold] 是否同时按住 Shift",
+          "type": "boolean"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "target": {
+          "description": "目标元素 CSS 选择器，缺省为当前焦点元素或 document",
+          "type": "string"
+        },
+        "text": {
+          "description": "[sequence] 要输入的文本字符串，会拆字依次触发 keydown+keyup",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "keyboard"
+  },
+  {
+    "description": "列出所有预设页面（名称+URL）。不确定页面名或链接时调用。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "list_available_pages"
+  },
+  {
+    "description": "导航到淘宝预设页面（主窗口），用于后续页面交互。不确定页面名时先调 list_available_pages；禁止编造 URL。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "description": "页面名称（不确定时先调 list_available_pages）",
+          "type": "string"
+        },
+        "searchKey": {
+          "description": "导航后自动搜索。仅支持 cart/order 两个页面",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "navigate"
+  },
+  {
+    "description": "打开已知 URL（仅淘宝/天猫可信域名）。预设页用 navigate，禁止编造 URL。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "url": {
+          "description": "URL（必须是淘宝/天猫可信域名）",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "navigate_to_url"
+  },
+  {
+    "description": "打开旺旺客服并发消息/图片（问商家/咨询/聊天优先用）。message 和 imagePath 至少传一个。未传 source 则根据当前页面自判断 cart/order/search。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "imagePath": {
+          "description": "图片：单张字符串或多张数组，支持本地路径/URL/base64"
+        },
+        "message": {
+          "description": "发给客服的文本",
+          "type": "string"
+        },
+        "productName": {
+          "description": "商品关键词（cart/order 场景）",
+          "type": "string"
+        },
+        "query": {
+          "description": "搜索词（search 场景）",
+          "type": "string"
+        },
+        "source": {
+          "description": "来源场景（可选），不传自判断",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "open_chat"
+  },
+  {
+    "description": "在 agent 右侧面板打开页面（仅查看/预览用；需页面交互改用 navigate/navigate_to_url）。仅可信域名。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "page": {
+          "description": "页面名称",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "title": {
+          "description": "面板标题",
+          "type": "string"
+        },
+        "url": {
+          "description": "直接指定 URL（优先级高于 page）",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "open_page_panel"
+  },
+  {
+    "description": "视觉模型 OCR 识别图片内容（商品名/品牌/关键词）。支持本地绝对路径或 http(s) URL。典型用途：识别后用关键词调 search_products 或 recommend_products_a2a。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "imagePath": {
+          "description": "本地绝对路径或 http(s) URL",
+          "type": "string"
+        },
+        "prompt": {
+          "description": "分析指令（可选，默认识别商品名/品牌/关键词）",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "imagePath",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "read_image"
+  },
+  {
+    "description": "提取当前页面可见文本。scope=CSS 限定范围；maxLength 默认 5000；offset 起始字符（分段读取被截断内容）。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "maxLength": {
+          "description": "默认 5000",
+          "type": "number"
+        },
+        "offset": {
+          "description": "起始字符，默认 0",
+          "type": "number"
+        },
+        "scope": {
+          "description": "CSS 选择器限定范围",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "read_page_content"
+  },
+  {
+    "description": "扫描当前页面可交互元素，返回带序号的 DOM 树。配合 click_element 使用：先扫描获取 [index]，再按序号点击。filter 参数可过滤关键词，强烈建议使用 filter 减少返回体积。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "filter": {
+          "description": "过滤词，只返回包含该关键词的元素行",
+          "type": "string"
+        },
+        "scope": {
+          "description": "CSS 选择器，限定扫描范围。如 \"[class*=order]\"",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "scan_page_elements"
+  },
+  {
+    "description": "滚动页面。direction=up/down/top/bottom；selector=滚动到指定元素；amount=像素数。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "description": "滚动像素数，默认 80% 屏高",
+          "type": "number"
+        },
+        "direction": {
+          "description": "up/down/top/bottom",
+          "type": "string"
+        },
+        "selector": {
+          "description": "CSS 选择器，滚动到该元素（优先于 direction）",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "scroll_page"
+  },
+  {
+    "description": "在已进入的旺旺聊天页发送文本/图片。message 和 imagePath 至少传一个；需先用 open_chat 进入。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "imagePath": {
+          "description": "图片：单张字符串或多张数组，支持本地路径/URL/base64"
+        },
+        "message": {
+          "description": "要发送的文本",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "send_chat_message"
+  },
+  {
+    "description": "店铺关注管理（单入口）。action=follow 关注（必填 shopUrl，打开店铺页点「收藏本店」）；action=unfollow 取消关注（必填 shopName，从订阅列表按名称定位并点「取消关注」，shopName 需与订阅列表显示一致）。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "description": "操作类型",
+          "type": "string"
+        },
+        "shopName": {
+          "description": "[unfollow 必填] 与订阅列表中展示一致的店铺名称",
+          "type": "string"
+        },
+        "shopUrl": {
+          "description": "[follow 必填] 店铺首页或店铺可访问页 URL（淘宝/天猫可信域名）",
+          "type": "string"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "shop_subscribe"
+  },
+  {
+    "description": "提交淘宝/天猫商品评价（评价页唯一入口，禁用 input_text/click_element/scan_page_elements）。单商品传 qualityContent；多商品传 qualityContents[]，长度=商品数且每条文案必须不同（禁止复制）。首次评价必填 merDsr/serviceQualityScore/saleConsignmentScore（1-5 星）；isAppend=true 追评时评分可省。imageUrls 为所有商品共用。",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": false,
+      "properties": {
+        "anonymous": {
+          "description": "是否匿名评价，默认为true",
+          "type": "boolean"
+        },
+        "birthday": {
+          "description": "生日/预产期，格式：YYYY-MM-DD，如2026-03-13",
+          "type": "string"
+        },
+        "gender": {
+          "description": "性别，1=男，2=女",
+          "type": "number"
+        },
+        "imageUrls": {
+          "description": "图片路径数组，最多5张。支持：本地文件路径、base64数据、网络URL。所有商品共用这些图片。",
+          "type": "array"
+        },
+        "isAppend": {
+          "description": "是否追加评价，默认false。追加评价时评分可不填",
+          "type": "boolean"
+        },
+        "merDsr": {
+          "description": "描述相符评分，1-5星（首次评价必填）",
+          "type": "number"
+        },
+        "qualityContent": {
+          "description": "【单商品专用】单个商品的评价内容。仅当订单只有一个商品时使用。多商品时禁止使用此参数！",
+          "type": "string"
+        },
+        "qualityContents": {
+          "description": "【多商品必填】多商品评价内容数组。要求：1.数组长度必须等于商品数量；2.每个元素必须是不同的评价内容，禁止重复！3.顺序与页面商品顺序一致。",
+          "type": "array"
+        },
+        "saleConsignmentScore": {
+          "description": "物流服务评分，1-5星（首次评价必填）",
+          "type": "number"
+        },
+        "serviceContent": {
+          "description": "服务评价内容（评价服务）",
+          "type": "string"
+        },
+        "serviceQualityScore": {
+          "description": "卖家服务评分，1-5星（首次评价必填）",
+          "type": "number"
+        },
+        "sourceApp": {
+          "description": "调用来源应用名称，如 TaoClaw、openClaw、copaw 等",
+          "type": "string"
+        },
+        "submit": {
+          "description": "是否自动点击提交按钮，默认为true",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sourceApp"
+      ],
+      "type": "object"
+    },
+    "name": "submit_product_rating"
+  }
+]

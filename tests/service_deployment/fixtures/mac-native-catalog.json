@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "root_service_id": "service.notes-native",
+  "manifests": [
+    {
+      "schema_version": 1,
+      "service_id": "service.notes-native",
+      "name": "Synthetic notes-native",
+      "version": "1.0.0",
+      "icon_ref": "sf:server.rack",
+      "repository_url": "https://code.example.invalid/synthetic/notes-native",
+      "revision": "cccccccccccccccccccccccccccccccccccccccc",
+      "license_spdx": "MIT",
+      "runtimes": [
+        {
+          "backend": "mac_native",
+          "artifact_url": "https://artifacts.example.invalid/synthetic/app.zip",
+          "artifact_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "bundle_id": "invalid.example.synthetic"
+        }
+      ],
+      "ports": [
+        {
+          "name": "web",
+          "service_port": 8080,
+          "protocol": "tcp",
+          "required": true
+        }
+      ],
+      "mounts": [],
+      "parameters": [
+        {
+          "key": "READ_ONLY",
+          "kind": "boolean",
+          "required": true
+        },
+        {
+          "key": "WORKERS",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 4
+        },
+        {
+          "key": "DISPLAY_MODE",
+          "kind": "enum",
+          "required": false,
+          "choices": [
+            "compact",
+            "comfortable"
+          ]
+        }
+      ],
+      "credential_requirements": [],
+      "dependencies": [],
+      "portal": {
+        "scheme": "http",
+        "port": "web",
+        "path": "/"
+      },
+      "health": {
+        "endpoint": {
+          "scheme": "http",
+          "port": "web",
+          "path": "/health"
+        },
+        "expected_status": 200,
+        "timeout_ms": 1000,
+        "interval_ms": 30000,
+        "stale_after_ms": 90000
+      }
+    }
+  ],
+  "configurations": [
+    {
+      "schema_version": 1,
+      "service_id": "service.notes-native",
+      "deployment_id": "notes-native-fixture",
+      "target_id": "synthetic-mac",
+      "backend": "mac_native",
+      "port_bindings": [
+        {
+          "name": "web",
+          "host_port": 8080,
+          "exposure": "target_loopback"
+        }
+      ],
+      "mount_bindings": [],
+      "parameters": {
+        "READ_ONLY": true
+      },
+      "credential_refs": {}
+    }
+  ],
+  "inventory": {
+    "schema_version": 1,
+    "target_id": "synthetic-mac",
+    "supported_backends": [
+      "mac_native"
+    ],
+    "occupied_ports": [],
+    "source": "synthetic",
+    "observed_at_ms": 1000000
+  }
+}

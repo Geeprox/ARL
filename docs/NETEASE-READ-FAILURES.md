@@ -1,0 +1,19 @@
+# Bounded NetEase read failures
+
+The pinned CLI is invoked with its official `--output json`. Two representation counterexamples are now covered: a 484291-byte, 20-song response becomes 3127508 bytes with two-space indentation; numeric values such as `1e20` expand to 21 digits even in compact `JSON.stringify` output. Neither formatted nor compact CLI text has the same byte size as the received JSON.
+
+Read capture scans the complete bounded string, removing formatting whitespace only outside strings. Whitespace between primitive tokens is retained so `[1 2]` and `[t rue]` remain invalid. The full normalized JSON passes unchanged duplicate-key, depth<16 and complete/truncated-input checks. It no longer has a second 1 MiB size gate. No prefix is accepted, no song is omitted at this capture stage, and no keyword-refinement workaround is returned.
+
+The existing 35651617-byte formatted-input work budget remains. This is a local resource policy, not a published provider maximum. Normalization removes bytes and cannot exceed this checked input budget. The separate HTTP/decompressed response budget is still 1 MiB; its suitability for normal provider responses remains an open audit item rather than an established upstream contract. Login/write capture remains 64 KiB and is outside this read-only repair.
+
+An excessive formatted input returns `cli_output_too_large` / -97062, exact `output_bytes` and `output_limit_bytes=35651617`, `next_step=inspect_adapter`, and `automatic_retry=false`. Native decoding still accepts the historical 1 MiB failure value for compatibility, but current read capture no longer emits it. The capture repair preserves DTO shapes. The separate pagination repair below adds optional read offsets and explicit continuation metadata; write DTOs remain unchanged.
+
+Search scalar diagnostics -97400/-97401 measure actual formatted CLI bytes without query/account/secret disclosure. HTTPS byte guards report `provider_response_invalid` / `provider_response` and the observed status. Pre-response failures omit status. Projection failures retain their finite reason/stage. Only `provider_unavailable` permits a manual read retry; no write replay is authorized.
+
+Playlist aggregation retains its 96 KiB, page/item and time budgets, but now keeps each complete item that fits. `pagination.next_offset` allows the caller to continue the same account/playlist through the existing list/describe tools. A nonzero-offset end is `continuation_end` with `complete=false`; it never qualifies as a complete write-preflight snapshot. The actual pinned CLI synthetic fixture returns 69 + 31 unique songs where the old implementation returned zero. The small zero-offset two-sweep completion and drift rejection remain.
+
+The outer private result frame also carries the stored credential envelope. Playlist read results now fit complete items against that exact final frame, keeping the existing 262144-byte line bound, 524288-byte stream bound and 98304-byte aggregation bound. With a 125517-byte synthetic stored envelope the actual pinned CLI returns 66 + 34 unique songs in 260788/215703-byte frames instead of `contract_rejected/runtime_output_missing`. The remainder uses the same explicit offset and never becomes a complete write-preflight snapshot. Login/write framing is unchanged. Oversized non-pageable search, unproven or drifted results remain rejected; split private frames and broader search continuation are not implemented by this patch.
+
+Swift consumer validation, combined build, independent review and installed entry readback are pending; source tests do not establish installed product completion.
+
+Historical call 0B6FCBA4-797D-4A8F-8EE0-FCF32FE42980 returned HTTP/business200 then missing_typed_output. Its original keyword, offset and size were not logged; the association and unique cause remain unproven. Counterexamples are synthetic, not reconstructed private output.

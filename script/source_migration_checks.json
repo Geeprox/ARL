@@ -1,0 +1,75 @@
+[
+  {
+    "name": "music-projection-compile",
+    "sources": [
+      "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicWriteContract.swift",
+      "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicDiagnostics.swift",
+      "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicWriteRecovery.swift",
+      "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicReadContract.swift",
+      "tests/fixtures/MusicRepairProjectionSupport.swift",
+      "tests/MusicRepairProjectionTests.swift"
+    ],
+    "binary": "music-projection-fixture",
+    "seconds": 60
+  },
+  {
+    "name": "music-projection-fixture",
+    "binary": "music-projection-fixture",
+    "seconds": 10
+  },
+  {
+    "name": "messages-host-typecheck",
+    "sources": [
+      "integrations/imessage/host_contract_v2/Host/MessagesBridgeMainV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesResponsibleHostV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesHostPolicyV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesRunJournalV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesCleanupQueueV2.swift",
+      "integrations/imessage/host_contract_v2/Shared/MessagesAuthorityV2.swift",
+      "integrations/imessage/native/Host/MessagesBackendPipe.swift",
+      "integrations/imessage/native/Support/MessagesNativeIO.swift",
+      "integrations/imessage/native/Support/MessagesStrictJSON.swift",
+      "integrations/imessage/native/Models/OnboardingModels.swift",
+      "integrations/apple_permissions/NativePermissions.swift"
+    ],
+    "flags": [
+      "-typecheck"
+    ],
+    "seconds": 120
+  },
+  {
+    "name": "messages-contract-compile",
+    "sources": [
+      "integrations/imessage/native/Models/OnboardingModels.swift",
+      "integrations/imessage/native/Services/OnboardingClient.swift",
+      "integrations/imessage/native/Support/MessagesNativeIO.swift",
+      "integrations/imessage/native/Support/MessagesStrictJSON.swift",
+      "integrations/imessage/native/Control/MessagesNativeClient.swift",
+      "integrations/imessage/control_future/Sources/MessagesProductClient.swift",
+      "integrations/imessage/control_future/Sources/MessagesProductEvidence.swift",
+      "integrations/imessage/control_future/Sources/MessagesProductStore.swift",
+      "integrations/imessage/host_contract_v2/Shared/MessagesAuthorityV2.swift",
+      "integrations/imessage/host_contract_v2/Control/MessagesProductClientV2.swift",
+      "integrations/imessage/host_contract_v2/Control/MessagesProductReplyV2.swift",
+      "integrations/imessage/host_contract_v2/Control/MessagesProductStoreV2.swift",
+      "integrations/imessage/host_contract_v2/Control/MessagesProductViewV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesRunJournalV2.swift",
+      "integrations/imessage/host_contract_v2/Host/MessagesCleanupQueueV2.swift",
+      "integrations/imessage/host_contract_v2/Fixtures/ContractTests.swift"
+    ],
+    "flags": [
+      "-D",
+      "MESSAGES_HOST_FIXTURE"
+    ],
+    "binary": "messages-contract-fixture",
+    "seconds": 180
+  },
+  {
+    "name": "messages-contract-fixture",
+    "binary": "messages-contract-fixture",
+    "arguments": [
+      "integrations/imessage/host_contract_v2/Fixtures/wire.synthetic.json"
+    ],
+    "seconds": 30
+  }
+]

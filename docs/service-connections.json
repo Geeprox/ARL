@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "services": [
+    {
+      "id": "amap",
+      "name": "高德地图",
+      "symbol": "map",
+      "configuration": "native_credentials",
+      "credential_purpose": "amap.maps-weather",
+      "tool_prefixes": [
+        "mio_maps_"
+      ]
+    },
+    {
+      "id": "fliggy",
+      "name": "飞猪",
+      "symbol": "airplane",
+      "configuration": "native_credentials",
+      "credential_purpose": "fliggy.travel-readonly",
+      "tool_prefixes": [
+        "mio_flyai_"
+      ]
+    },
+    {
+      "id": "netease",
+      "name": "网易云音乐",
+      "symbol": "music.note",
+      "tool_prefixes": [
+        "netease.",
+        "mio_netease_"
+      ],
+      "official_url": "https://github.com/NetEase/skills#ncm-cli-setup",
+      "configuration": "native_credentials",
+      "credential_purpose": "netease.music-account",
+      "reason": "应用凭据和登录状态统一由 ARL 管理。保存、扫码登录和服务调用分别核验；歌单写入尚未开放。"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "symbol": "cpu",
+      "configuration": "host_scoped_model",
+      "credential_purpose": null,
+      "tool_prefixes": [
+        "codex."
+      ],
+      "reason": "由 ARL 既有后台处理显式文字任务；gpt-6.1-sol、Standard、xhigh，原任务与剩余调用分别核验。"
+    }
+  ]
+}

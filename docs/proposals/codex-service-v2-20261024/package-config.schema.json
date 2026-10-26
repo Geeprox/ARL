@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arl:codex:package-config:v2",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "base_revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "catalog_version": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "packages": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "display_name",
+            "model",
+            "reasoning_effort"
+          ]
+        },
+        "medium": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "display_name",
+            "model",
+            "reasoning_effort"
+          ]
+        },
+        "high": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "display_name",
+            "model",
+            "reasoning_effort"
+          ]
+        },
+        "very_high": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "display_name",
+            "model",
+            "reasoning_effort"
+          ]
+        },
+        "highest": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "display_name",
+            "model",
+            "reasoning_effort"
+          ]
+        }
+      },
+      "required": [
+        "low",
+        "medium",
+        "high",
+        "very_high",
+        "highest"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "base_revision",
+    "catalog_version",
+    "packages"
+  ]
+}

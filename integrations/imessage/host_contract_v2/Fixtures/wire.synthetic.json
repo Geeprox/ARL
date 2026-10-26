@@ -1,0 +1,2229 @@
+{
+  "fixture_only": true,
+  "actual_os_or_mio_evidence": false,
+  "preview": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "disabled",
+      "enabled": false,
+      "implementation": "source_only",
+      "session_id": null,
+      "generation": 0,
+      "account": {
+        "state": "unknown",
+        "evidence": "not_checked",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "unknown",
+        "receive_access": "untested",
+        "send_automation": "unknown",
+        "send_readback_access": "untested",
+        "executable_pinned": false
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "not_required",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "disabled",
+      "source_only": true,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirm in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Setup or verification needed",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": "Responsible Messages host is not installed."
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Source preview. This panel does not activate an Apple account or Messages access.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "disabled": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "disabled",
+      "enabled": false,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "completed",
+      "last_error": null,
+      "remaining_test_sends": 2,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "disabled",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": true,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "completed"
+    }
+  },
+  "account": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "account",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "unknown",
+        "evidence": "not_checked",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "blocked",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "not_required",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "account",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirm in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Setup or verification needed",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "permissions": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "permissions",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "blocked",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "not_required",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "permissions",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Setup or verification needed",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "group": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "group",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "not_required",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "group",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "selected": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "review_test",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "selected",
+        "scope_id": "ims_11111111111111111111111111111111",
+        "participant_count": 2
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "not_required",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "review_test",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "groups": {
+    "schema_version": 1,
+    "ok": true,
+    "candidates": [
+      {
+        "id": "candidate_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "name": "Synthetic family",
+        "participants": [
+          "a@example.invalid",
+          "b@example.invalid"
+        ]
+      }
+    ],
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "group",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "review": {
+    "schema_version": 1,
+    "ok": true,
+    "plan": {
+      "schema_version": 1,
+      "plan_id": "621718ec-4247-493e-b3cd-99663eea45d0",
+      "operation_id": "70109eff-1aaa-4dd8-9074-be692fa8b0e5",
+      "scope_id": "ims_11111111111111111111111111111111",
+      "send_text": "ARL setup test 46f4a806e8e347a79e2ed72db75b9ecc",
+      "receive_text": "ARL setup hello 46f4a806e8e347a79e2ed72db75b9ecc",
+      "confirmation_text": "ARL setup received 46f4a806e8e347a79e2ed72db75b9ecc",
+      "send_limit": 1,
+      "receive_limit": 2,
+      "expires_at": 1900,
+      "audience": "local_only",
+      "group_pin": "c6aa8520cde520e2fe9f5241fa4b8a27bdfad3497766a0494634068f004634f2",
+      "automatic_retry": false
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "review_test",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "not_required"
+    }
+  },
+  "verifying": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "verifying",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "selected",
+        "scope_id": "ims_11111111111111111111111111111111",
+        "participant_count": 2
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "pending",
+      "last_error": null,
+      "remaining_test_sends": 3,
+      "operational_grant": "bounded_trial_only"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "verifying",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "pending"
+    }
+  },
+  "local": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "local_ready",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "selected",
+        "scope_id": "ims_11111111111111111111111111111111",
+        "participant_count": 2
+      },
+      "local_transport": {
+        "receive": "verified_challenge",
+        "send": "participant_confirmed",
+        "locked_state": "verified_for_trial",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "pending",
+      "last_error": null,
+      "remaining_test_sends": 2,
+      "operational_grant": "bounded_trial_only"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "local_ready",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Send and receive verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Verified for this bounded test",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "pending"
+    }
+  },
+  "connected": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "connected",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "selected",
+        "scope_id": "ims_11111111111111111111111111111111",
+        "participant_count": 2
+      },
+      "local_transport": {
+        "receive": "verified_challenge",
+        "send": "participant_confirmed",
+        "locked_state": "verified_for_trial",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "transport_accepted",
+        "consumption": "observed_event_trigger",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "pending",
+      "last_error": null,
+      "remaining_test_sends": 2,
+      "operational_grant": "bounded_trial_only"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "connected",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Send and receive verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Event-triggered consumption observed",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Verified for this bounded test",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": null,
+      "cleanup": "pending"
+    }
+  },
+  "revoked": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "reconnect_required",
+      "enabled": true,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "denied",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "selected",
+        "scope_id": "ims_11111111111111111111111111111111",
+        "participant_count": 2
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "verified_for_trial",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "pending",
+      "last_error": "permission_required",
+      "remaining_test_sends": 2,
+      "operational_grant": "bounded_trial_only"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "reconnect_required",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Setup or verification needed",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "2 reviewed participants",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Verified for this bounded test",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": "permission_required",
+      "cleanup": "pending"
+    }
+  },
+  "restart": {
+    "schema_version": 1,
+    "ok": true,
+    "snapshot": {
+      "schema_version": 1,
+      "phase": "needs_review",
+      "enabled": false,
+      "implementation": "installed",
+      "session_id": "5a95ee2b-2cec-418f-9fa4-be526ebc9f52",
+      "generation": 1,
+      "account": {
+        "state": "reported_signed_in",
+        "evidence": "user_confirmation_in_messages",
+        "server_authentication": "not_inspected",
+        "service_route": "not_verified"
+      },
+      "permissions": {
+        "identity": "verified",
+        "receive_access": "verified",
+        "send_automation": "authorized_automation",
+        "send_readback_access": "verified",
+        "executable_pinned": true
+      },
+      "selection": {
+        "state": "unselected",
+        "scope_id": null,
+        "participant_count": 0
+      },
+      "local_transport": {
+        "receive": "not_verified",
+        "send": "not_verified",
+        "locked_state": "not_tested",
+        "media": "not_tested",
+        "understanding": "not_performed"
+      },
+      "mio": {
+        "audience": "organization",
+        "personal_exclusive": false,
+        "transport": "not_attempted",
+        "consumption": "unproven",
+        "workflow_identity": "not_available_from_subscription"
+      },
+      "cleanup": "unknown",
+      "last_error": "cleanup_unknown",
+      "remaining_test_sends": 2,
+      "operational_grant": "inactive"
+    },
+    "presentation": {
+      "schema_version": 1,
+      "title": "Messages connection",
+      "phase": "needs_review",
+      "source_only": false,
+      "rows": [
+        {
+          "id": "account",
+          "title": "Messages account",
+          "value": "Confirmed in Messages",
+          "detail": "Sign in with Apple inside Messages. ARL never asks for your Apple password. Account confirmation and the message test are separate."
+        },
+        {
+          "id": "permissions",
+          "title": "Mac permissions",
+          "value": "Authorized for required paths and sending",
+          "detail": "Receive access and Automation → Messages belong to the actual Messages bridge. Refresh only reads permission evidence."
+        },
+        {
+          "id": "group",
+          "title": "Allowed group",
+          "value": "Choose an existing group",
+          "detail": "Only the group and participants you review are allowed. Listing group metadata needs separate permission."
+        },
+        {
+          "id": "local",
+          "title": "Test messages",
+          "value": "Not verified",
+          "detail": "One agreed test send and two new participant messages. Command acceptance alone is not delivery. No automatic resend."
+        },
+        {
+          "id": "mio",
+          "title": "Mio connection",
+          "value": "Same-Mio event not verified",
+          "detail": "Test text goes to the existing organization-scoped Mio/OpenAI transport. This is not a personal-exclusive conversation. Subscription or HTTP acceptance does not prove consumption."
+        },
+        {
+          "id": "locked",
+          "title": "While the Mac is locked",
+          "value": "Live test still needed",
+          "detail": "Normal authorized operations have no unlocked-screen requirement. Sleep, logout, reboot and first FileVault unlock are separate conditions."
+        }
+      ],
+      "actions": [
+        {
+          "id": "begin",
+          "label": "Set up Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "open_messages",
+          "label": "Open Messages",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "confirm_account",
+          "label": "I’m signed in to Messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "refresh",
+          "label": "Refresh status",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "receive_settings",
+          "label": "Open Full Disk Access settings",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "receive_retest",
+          "label": "Verify required-path access",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "send_permission",
+          "label": "Allow Messages sending",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "discover_groups",
+          "label": "Review groups and participants",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "prepare_test",
+          "label": "Review test messages",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "verify_mio",
+          "label": "Review organization disclosure and verify Mio",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "cancel",
+          "label": "Cancel setup",
+          "enabled": false,
+          "reason": ""
+        },
+        {
+          "id": "disable",
+          "label": "Disable Messages connection",
+          "enabled": true,
+          "reason": ""
+        },
+        {
+          "id": "reconnect",
+          "label": "Reconnect with a fresh review",
+          "enabled": false,
+          "reason": ""
+        }
+      ],
+      "notice": "Account confirmation, Mac authorization, local transport and Mio verification are separate.",
+      "support_url": "https://support.apple.com/guide/messages/set-up-messages-on-mac-ichte16154fb/mac",
+      "last_error": "cleanup_unknown",
+      "cleanup": "unknown"
+    }
+  }
+}

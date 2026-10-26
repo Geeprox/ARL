@@ -1,0 +1,135 @@
+{
+  "schema": 1,
+  "kind": "native_compile_inputs_only",
+  "product": "ARLMioAppleBridge",
+  "installed_build_observed": "22",
+  "target": "arm64-apple-macos14.0",
+  "swift_version": "6",
+  "workers": 1,
+  "sources": [
+    {
+      "path": "integrations/mio_apple/Consumer.swift",
+      "sha256": "80e763941665671048ae8cbced7d1c5ab9d41ca227fff2ced229c362a3f68c1c"
+    },
+    {
+      "path": "integrations/mio_apple/Host.swift",
+      "sha256": "613e03704711a8ae3e9f47ab35d02f122324d98611962f2d621637c7cf71316a"
+    },
+    {
+      "path": "integrations/mio_apple/MioReadCatalog.swift",
+      "sha256": "6b49f1e74241b418a68023f6f2924d6905adc62dac80b9f7a483f6500f4232b4"
+    },
+    {
+      "path": "integrations/mio_apple/MioReadOwnerAdapter.swift",
+      "sha256": "7a14140ea1bfab60168c533b8d3328b5cd8e22669a9f9c615c2705fdee9d3008"
+    },
+    {
+      "path": "integrations/mio_apple/NativeSetupReview.swift",
+      "sha256": "2aee3999ea1de7c8aaea1491de16140b3a6798eff8b657c3f5aef41a5ca451ec"
+    },
+    {
+      "path": "integrations/mio_apple/OwnedProcesses.swift",
+      "sha256": "eae863e530da64755a6e37e78820583d94dee13d4b06ea892c8a0f5dc66f4e54"
+    },
+    {
+      "path": "integrations/mio_apple/Setup.swift",
+      "sha256": "3dac3a4db37f05dda6f9e8d0e4826ca8efe4e64ddf774f8be84e18ebcadde9b0"
+    },
+    {
+      "path": "integrations/mio_apple/SetupFlow.swift",
+      "sha256": "16aade62deedea8f4e5092174fc1417d344da994b33942178258e9988d733da8"
+    },
+    {
+      "path": "integrations/mio_apple/StartupDiagnostics.swift",
+      "sha256": "ae193a5aa41aee453ef095cd73234d3480185593680fdde35eeb49ec930496c7"
+    },
+    {
+      "path": "integrations/mio_apple/Transport.swift",
+      "sha256": "22767650649c90c88db28ef49a01b198e62bfc53d5ece09716db77be69608847"
+    },
+    {
+      "path": "integrations/mio_apple/main.swift",
+      "sha256": "516b668e992c5d015b8f7d7b29e444f1199abd7d641969120d15948045e3e2ef"
+    },
+    {
+      "path": "integrations/apple_review/Proposal.swift",
+      "sha256": "f51c8e3bc8b77d438a75a40b5ab7184aa156e47116b3268bc38874fe8aa4b06a"
+    },
+    {
+      "path": "integrations/apple_review/PeerAuthentication.swift",
+      "sha256": "6b50ac353002d4be80c0a239081c3936b3bf02e7398377de920fcab3235d8b20"
+    },
+    {
+      "path": "integrations/apple_review/ConsumptionJournal.swift",
+      "sha256": "b813dbddfc8782d4c64790b6007c0504ac99220b9fad202faf29b6ed2354d917"
+    },
+    {
+      "path": "integrations/apple_review/ApprovalEngine.swift",
+      "sha256": "7480355635a85ebbfcb3745ad637923eab8662059c68ec58280540efd0826b0b"
+    },
+    {
+      "path": "integrations/apple_review/EventKitEffects.swift",
+      "sha256": "99eb5342e0b257cfc37d3d79a68d1af759015f994dc696ec3e31dd61ac16d128"
+    },
+    {
+      "path": "integrations/credential_read_owner/CapabilityRegistry.swift",
+      "sha256": "b4cf610af0ca62e6867c965c3d06ccf87dfddb614911049d880f04392c512c13"
+    },
+    {
+      "path": "integrations/credential_read_owner/OwnerReadAuthority.swift",
+      "sha256": "9da0380ea1c036eec6030beeb7eab4b24966e2fd20eb2b8ae415e31d8fd41fb2"
+    },
+    {
+      "path": "integrations/credential_read_owner/OwnerReadTransport.swift",
+      "sha256": "909652be48c6ff8f26283ac001080437afdd6ff9c9bd349f59b7a361940ea683"
+    },
+    {
+      "path": "integrations/credential_read_owner/OwnerReadWire.swift",
+      "sha256": "ab673a62f6e7311ea465067583e7177500e84018f6fa48c1447e4ea08e9a41fe"
+    },
+    {
+      "path": "integrations/credential_read_owner/AppleCapability.swift",
+      "sha256": "0432657698d8b2851aef75e6bb86665bb248625a5791cbc9900bc6e5ceb79f8e"
+    },
+    {
+      "path": "integrations/credential_read_owner/NASCapability.swift",
+      "sha256": "8da33919893b109893e5adbca1b3401a83b10ac5dd73a7179e9e45103837eacd"
+    },
+    {
+      "path": "integrations/credential_read_owner/AppleProductCapability.swift",
+      "sha256": "f4a5cbbe05a3d1e19f97d5258c59bac567a3774a26fa5c564d23e132e4836c93"
+    },
+    {
+      "path": "integrations/credential_read_owner/MusicPlaylistCoverCapability.swift",
+      "sha256": "994d407ff434fbdb23173c2d0c6587ae0b838d6dd4d6187af7e1d2a2c53007bd"
+    },
+    {
+      "path": "integrations/runtime_logging/ConnectionLog.swift",
+      "sha256": "e94c1a30047d41b966020ebe574f2be96de0116fffa970f967fd08259db00a58"
+    },
+    {
+      "path": "integrations/mio_apple/AttachmentInspection.swift",
+      "sha256": "7479993f6e481a81745b80cbd82d1fde3d20a852e23d64447e481dd56f934114"
+    },
+    {
+      "path": "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASFileReaderContract.swift",
+      "sha256": "4eb39b6ef09dd111721b6f1be8fca1134f187bd7e660eb8399cf29c5066e3b35"
+    },
+    {
+      "path": "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASDocumentContract.swift",
+      "sha256": "5b791935ddeb0a78e01e93dbc56ad0bd515792fcf943c7770f8d1b53d546790b"
+    }
+  ],
+  "frameworks": [
+    "EventKit",
+    "AppKit",
+    "CoreGraphics",
+    "Security"
+  ],
+  "output_directory": "build/mio-native",
+  "module_cache": "build/cache/ModuleCache",
+  "source_root": ".",
+  "historical_external_inputs_removed": true,
+  "recompiled_this_migration": false,
+  "signing_or_installation_authorized_by_this_file": false
+}

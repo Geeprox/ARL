@@ -1,0 +1,13 @@
+ARL source distribution
+
+LICENSE.proposed is a review draft pending the owner's license choice. The final
+root LICENSE will apply to original ARL source after adoption. Third-party
+software, operating-system frameworks, service names and trademarks remain
+subject to their respective terms.
+
+This source snapshot does not redistribute the cached Python interpreter,
+Python wheels, Pillow binary modules, tunnel executables, official music CLI
+bundle, installed applications, or third-party brand icon. Dependency lock files
+identify inputs; the corresponding upstream licenses and notices must accompany
+any future binary redistribution. Inspect the dependency inventories before
+packaging. A successful source check is not a binary redistribution approval.

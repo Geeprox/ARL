@@ -1,0 +1,1566 @@
+{
+  "schema": 1,
+  "source_files": 1072,
+  "private_review_completed": true,
+  "unresolved_sensitive_findings": 0,
+  "history_included": false,
+  "real_credentials_included": false,
+  "license_status": "MIT draft awaiting owner selection",
+  "upstream_history_cleanup_required_before_public": true,
+  "reviewed_pattern_matches": [
+    {
+      "path": "OPEN-SOURCE-REVIEW.md",
+      "sha256": "ecd4afeef01d7b8e1787e3f6050ab78dc384f5e8546f8d9450a23728d491576b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_contract.py",
+      "sha256": "19ca594307eb88000927d03f71af7d8ddcd10dc193a3852cb4d72d184b49a510",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_execution_contract.py",
+      "sha256": "812f19158d909cbfb8b7b0c8e5671b24f652202eb01451bc3dbfcef64feaa2a8",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_research.py",
+      "sha256": "eed80a351a39fe91996710029bf35e349dade58a1905277463063750a88c8232",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_research_client.py",
+      "sha256": "526f001bc0663d9f361d8eac9d124448a44c86d31e5451353a848ca6f8a9ecf5",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_selected.py",
+      "sha256": "21e558ad2eb89da4ac8f23e943f42e44585a639d3731bf1a2b9ab785c46d79a0",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_selected_contract.py",
+      "sha256": "5bafb37bbd3c5ae86ed07c96f6e42f979ed1fe91d3c77f16c381e8ae0fd29852",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_selected_engine.py",
+      "sha256": "e0671791cf326dbf559d1f1586113cf42b7939dca2943c9658286963037ed7fd",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_selected_host.py",
+      "sha256": "21cdf1e453cc15f32ede01b87e6d68fc5f92d8d007c8e609c41db73ee60f5efb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_selected_transport.py",
+      "sha256": "9511f97271575f231f8e002d110f2bb816fc4fb0b8f5fc0df8a746963d093410",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_sourced_contract.py",
+      "sha256": "ed10f2eb34180130b84862dd3b3c0d01c999b6548672c002fc2a16318f03e547",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/codex_sourced_research.py",
+      "sha256": "eb5e755501484562e63d9f8467bd43004c8f71e651a22fdf5434ea6a884ab19d",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/compat_host.py",
+      "sha256": "978614775af88f5588f619fd9ef05fb2e9851e82cceb31739dec90e43f6d276b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/formal_peer.py",
+      "sha256": "14262edaefb46c9c4418ba8c17692f7e68e4b5f9991f8150a87649b8fac3b2dd",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/formal_research_host.py",
+      "sha256": "20c70801f8cff692f58e9395ab3b640c162429b07376f9994768ca9c4f544602",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_actor_client.py",
+      "sha256": "106f3cc5bcde943e16cb3e88092199af2598712d6282ab2b92dff1db0714a8d2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_actor_host.py",
+      "sha256": "adbc90bdd41ca8650119952e8c2728d42b879e02f5b15281f01b5e288f052b40",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_binding.py",
+      "sha256": "a06af1411b779ff25d85a0b5c07cfe1672ec775143bf0bfa69cdfa0bebda4564",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_planning.py",
+      "sha256": "2e3d3cf5f446fd315311d59705a10a7ca175c150cd18a200adf790937e51e0be",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_planning_client.py",
+      "sha256": "cc10b2787e5d35cdec36d3cf856aa24303452f6c53d1863992e61f8f42d770a2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/friday_profile.py",
+      "sha256": "01fcd719e1c3ebce3ce61f685c3d70081f16468b93ccb222ac534e16ba96005a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/priority_host.py",
+      "sha256": "cb7b22e56331fca55daa8f61682af5ee043270e58b6ff47a25375b3d63e4a142",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/private_compat.py",
+      "sha256": "83010305ed3a010afbe2327ecace7f85e093fa755903694f89c14342257d4b88",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/research.py",
+      "sha256": "35f0b92b37eb0c081e1ae45c5dad6ebb093bc9afeaf24b98c1d355878ff8f01c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/research_client.py",
+      "sha256": "7f4ab5a65c7e52256ea848222774ff09eb4ba6e9a6fed8392d6feaaed49f260f",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/research_product.py",
+      "sha256": "856523c053b2b63c473dcbb679a27d8d997eb90634bc40403916393ece46c8f4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_composition.py",
+      "sha256": "e09e0c3bea7d52930a60cd6e55377c7b3892273095e3d951a0203f053a50b4eb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_contract.py",
+      "sha256": "adc081d18ed69d48a09498888ce884525194db44d8acb89151fbe6b5c0791445",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_host.py",
+      "sha256": "0e9b7ac0ec03e6034ba057d9ea707d6166d917cb4208ec986541ab054c264c35",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_process.py",
+      "sha256": "992c73d261bde2c6a3aa2c31789db5b3e511f343e2d877fe2ac3bddec7999869",
+      "categories": {
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname.",
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_profiles.py",
+      "sha256": "f3fdf17495aa9732add1780e6260d375d022d6d46233716b07558fcf761ca83c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_runtime.py",
+      "sha256": "cbc75e11e8f1323a679810f09760bdddbd3eb0526b3f7db5d24711fd44b40cef",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl/tisra_capture_uploads.py",
+      "sha256": "4946981e47735ddd15b07fe3b4c727f3cf91a7acc828d2c063dc31d1355e7b78",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "arl_nas_credential/friday_bridge.py",
+      "sha256": "a6636c7c63eb0fffcf0d7eda0194e8c3c99487fda668c6649bf052136a68a300",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/APP-INTEGRATION.md",
+      "sha256": "d1e4bd66f113cf69ecc102d4fc3c4e389cceed248250dd6a445f7f5559a074d6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/APPLE-PERMISSIONS-CONTROL-CONTRACT.md",
+      "sha256": "c43b543450191e49494b32a57d0ffb0e8ac4fcbe90b6c317ed5d9222df1b2b66",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "0b7d17d6da7862c60da4d065da313c8e3e1de1f566f4f6df4c88949a7be1eb01",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/ARL-REMAINING-MVP.md",
+      "sha256": "58964e69817b09c9b199923f276143ce4cb13e63bfd2a5e67cfb15c56d9a136c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CODEX-PRODUCTION-ENABLEMENT.md",
+      "sha256": "2d9c42b431853526ef2fa87ca165f9c39b8fe6bcddc912490b8b24a75003d10a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CODEX-SCHEDULING.md",
+      "sha256": "f28e7ea627f278d623600ae7c06e81d42f54a9afa40519ae6ff4cdcea6fbb2cb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CONNECTED-APPS-ACCEPTANCE.md",
+      "sha256": "83e61809c00b9782d3ab353834d50189ce82d2faf3b38556e30a2666e661b70f",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CONNECTED-APPS-FIX.md",
+      "sha256": "26d5e9fe0601703b451ec8b988385c5d4fc0745c9cffd80cf4e99a5d0b88ad0e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CONTROL-API.md",
+      "sha256": "6cb5c7305223e7663d680c22e0a759e63afb998619c992bedc0394c8d504dfb1",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CONTROL-UPDATE-ACCEPTANCE.md",
+      "sha256": "0ae33a7814ad51ceea8bf73c78a1e6da80c18aed9415b546d9a4737939a04aac",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/CREDENTIAL-INTEGRATION.md",
+      "sha256": "e613f610e0361379217897ee19497e79bf766e0bcf2f0b2603b3e9427eb0aebd",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/DEVELOPMENT-BACKLOG.md",
+      "sha256": "d438ba9cbbe124c2b187ccdacc4f91dfefc5b3b9bfc4082bca1d340eb129c820",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "sha256": "2dcb3fb9daf2277590ce7d87f3ef1215c98599be7bbb2a8c8ed2b0a1b8648c13",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/MIO-GATEWAY-CONTRACT.md",
+      "sha256": "78917107c4b3f12b44b4ee14f254b0b2b490e9e920010bcd1df31c60ce2f7b72",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/NAS-ACCESS-CONTRACT.md",
+      "sha256": "82366639dd6dd006f761aaa181b22c6c926315af9730c3299bda722aeec13c9a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/NAS-PRODUCTION-ACCESS.md",
+      "sha256": "29f19f968c22d4c7b81de5de7f2862ae8362899a1b513db7a1c6b823b4a883c4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/PROTOCOL.md",
+      "sha256": "4b5882c95709aeca2451dbaf02dd9b06dcb67dfaf53b8cfb5d2d50b929d2820a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/REAL-CAPABILITY-ACCEPTANCE.md",
+      "sha256": "2191897499d574af2a24eb03cd0445d0085c36641fe59196c873db9f84866258",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/REMINDERS-FIRST-USE.md",
+      "sha256": "4ad4b3b96485e59a31d3fd35233735138597f9fb48646d3c3745c77097269b4b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/SELECTED-MATERIAL-TRANSPORT.json",
+      "sha256": "8337691e4504f3dfb7a3ba29385d59c7b41609c9fc3d71d9735e2a5870b62bbc",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/SETTINGS-API.md",
+      "sha256": "05a6daf3bb163fcc8ce7d805893a26837c2da791d2e61c3450085f60372f1097",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/STATUS.md",
+      "sha256": "6c04478c13314cb551abcdc1fc15c5d2ce673a7d494058cd43d20181efded967",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-APPLICATION-MODELS.md",
+      "sha256": "56628a227689a37977bdd4744868c5005eee2b1d61fa34ff58c979bcea385467",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CAPTURE-APPLICATION-SLICE.md",
+      "sha256": "8106760706d39b77fbea3faa74d8b76f9b3ba38e57f36fc4a37fe1bb131ee9f5",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CAPTURE-FUTURE-CONTRACT.md",
+      "sha256": "29315d3530e34fb705933372ea4b7f79883d4e28d7ed532cfea6bbf6461e803d",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CAPTURE-HOST-ATTACHMENT.md",
+      "sha256": "eaaf692a6bbea688ef78d3849f16aebe3bb49223f96fc3ee627193db52654d0e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CAPTURE-PROCESS-V2-INTEGRATION.md",
+      "sha256": "4c4cd8faae1f71d84d0d13a814f66902caafd27e891b45331da22e9050f39d51",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CAPTURE-RUNTIME-INTEGRATION.md",
+      "sha256": "5c1ca421b71448cd7a0e765da04e4af6f08fdc27747c531d02346489a279efb4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CODEX-MIGRATION.md",
+      "sha256": "93844ef3d8c9996384a8e7196e397574e85a6edc30b8351ce76ed3800b2ffd35",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CODEX-NATIVE-IMPLEMENTATION.md",
+      "sha256": "7d7893b55cdcb8711fff05c5bc8e7b885d901981bdf4c08ce000f6c367a2e9b9",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CODEX-NATIVE-PROPOSAL.md",
+      "sha256": "e288c124d381fb651beca6a2595b2bed0621738be4e370361fbd82833543dea6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-CODEX-SOURCED-V2-ADOPTION.md",
+      "sha256": "dd82a4fba43ba00ee4f2321541ca95bcd7608b7e6b6220b935cc85b2c41bfafa",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-RESEARCH-API.md",
+      "sha256": "b975b1efe0983d2416776ca7d9380b0e5043a3984e6a0a8e8b9d0fb00dca59c2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-RESEARCH-CONSUMER-FOLLOWUP.md",
+      "sha256": "aa4ee4fa5ccf1e2fd795eefd7ccd8bc5e92dfab594b5e9b0af1473769f931500",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-RESEARCH-LAYA-COORDINATION.md",
+      "sha256": "5c0a5d965b4250b8df15082b28c736020d44c7f2c69f49681c318f708557043c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-RESEARCH-PRODUCT-ACTIVATION.md",
+      "sha256": "00d5d689400e718aab99587a0dfe05dae86e1b554e8b60eb619890bea8d2f7ac",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/TISRA-RESEARCH-SDK-HARDENING.md",
+      "sha256": "c56033050cbb244f339cf8fc562e8afbc9bd5db5d28a1b8beb7505b2570f495f",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/friday-rule-removal.schema.json",
+      "sha256": "21c9a421aa2e3944be7ab95f43a38cdf154faee3565af97a6136b6f27dd37b90",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/priority-v1-requirements.md",
+      "sha256": "d438c10b7676b48340314db9d841a6f15b64d56decbe4145fddced7e4cbefe6e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/priority-v2-contract.md",
+      "sha256": "651f146d6716380fa17188f1be24f165f757efb3cc7c2edf8f98a659dd727bdb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/product/APPLE-EXECUTION-20261019.md",
+      "sha256": "e85237eb4e08a94f37f2e05609ccf3ec708f2cdfe0f7acb90255c7d40d67d395",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/product/ARL-DELIVERY-20261019.md",
+      "sha256": "53f1146abf5a22fbfa67dcbf3c920efba6e0b47f93ec4a574755d274de60c9eb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/proposals/codex-service-v2-20261024/PROTOCOL.md",
+      "sha256": "aee7e897838548ea14c4b774aab03f0b1d6902b9d24c2f7525d97546ed20687e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/proposals/codex-service-v2-20261024/nas-account-quota.patch",
+      "sha256": "ebf376ae40692793476e66707782dd92f32e113497ab56a5398d283a5fb22446",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/proposals/codex-service-v2-20261024/quota-migration.json",
+      "sha256": "409ebe40b4526487a10a1cdb525319279cab67a7376cf8e3c0493e7e7291d09c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/apple_notes/README.md",
+      "sha256": "b35b63ec5c91ceea855e15057d6b963829350f5dccef503f079ce44d1bab8da3",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/apple_notes_host/README.md",
+      "sha256": "81fee42e80c5263399e7f75a4c909cbc05ceed89fa735726fabd3c483a1a4770",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASArchiveMount.swift",
+      "sha256": "a2fe6676b2c539aa5fca7b0fff099eeec4a2d0d59ec932f08d93da73313de7f4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/friday/load_sdk.py",
+      "sha256": "d76e39a4437ba3f12c0999edaec42462d58d4588daa35af9d20124227958be4d",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/friday/planning_consumer.py",
+      "sha256": "8df7ff1031c9c8a03c185df81cc467402a1830f7291415f03a95a3670f31f8dd",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/friday/planning_host.py",
+      "sha256": "1b794a5e9310511b3234b64b24dd116b16281e405705cceba390d543f2f80df9",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/friday/prepare_planning_candidate.py",
+      "sha256": "aacc9703813d6a17362b6f2a4c940dee1b1ef2a6f68b8b534b3ef2ffb5188ee7",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/friday/smoke.py",
+      "sha256": "94e9b1bfb15b99c2bbacf6e68e92b74d807b9173e2dd8c449ab53a5d94767357",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/mio_apple/activation.example.json",
+      "sha256": "d3059d5f33008a512ad4c431e7414cbb12cb0e7ae59d64b8dbf13d0bc46a8ff0",
+      "categories": {
+        "organization_or_tunnel_identifier": "Disabled example or test with an all-zero tunnel identifier."
+      }
+    },
+    {
+      "path": "integrations/mio_status/test_status.py",
+      "sha256": "de2ea1aa242157ab80e5c9f001ec00f863598276d74a110dcd8b9a4f3daaa569",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential."
+      }
+    },
+    {
+      "path": "integrations/moments/README.md",
+      "sha256": "287c56ddd4e8bf65642e88e1bc81c4cd67fcdf64bd4b7f14eb9f54070f8fff62",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/moments/worker/local_service.py",
+      "sha256": "c568dd0e18ff686370360c29630cfe49ba921ba7e3ad26f9da7b786062da77bc",
+      "categories": {
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname."
+      }
+    },
+    {
+      "path": "integrations/nas/tests/test_upload_consumer.py",
+      "sha256": "6b1c22e245b160d8b2d2a17c0b513f1fa968a65528b0d9c51beddaadcf8ca7aa",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/nas_codex_v2_20261024/README.md",
+      "sha256": "e95762c0577f50ce4c6e2692a01d534026dcc1955ef0156a722a14fbf8f40e14",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/nas_codex_v2_20261024/nas/launch.py",
+      "sha256": "1e0240fc9ed23fe293270048d5cfe287f6c30568d82cf1c07604fecbb27105c6",
+      "categories": {
+        "personal_path": "Fixed generic container image home /home/app; no personal account path.",
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/nas_codex_v2_20261024/nas/local_api.py",
+      "sha256": "a9b8f20bb75e4325a8e8105e54f66c727e6346e50107146926a4a666b798d4b5",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/nas_codex_v2_20261024/nas/worker.py",
+      "sha256": "3baac734a8d176c278095a661b1796c3d70b7d1db94d4a04d492e74d31172406",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/nas_codex_v2_20261024/runtime-v2.patch",
+      "sha256": "59feccef22c776413c21567886dea6a3ac045b9449de339e065d102731dc25b1",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/ARLResearchClient.swift",
+      "sha256": "09091d3a484661467a61f74ed61d828d7a10d3698a823b9527c5067e09f4dddb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/ResearchClientFixture.swift",
+      "sha256": "14efc913c87195382f406e1703b9fe5da097bd4901619d4b499e7eaeaf306647",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/ResearchSmoke.swift",
+      "sha256": "19eeaed46d8fb16baa032b849bee144776aae1fbc70f5eb3c46c07cbe081a63e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/Smoke.swift",
+      "sha256": "965cc4090393887de19de854225ea0453de787aa7419b9c75f21b25907191b64",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/TisraRuntime.swift",
+      "sha256": "123ed1b737ca09d16566ac3d7cb6daf89f5b2dca15bacc240b34122c342fa972",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/capture-inner-manifest-v1.json",
+      "sha256": "99a685522b216f39300662f6abeafc268e27afa33288cf45dc5d940c320b936c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/codex-native-proposal-v1.json",
+      "sha256": "9cdc14e57d1528f4d257c8a1cd79c9c96097b39652ba7272f0a47f650dddeed1",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/codex-native-source-review-v1.json",
+      "sha256": "6d509c7473e8c9755989200cf38199a7a5c076eb2b4e4ce52df874fc16f7a637",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/codex-native-sourced-v2-fixtures.json",
+      "sha256": "c8e662d6424718e26f268cce1818a990bc6a82bb2f54a84a200ad8dfc4205794",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/codex-native-sourced-v2.json",
+      "sha256": "27f2204b3870a4c2510b6d4f93ce22d02fc97b82dcd4a9831ca9c524bdfd57ef",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/manifest.json",
+      "sha256": "faaaad3584959ad30034c22294198182b4bdcbe605cb3dfc3ff77e5ce173ca7e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/selected-existing-test-output.txt",
+      "sha256": "8d03f6d0d8d0f280ce65d5ae3bb3a16459656ef2faac85c0ff8cb028114c62b6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/arl/research_client.py",
+      "sha256": "c863d322adb99076b970abbb5f3e04cf9dcc501a46da6aebbdf33a3f9b2a4772",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/docs/TISRA-RESEARCH-SDK-HARDENING.md",
+      "sha256": "54eea84b1d5dc5edd702edaa49efb341f8916de03c34f4899e271b8c11c9a1d2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/integrations/tisra/ARLResearchClient.swift",
+      "sha256": "55bce82b7e044d5d280f3fe4e961569a5a8af4d280cc1df559a5698d9ac7f945",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/integrations/tisra/ResearchClientFixture.swift",
+      "sha256": "74d648dd6dc5bd386919aaaa71e5064252951c93036a0ffe6054e140feea073e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/tests/test_research_client.py",
+      "sha256": "3f57dd18684ed6b0ac74fa8665994659cf5e8b25482247ecaefe7741b95a79c4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "integrations/tisra/sdk-hardening-v1/source/tests/test_research_sdk_swift.py",
+      "sha256": "37273c417ff207c27f78c511db7d99bd8a2b501551fd8a56f7398c99e0620c4d",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/CONTROL-PLANE.md",
+      "sha256": "d684e24d5a88b4aa1bc777f347a0846da5d7174497fcb1172556282243a1f7c9",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Moments/MomentsController.swift",
+      "sha256": "939c4fe21447719b1ea93ea90807fee2a921e7cba2b10836dbd2bdb8f4c90c3c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Moments/MomentsFiles.swift",
+      "sha256": "d13f3c5669daec54f184a6da850967914e6d69fd0b4dbbb7571650bfce127425",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Moments/MomentsNAS.swift",
+      "sha256": "e2aa818b0264605db3c37ca56959c1b1b56e8f71fa25a9110c074853f341a298",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Moments/MomentsNASPicker.swift",
+      "sha256": "40fc1449107e187047e38631f89d8301c4f5b50febf6fb11eb20b7df0c6370ce",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Moments/MomentsView.swift",
+      "sha256": "a41cc2fdcef7870ff28d8a1100dcc4c2fab8d9883a6932976924071402a4fb04",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Resources/AppIcon/ARL.icns",
+      "sha256": "4000f5bc9d2491ad3c77858e6e9c2a77f1db781cf5bd7fab34ced2da3439f78b",
+      "categories": {
+        "binary_review": "Reviewed ARL icon graphic; PNGs contain only image/color chunks and no text/EXIF."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Resources/AppIcon/AppIcon-1024.png",
+      "sha256": "5a541dd80dee29ea39a62bc8e725862afd9e37d3e2c39c6c2d79a304eca44989",
+      "categories": {
+        "binary_review": "Reviewed ARL icon graphic; PNGs contain only image/color chunks and no text/EXIF."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Resources/AppIcon/approved-arl-crop.png",
+      "sha256": "23adf7bfb705e984b484a0c267abc58892c73ccf7f8335b67661bfbcd4f1104f",
+      "categories": {
+        "binary_review": "Reviewed ARL icon graphic; PNGs contain only image/color chunks and no text/EXIF."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Tests/ControlMetadataUnit.swift",
+      "sha256": "257df06c31074753f89c36361b0f2b32c69f666276e4775ea573ff1528376982",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "macOS/ARLControl/Tests/control_metadata_checks.py",
+      "sha256": "75389f516239747db0bf0a27e6b52a8ebfeb555e86d78f09dac9b55cf18bbaa2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/build_and_run.sh",
+      "sha256": "b8a01c2f5eec1bb2aa8388a31539868b13d90d073abd6d2fa003f0baf9975b66",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/core_runtime_sources.json",
+      "sha256": "22b4496bd2f3c98262dfbedaa5c08f01cf8bcd14a6eebb4d593087d6e9247b64",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/export_public_source.py",
+      "sha256": "706c22d6550f9a8120e7e2787ba0db8746f5656c7ff5f8e5689c9e9cfd4b948e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/make_app_icon.py",
+      "sha256": "10f4f35133caeffd1295f75cdcb05b6f84b2d9135946caecbedffcef5ef2b71d",
+      "categories": {
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "script/privacy_audit.py",
+      "sha256": "1340f9a1046b89fb865a5d08ca023f62dc87d4aa0db21f5bd44ccd19846a0643",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/stage_nas_runtime.py",
+      "sha256": "c6912c99d29ea825277c95601d504113f565570658b38dae03f0131ea75830f6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "script/verify_local_apps.py",
+      "sha256": "38b1a24e9924a7399f0b5ce1700c6d4f9a6254dc8b490d890336564ff730f266",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/MessagesDirectTests.swift",
+      "sha256": "5b491f5a689f0448ed0ab90b7dbdec95dbe101677fa7db2a77d978de9b7dc844",
+      "categories": {
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "tests/MioPlaylistCoverReadContractTests.swift",
+      "sha256": "39c35c46c1da9057778bd76d4b8ba52359d22abbe4c842923eb72d89edf44dc8",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential."
+      }
+    },
+    {
+      "path": "tests/Moments/ArchiveFilesTests.swift",
+      "sha256": "e317274d828c51f6132a7033b4cb233619358309f664e92c174736839d0c3e7c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/Moments/AuditReuseTests.swift",
+      "sha256": "9912c462f7ee24b2f90e7747dfa34862fed61480eacf8c411fea2d5a633853d8",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/Moments/BridgeTests.swift",
+      "sha256": "fae5a31fcf4f5ed9ec8cce6847e39160391438bd941ad29832dfb6c3893e4498",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/Moments/test_archive_storage.py",
+      "sha256": "74f749adda7d96bbb25a13ddbc0396235aed6de496d3cfe421958517bc8c454e",
+      "categories": {
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname.",
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/MusicBusinessAuditTests.swift",
+      "sha256": "58b5632bacc64ff4a1f2cd819329fe7f15529d89e69870b6479c3c01c9078f33",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/MusicBusinessInfoTests.swift",
+      "sha256": "4d715619f1fc871beadc11c1e5e2eebc0ba293c04a6b1925067e570ac797c45a",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/MusicLoginPresentationTests.swift",
+      "sha256": "b11eb370840198f4288103caedd58ec15bfd7e38b08ab325aacf53e1da03e018",
+      "categories": {
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "tests/MusicProviderFailureDiagnosticsTests.cjs",
+      "sha256": "0cc250f39b1a71a49ce3045988d86692080d7cb31262f3dd82f5560df9a036d1",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASCredentialProviderTests.swift",
+      "sha256": "6bbe90e5c839676c878acd660fdb701e232f02d3e3bd750f7df0ffdf63255b91",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASDirectoryPipeTests.swift",
+      "sha256": "9cd14ef0a1e1b35bb25cabcf6df509ca0c2535da381cb96b5fc80bb887d882a7",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASDiscoveryRefreshTests.swift",
+      "sha256": "147fb50370e0a1a4db87b22b38832df15d8beef9d4d51b34ed025e498b9cd33f",
+      "categories": {
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname."
+      }
+    },
+    {
+      "path": "tests/NASProductionControllerRaceTests.swift",
+      "sha256": "3ae4c98e061315f62af949fab244a854b384f45d549691d9f8b28ea5639e3fff",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASRuntimePipeTests.swift",
+      "sha256": "a0e0008fd7527e2a930a8c4c70d6cc73a1b54ed4ee9deb7ce217f5462cedec40",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASServerPipeTests.swift",
+      "sha256": "751eeb43b5ba578849f97d9de651ce9af61273fcaadc3d0a4a53eeb7849bef8f",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASServerProductionFlowTests.swift",
+      "sha256": "494b2d7e966c501c2d50a359023738362e056e9c3708b8bce46ddc3feb2df075",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NASSetupFlowTests.swift",
+      "sha256": "5a92ccf77bcbb8a9c3937f86d7d03c48c3237964d220f12cd15fee980da51b3c",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential.",
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname.",
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NetEaseBusinessInfoTests.cjs",
+      "sha256": "f056ef76c35eea56c2288d0b78df93f8247ebaeec2f217929e1078b366e01319",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NetEasePlaylistCoverProjectionTests.cjs",
+      "sha256": "84c62e2ff8c79d52a57f893e829605bf81f49e5be87c5bc594a97aab764c1f56",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/NetEaseQRHostCases.json",
+      "sha256": "bd50d85886e54e9fde73d699014ee0869ad007cb2b74d4a8e893a8b7f1d30f2c",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential.",
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "tests/ServiceCredentialUIContractFixtures.swift",
+      "sha256": "352a6ce24446a801704894b203975970d9adb1e4bc7f331a739542775dfcef0a",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential.",
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "tests/Taobao300SearchTests.swift",
+      "sha256": "ce09c3d22c16ece3353ca71ba4c3de29bb1f5830b5e4bd08b4f1daadb3775030",
+      "categories": {
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename."
+      }
+    },
+    {
+      "path": "tests/capture_application_host.py",
+      "sha256": "57c818efd64890170181050a586451b33e5433f01fcd01badcc41928f81bb93a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/capture_host_fixture.py",
+      "sha256": "acfbe68f2d62521ae34890374daf39fe71e27d36db411564666b55f3f39bf841",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/controlled_metadata_fixture.py",
+      "sha256": "ece45354ca14299805cbc5e789bddec95ecb6ddd8a36e95ea800c462f7ce0f91",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/fixtures/NetEaseLibraryFetch.mjs",
+      "sha256": "028c2f7aa3c994c2ad240af0dfef68f754fe60246d988f65098dd7d3d35f82a4",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/fixtures/TisraApplicationModels.swift",
+      "sha256": "b79806ac289518f9c127909c27610c3639a8f6a777fe4646f9240c62f6127e8b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/fixtures/TisraSourcedExecutionHost.py",
+      "sha256": "5961891cd99464173b1d4fe74db40c4501f1d480839fe3fce7e1f30ae9871b11",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/fixtures/nas_directory_pipe_host.py",
+      "sha256": "a0da7ebb55647e203a8eb3d9971e4f4951aa88f15e1247e672253e4e09e8b7bf",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/fixtures/nas_runtime_pipe_host.py",
+      "sha256": "6c877e3190207a11af00b157c9f36f348a43dfbcea02c2b4d8601913e189c757",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/service_deployment/test_validation.py",
+      "sha256": "9d2c484f9e2a6eb16320755a43b45abb861da7e505a968053091816041674ea8",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential.",
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/service_portal/test_review_fixes.py",
+      "sha256": "6ae4ba26763285e977c73c5ff4277430af4eb62db2151f95e063771aa1e7dbd8",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_app_connections.py",
+      "sha256": "6f616d68b31fe6ffa6060ae66ff107fa6e5778ed52bd2ea72868f378b4ff1374",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_app_integration.py",
+      "sha256": "a971705963811be9337413dd70cb1f1006760dfc5c26639293387e38ebec3b7d",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_application_host.py",
+      "sha256": "d70016dd980aee17fe4e44580ac8a719e20e797a888a86c8d786d16f4346984b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_application_models.py",
+      "sha256": "ffadad6bbdde0d2c78976d7d67bb0fe2da70e6c4137478ee8e4f7766ac4cf798",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_calendar_write.py",
+      "sha256": "bcaf02a611f35c7d64b4b0b639fa064fb97f647306b05d22f7a699aa4934573e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_capture_application_integration.py",
+      "sha256": "3af72fdfbe25cf5e7135e46ba5292d3d16a0ddbcc3cead5c1d05c6151047dfc0",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_capture_host_attachment.py",
+      "sha256": "7f13899f4c0694239958c4cfc5d6d955ea2ebb61ca02e3dd7faf85940c7d5e17",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_capture_process_end_to_end.py",
+      "sha256": "587a41abca88a9bb27887886daa81363c8f1e1d6ec2a6fa769d1a61eb924348a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_contract.py",
+      "sha256": "0c0ae35bcbebc2630b0b234898458c834ac7f08b1907102bcc8c33950826d6f0",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_research.py",
+      "sha256": "85ec469acf45a71107c6ddd95054c40de4f4750038ad9f44c6ad08f9ea9e0a1a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_research_client.py",
+      "sha256": "8c556a164da1056651a117f2a1da0ad5c0523830378b19257e329e40a1803d2e",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_server.py",
+      "sha256": "4ae1924a0e4f5161cb29b50eb506c003c0235a6145391d7f4926720dec3f79eb",
+      "categories": {
+        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname.",
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_sourced_client.py",
+      "sha256": "a1eb50b5938bc6b21a019c7c78d5bfd6d671aad97744289b23216f0e8d4e795c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_sourced_contract.py",
+      "sha256": "09e81686647b795f8ab11cc1a9bcd4d93bf3782d4e49ea47a6c54497c3d0b7d7",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_sourced_execution.py",
+      "sha256": "0f104457b542f29909a930993ce36b14063260db6ae3211652c4eb44b3aabcba",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_codex_sourced_research.py",
+      "sha256": "6b2357a3c6bf822b716494d558aae3880cbd291c1f14721022dbd49fbd74942a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_control.py",
+      "sha256": "a9a270907a45818a12df0be9be32598449f5c5707d41c9c5140473819b62303a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_deployment.py",
+      "sha256": "bd7947d9e3b785c64acf461def2443f0f6c1eb0759679dcefa28c5ac332a9a5f",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_formal_research_host.py",
+      "sha256": "9ad082e6b24e69951f8e8cd0b816f331824770ad51a6f4fc0eb6dde313c64cae",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_formal_research_r4_transaction.py",
+      "sha256": "1da76a870ce67b5ccee31f842a409c04b9d88031df589e637425a2e2e7820028",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_friday_actor.py",
+      "sha256": "9936468ffdf867b980319539e4fc45ee5588106940cd89a48b0f67d1239a9660",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_friday_planning.py",
+      "sha256": "c13ad6e3934cf39c783954677563c6a0446bbc13c173291f94cc171d4921d8ed",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_friday_real_priority.py",
+      "sha256": "3bcc216be3c15dc02a19f517206bd342882da0dac7e560e0d3d7e71c612acb54",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_identity.py",
+      "sha256": "5d864a59aff21b6f51c3963a0f50d6c2c47e22af19e356994160790399a2bbdb",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_mio_host_lifecycle.py",
+      "sha256": "0adb2b23d9cde93c38df5bc860f4371e53be75be0c53208d75ff25557aa2121e",
+      "categories": {
+        "organization_or_tunnel_identifier": "Disabled example or test with an all-zero tunnel identifier."
+      }
+    },
+    {
+      "path": "tests/test_model_transport_boundary.py",
+      "sha256": "67d161aed3654cfabff439725bed86f3389819a2d09c375f2f6c079fcb579a8f",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_nas_file_params_importer.py",
+      "sha256": "8b3c22896b1386e99f8c3a11a8c87d22a691768364a91382e312776c3ddf85af",
+      "categories": {
+        "email_address": "Synthetic adversarial URL/address fixture or image scale filename.",
+        "private_network_address": "Synthetic private-address rejection fixture."
+      }
+    },
+    {
+      "path": "tests/test_nas_runtime_assembly.py",
+      "sha256": "8e003af04cec8dc3c65d4b4d5b57ed83f7ee772aa4fd9a4164221239a950c68b",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/test_nas_server_setup.py",
+      "sha256": "d5f96769554d6ee024995f0be06d1e5ebf138e0bc5d4c07d50eb74a377f64a3b",
+      "categories": {
+        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+      }
+    },
+    {
+      "path": "tests/test_native.py",
+      "sha256": "01e4fe06b7214c16d81784f9324bdfa711907de598b97ca9602b89e698d9587c",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_priority_host.py",
+      "sha256": "7342565af4a9f20a762cda6676a6af69e36304155e75c46c4a14145524ed7ba5",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_priority_r2.py",
+      "sha256": "f6b1ba18ba8ff51bbf2b3c3d382e8e29f08f862c8a2b11f79cda51b9192a2e9a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_priority_r3.py",
+      "sha256": "e68794391482dabfb3cecf55cd525587b9e5b3a59fd17a45fd503809c216df2b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_priority_v1.py",
+      "sha256": "8d61a2447468e21898d443c7f0c0bc5a459cc7c2032a64d2625e9ee5eca385da",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_privacy_audit.py",
+      "sha256": "81ba3db71f40b9beeb5100bc3523e697792b275e7e83e83829dc5cba374a15dd",
+      "categories": {
+        "credential_url": "Synthetic credential-URL rejection test; no usable service credential."
+      }
+    },
+    {
+      "path": "tests/test_providers.py",
+      "sha256": "b4027d58301ef8cbd141687b5a20efa184e29aa94a5ae49629c71e709a2230fd",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research.py",
+      "sha256": "7019f4db24a180f44620c0381d5fd119e2a3d55862d98d0e18afa3c06f778dc5",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research_client.py",
+      "sha256": "3f57dd18684ed6b0ac74fa8665994659cf5e8b25482247ecaefe7741b95a79c4",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research_product_entry.py",
+      "sha256": "b5565152d3d50af35a97d7bec3da4812450333b30fe0d4365d55403f78962181",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research_product_socket.py",
+      "sha256": "c660b1e9c17c8bac20fb6b689b86af169c66df7aa330abe1b6570dc9d5919f8a",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research_sdk_swift.py",
+      "sha256": "e4c0f9ebad515999346d8bc160d5ad52c4316e362d48f7457286e82bb6452821",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_research_swift.py",
+      "sha256": "5b2ac390d0bfda2e5dc51dc019757fc557b4423264f480d1f20d7bc10a0e53d6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_review_regressions.py",
+      "sha256": "76c291846fa9a01531d7228c4b0cc26270e3e975f557b5446907ee239cb954f2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_runtime.py",
+      "sha256": "9bb8842d30eb8d327784a03c8ffe21ea14a09759c5b3abb8aaa6ed65311d5d7b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_runtime_description.py",
+      "sha256": "da11546fc7ca59bffdd61927f39b825c874a93198ab069c40c479b8f21c6ece0",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_scheduling.py",
+      "sha256": "9f4190845bb3299684c0df2fabd614702bdd7028c0f80f00e11a3f0d32a014e2",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_selected_integration.py",
+      "sha256": "9d0e8f279b7d8e879a1088ec574824895b3c4fcf834915dd65db8d625fb05d5b",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_settings.py",
+      "sha256": "fede4f2564c7074dce82e983839c947f7b71663c1b65e21b2e318320c5a4a443",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_tisra_capture_contract.py",
+      "sha256": "5165327b82ee293626da23721824310a7577e8a2df32eec97747ae5ce262cb25",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_tisra_capture_frozen_evidence.py",
+      "sha256": "c6c5daa6b379987870c9a95e588e369708b9c953d5c3cd19957bc17ec149c6f8",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_tisra_capture_process.py",
+      "sha256": "2adc3bc72bb996c41648d74c2fa8ef5108da5231f58936b6552e6f9e0cb4d6d6",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_tisra_capture_runtime.py",
+      "sha256": "cc2c9f4a89ff9326842fef79b13276944d72b68b6ed67aa4213b213a79dbc369",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/test_tisra_capture_uploads.py",
+      "sha256": "4250610e5bc27f0fc88a3c54a0c57b363cd80a0b55e67aa4f7131c41980e95b1",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "tests/worker_fixture.py",
+      "sha256": "72aa18e6400cb1c6e9032a252b90b0f48db446ddf45ff6163cd2d619ff01c9b3",
+      "categories": {
+        "private_app_reference": "Intentional integration product or module names."
+      }
+    }
+  ],
+  "limits": [
+    "Pattern review is not proof of absence.",
+    "This source snapshot is not an installed or distributable signed application."
+  ]
+}

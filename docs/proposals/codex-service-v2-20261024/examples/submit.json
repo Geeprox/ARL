@@ -1,0 +1,19 @@
+{
+  "protocol": "arl/1",
+  "app": "example.pdf-client",
+  "method": "submit",
+  "params": {
+    "tool": "codex.text.generate.v2",
+    "key": "c65d163b-d81f-48fe-8ab0-997b02e36cda",
+    "args": {
+      "schema_version": 2,
+      "resolution_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Translate the following sentence into Chinese: A home portal has two addresses."
+        }
+      ]
+    }
+  }
+}

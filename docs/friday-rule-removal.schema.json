@@ -1,0 +1,106 @@
+{
+  "status": "source_only_not_installed",
+  "tool": "friday.rule-removal.plan.v1",
+  "version": 1,
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "model": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "request_json": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 7000
+      }
+    },
+    "required": [
+      "model",
+      "request_json"
+    ],
+    "additionalProperties": false
+  },
+  "permissions": [
+    "codex_app_server_inference",
+    "friday_reviewed_planning"
+  ],
+  "idempotent": false,
+  "request_format": "friday.rule-removal.request.v1",
+  "result_format": "friday.rule-removal.proposal.v1",
+  "request_fields": [
+    "schema_version",
+    "execution_id",
+    "text",
+    "context_fingerprint",
+    "captured_at_ms",
+    "expires_at_ms",
+    "choices"
+  ],
+  "choice_fields": [
+    "record_id",
+    "action_id",
+    "expected_fingerprint",
+    "rule_label",
+    "action_label"
+  ],
+  "proposal_fields": [
+    "schema_version",
+    "status",
+    "record_id",
+    "action_id",
+    "expected_fingerprint",
+    "summary"
+  ],
+  "proposal_statuses": [
+    "proposal",
+    "clarification",
+    "unsupported"
+  ],
+  "empty_identifiers_for_abstention": true,
+  "bounds": {
+    "wire_protocol": "arl/1",
+    "request_json_utf8_bytes": 7000,
+    "rendered_model_input_utf8_bytes": 8192,
+    "text_scalars": 1024,
+    "text_utf8_bytes": 4096,
+    "choices": 16,
+    "summary_scalars": 300,
+    "model_output_utf8_bytes": 4096,
+    "whole_call_ms": 30000,
+    "snapshot_age_ms": 60000,
+    "snapshot_ttl_ms": 60000
+  },
+  "result_binds": [
+    "owner",
+    "job_id",
+    "execution_id",
+    "context_fingerprint",
+    "request_sha256",
+    "prompt_sha256",
+    "model",
+    "provider",
+    "thread_id",
+    "turn_id",
+    "captured_at_ms",
+    "expires_at_ms"
+  ],
+  "model": "gpt-6.1-sol",
+  "provider": "codex_app_server",
+  "action_authority": false,
+  "usage": {
+    "tokens": null,
+    "cost": null
+  },
+  "token_hard_cap_supported": false,
+  "production_grants": false,
+  "not_supported": [
+    "arbitrary HA services",
+    "new rules",
+    "multiple mutations",
+    "delayed/recurring effects",
+    "OpenAI Responses migration",
+    "calibrated confidence"
+  ]
+}

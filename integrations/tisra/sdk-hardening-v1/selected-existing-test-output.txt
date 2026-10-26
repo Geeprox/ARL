@@ -1,0 +1,11 @@
+test_full_512k_request_separate_descriptor_and_1m_reply_are_byte_exact (tests.test_research.ResearchTests) ... ok
+test_cancel_during_noncooperative_external_call_cas_discards_reply (tests.test_research.ResearchTests) ... ok
+test_cross_owner_and_spoof_identity_fail_closed (tests.test_research.ResearchTests) ... ok
+test_semantic_dedupe_new_handle_reconnect_and_conflict (tests.test_research.ResearchTests) ... ok
+test_descriptor_budget_and_raw_unknown_fields_rejected_not_stripped (tests.test_research.ResearchTests) ... ok
+test_codex_text_adapter_is_explicitly_incompatible_not_a_responses_conversion (tests.test_research.ResearchTests) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.419s
+
+OK

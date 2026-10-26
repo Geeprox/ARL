@@ -1,0 +1,15 @@
+{
+  "schema_version": 2,
+  "enabled": 0,
+  "home": "/path/to/private/arl/mio",
+  "profile": "/path/to/private/arl/mio/profile.yaml",
+  "profile_sha256": "NOT_CONFIGURED",
+  "client_home": "/path/to/private/client-home",
+  "health_url_file": "/path/to/private/arl/mio/health-url.txt",
+  "audience_org": "org-example",
+  "tunnel_id": "tunnel_00000000000000000000000000000000",
+  "target_rule": "defaultCalendarForNewEvents",
+  "max_effects": 3,
+  "session_seconds": 3600,
+  "locked_qualified": 0
+}

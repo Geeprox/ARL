@@ -1,0 +1,31 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const srcPath=path.resolve(process.argv[2]||'integrations/service_runtime/netease_bridge.cjs');
+const src=fs.readFileSync(srcPath,'utf8'),setup=src.slice(0,src.lastIndexOf('\ntry {\n  const request=readRequest();'));
+const api=new Function('require','__dirname',setup+'\nreturn {cloudMetadataObservation,observeCloudMetadata,FiniteDiagnostics,set(c,d){readContext=c;diagnostic=d;},secret(v){privatePatterns.add(v);},clear(){privatePatterns.clear();}};')(require,path.dirname(srcPath));
+const method=()=>({name:'privateSongs',path:'/openapi/music/basic/cloud/song/list/v2',http_method:'GET',auth_required:true,
+ description:'云盘 metadata PRIVATE_DESCRIPTION',parameters:[{name:'offset',type:'integer',in:'query',required:true,default:'PRIVATE_DEFAULT'},
+ {name:'limit',type:'integer',in:'query',required:true,value:'PRIVATE_VALUE'}]});
+const fixture=()=>({manifests:{root:{methods:[],sub_resources:[{name:'assets',path:'assets'}]},
+ assets:{description:'用户资产',methods:[method()],sub_resources:[]}}});
+let tests=0;function check(fn){fn();tests++;}
+check(()=>{const v=api.cloudMetadataObservation(fixture());assert.equal(v.coverage,'complete');assert.deepEqual(v.entries[0].operation,['assets','privateSongs']);assert.equal(v.entries[0].endpoint,method().path);assert.equal(v.entries[0].parameters[0].name,'offset');assert.ok(!JSON.stringify(v).includes('PRIVATE_'));});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].name='downloadFile';f.manifests.assets.methods[0].path='/openapi/music/basic/cloud/file/download';const v=api.cloudMetadataObservation(f);assert.equal(v.entries[0].operation[1],'downloadFile');assert.equal(v.coverage,'complete');});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].parameters[0].in='body';f.manifests.assets.methods[0].http_method='POST';assert.equal(api.cloudMetadataObservation(f).entries[0].parameters[0].location,'body');});
+check(()=>{const f=fixture();const m=f.manifests.assets.methods[0];m.description='';m.name='song';m.path='/openapi/music/basic/search/song';f.manifests.assets.description='普通';f.manifests.root.sub_resources[0].name='search';assert.equal(api.cloudMetadataObservation(f).matched_methods,0);});
+check(()=>{const f=fixture();f.manifests.assets.methods=[];f.manifests.assets.sub_resources=[{name:'library',path:'nested'}];f.manifests.nested={methods:[method()],sub_resources:[]};assert.deepEqual(api.cloudMetadataObservation(f).entries[0].operation,['assets','library','privateSongs']);});
+check(()=>{const f=fixture();f.manifests.assets.sub_resources=[{name:'cycle',path:'assets'}];assert.equal(api.cloudMetadataObservation(f).coverage,'partial');});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].path+='?token=PRIVATE';const v=api.cloudMetadataObservation(f);assert.equal(v.entries.length,0);assert.equal(v.omitted_candidates,1);});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].name='privateSongs\n';assert.equal(api.cloudMetadataObservation(f).omitted_candidates,1);});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].parameters[0].name='offset\n';const v=api.cloudMetadataObservation(f);assert.equal(v.coverage,'partial');assert.equal(v.entries[0].parameters.length,1);});
+check(()=>{const f=fixture();delete f.manifests.assets.methods[0].parameters[0].required;const v=api.cloudMetadataObservation(f);assert.equal(v.coverage,'partial');assert.equal(v.entries[0].parameters[0].required,'unknown');});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].parameters[1].name='offset';assert.equal(api.cloudMetadataObservation(f).coverage,'partial');});
+check(()=>{const f=fixture();f.manifests.assets.methods=Array.from({length:100},(_,i)=>({...method(),name:'cloudSong'+i}));const v=api.cloudMetadataObservation(f);assert.equal(v.matched_methods,100);assert.equal(v.coverage,'partial');assert.equal(v.entries.length+v.omitted_candidates,100);assert.ok(v.entries.length<=24&&Buffer.byteLength(JSON.stringify(v))<=8000);});
+check(()=>{const f=fixture();f.manifests.assets.methods[0].parameters=Array.from({length:30},(_,i)=>({name:'field'+i,type:'string',in:'query',required:false}));const v=api.cloudMetadataObservation(f);assert.equal(v.coverage,'partial');assert.equal(v.entries[0].parameter_count,30);assert.equal(v.entries[0].parameters.length,16);});
+check(()=>{assert.equal(api.cloudMetadataObservation({}).coverage,'invalid');});
+check(()=>{const f=fixture();delete f.manifests.assets.methods[0].parameters;const v=api.cloudMetadataObservation(f);assert.equal(v.entries.length,1);assert.equal(v.entries[0].parameter_count,-1);assert.equal(v.coverage,'partial');});
+check(()=>{const events=[],d=new api.FiniteDiagnostics('00000000-0000-0000-0000-000000000001',x=>events.push(x));api.set({operation:'search',isWrite:false},d);api.observeCloudMetadata(fixture());api.observeCloudMetadata(fixture());assert.equal(events.length,1);assert.equal(events[0].cloud_metadata.coverage,'complete');assert.equal(d.phase,'initialize');});
+check(()=>{for(const c of [{operation:'playlist_append',isWrite:true},{operation:'user_playlists',isWrite:false}]){const events=[];api.set(c,{record(...v){events.push(v);}});api.observeCloudMetadata(fixture());assert.equal(events.length,0);}});
+check(()=>{api.secret('privateSongs');const v=api.cloudMetadataObservation(fixture());assert.equal(v.entries.length,0);assert.equal(v.omitted_candidates,1);api.clear();});
+check(()=>{for(const target of ['method','group','both']){const f=fixture(),m=f.manifests.assets.methods[0];m.name='song';m.path='/openapi/music/basic/search/song';m.description='';f.manifests.assets.description='';f.manifests.root.sub_resources[0].name='search';const long='x'.repeat(2048)+'\u4e91\u76d8';if(target!=='group')m.description=long;if(target!=='method')f.manifests.assets.description=long;const v=api.cloudMetadataObservation(f);assert.equal(v.scanned_methods,1);assert.equal(v.uninspectable_methods,1);assert.equal(v.coverage,'partial');assert.equal(v.matched_methods,0);assert.deepEqual(v.entries,[]);assert.ok(!JSON.stringify(v).includes(long));}});
+console.log(JSON.stringify({status:'PASS',tests,provider_calls:0,credential_access:0,unknown_business_calls:0,fixture_commands_are_synthetic:true}));

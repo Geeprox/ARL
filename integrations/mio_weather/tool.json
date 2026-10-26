@@ -1,0 +1,20 @@
+{
+  "name": "mio_maps_weather",
+  "version": 1,
+  "description": "只读高德天气；指定六位行政区代码，mode=current查实况、forecast查预报。返回供应方report_time与抓取时间，不推断本机位置。",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "adcode": {"type": "string", "minLength": 6, "maxLength": 6, "pattern": "^[0-9]{6}$"},
+      "mode": {"type": "string", "enum": ["current", "forecast"], "default": "current"}
+    },
+    "required": ["adcode"],
+    "additionalProperties": false
+  },
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "idempotentHint": true,
+    "openWorldHint": true
+  }
+}

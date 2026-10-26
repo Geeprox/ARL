@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "root_service_id": "service.nas-library",
+  "manifests": [
+    {
+      "schema_version": 1,
+      "service_id": "service.nas-library",
+      "name": "Synthetic nas-library",
+      "version": "1.0.0",
+      "icon_ref": "sf:server.rack",
+      "repository_url": "https://code.example.invalid/synthetic/nas-library",
+      "revision": "cccccccccccccccccccccccccccccccccccccccc",
+      "license_spdx": "MIT",
+      "runtimes": [
+        {
+          "backend": "nas_docker",
+          "image": "registry.example.invalid/synthetic/nas-library@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "ports": [
+        {
+          "name": "web",
+          "service_port": 8080,
+          "protocol": "tcp",
+          "required": true
+        }
+      ],
+      "mounts": [
+        {
+          "name": "library",
+          "destination": "/data",
+          "access": "rw",
+          "kind": "directory",
+          "required": true
+        }
+      ],
+      "parameters": [
+        {
+          "key": "READ_ONLY",
+          "kind": "boolean",
+          "required": true
+        },
+        {
+          "key": "WORKERS",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 4
+        },
+        {
+          "key": "DISPLAY_MODE",
+          "kind": "enum",
+          "required": false,
+          "choices": [
+            "compact",
+            "comfortable"
+          ]
+        }
+      ],
+      "credential_requirements": [
+        {
+          "key": "SERVICE_TOKEN",
+          "purpose": "service_api",
+          "required": true
+        }
+      ],
+      "dependencies": [],
+      "portal": {
+        "scheme": "http",
+        "port": "web",
+        "path": "/"
+      },
+      "health": {
+        "endpoint": {
+          "scheme": "http",
+          "port": "web",
+          "path": "/health"
+        },
+        "expected_status": 200,
+        "timeout_ms": 1000,
+        "interval_ms": 30000,
+        "stale_after_ms": 90000
+      }
+    }
+  ],
+  "configurations": [
+    {
+      "schema_version": 1,
+      "service_id": "service.nas-library",
+      "deployment_id": "nas-library-fixture",
+      "target_id": "synthetic-nas",
+      "backend": "nas_docker",
+      "port_bindings": [
+        {
+          "name": "web",
+          "host_port": 48080,
+          "exposure": "target_loopback"
+        }
+      ],
+      "mount_bindings": [
+        {
+          "name": "library",
+          "source": "/Volumes/Synthetic Library/library"
+        }
+      ],
+      "parameters": {
+        "READ_ONLY": true
+      },
+      "credential_refs": {
+        "SERVICE_TOKEN": "synthetic-opaque-ref"
+      }
+    }
+  ],
+  "inventory": {
+    "schema_version": 1,
+    "target_id": "synthetic-nas",
+    "supported_backends": [
+      "nas_docker"
+    ],
+    "occupied_ports": [],
+    "source": "synthetic",
+    "observed_at_ms": 1000000
+  }
+}

@@ -1,0 +1,433 @@
+{
+  "contract_version": 2,
+  "status": "source_only_consumer_acceptance_required",
+  "provider": "codex_app_server",
+  "tool": "tisra.codex.research.v2",
+  "transport": {
+    "schema_version": 1,
+    "rpc_namespace": "codex.*.v1"
+  },
+  "formats": {
+    "request": "tisra.codex.request.v2",
+    "output": "tisra.codex.result.v2",
+    "history": "tisra.codex.history.v2"
+  },
+  "payload_purposes": {
+    "request": "tisra.codex.request.v2",
+    "descriptor": "tisra.codex.descriptor.v2",
+    "result": "tisra.codex.result.v2"
+  },
+  "renderer": {
+    "version": "tisra.codex.raw-json.v2",
+    "input": "complete_original_utf8_json_bytes_as_sole_text_input",
+    "transformations": "none_no_reserialize_fetch_truncate_summarize_or_normalize",
+    "history": "explicit_public_question_answer_and_original_citations_only",
+    "output": "text_and_original_generated_citations_in_original_order",
+    "private_reasoning_replayed": false
+  },
+  "bounds": {
+    "original_request_bytes": 8192,
+    "provider_input_bytes": 8192,
+    "separate_descriptor_bytes": 32768,
+    "generated_body_original_bytes": 32768,
+    "generated_body_canonical_bytes": 32768,
+    "generated_text_bytes": 32768,
+    "stored_result_envelope_bytes": 262144,
+    "upstream_complete_json_line_bytes": 65536,
+    "whole_call_wall_time_ms": 30000,
+    "provider_turns": 1,
+    "automatic_retries": 0,
+    "output_token_hard_cap": null,
+    "cost_hard_cap": null
+  },
+  "common_rules": {
+    "unknown_keys": "reject",
+    "duplicate_keys": "reject",
+    "nullable_keys": "explicit_null_required",
+    "uuid": "canonical_lowercase_uuid",
+    "sha256": "64_lowercase_hex",
+    "integer": "finite_integer_not_boolean",
+    "strings": "strict_utf8_no_unpaired_surrogates",
+    "overflow": "reject_complete_object_before_external_start_no_truncation"
+  },
+  "request": {
+    "schema_version": 2,
+    "exact_keys": [
+      "schema_version",
+      "text",
+      "public_history",
+      "evidence",
+      "migration"
+    ],
+    "text": {
+      "type": "string",
+      "min_utf8_bytes": 1,
+      "max_utf8_bytes": 8192
+    },
+    "public_history": {
+      "type": "array",
+      "max_items": 20,
+      "item": "public_history_pair"
+    },
+    "evidence": {
+      "type": "array",
+      "max_items": 100,
+      "item": "selected_source_part",
+      "unique_by": [
+        "evidence_id",
+        "record_id",
+        "revision",
+        "unit"
+      ],
+      "digest_consistency": "one_snapshot_digest_per_evidence_id",
+      "record_consistency": "one_revision_title_extraction_state_per_evidence_id_record_id"
+    },
+    "migration": "explicit_null_or_migration_binding"
+  },
+  "objects": {
+    "selected_source_part": {
+      "exact_keys": [
+        "evidence_id",
+        "snapshot_digest",
+        "record_id",
+        "revision",
+        "unit",
+        "attachment_sha256",
+        "text",
+        "title",
+        "locator",
+        "extraction_state"
+      ],
+      "evidence_id": "uuid",
+      "snapshot_digest": "sha256_of_trusted_original_complete_snapshot_not_part_text",
+      "record_id": "uuid",
+      "revision": "integer_1_to2147483647",
+      "unit": "explicit_null_or_integer_0_to1999",
+      "text": "string_max8192_utf8_bytes",
+      "attachment_sha256": "explicit_null_for_note_or_sha256_of_original_attachment_for_extracted_unit",
+      "attachment_binding": "caller_supplies_matching_record_source_blob_hash_and_extraction_blob_hash_no_blob_fetch",
+      "title": "string_max1024_utf8_bytes",
+      "locator": "explicit_null_for_note_or_string_max200_utf8_bytes_for_unit",
+      "extraction_state": [
+        "failed",
+        "partial",
+        "ready",
+        "unavailable"
+      ],
+      "unit_requires_extraction_state": [
+        "ready",
+        "partial"
+      ],
+      "empty_note_text_allowed": true
+    },
+    "citation": {
+      "exact_keys": [
+        "evidence_id",
+        "snapshot_digest",
+        "record_id",
+        "revision",
+        "unit",
+        "attachment_sha256",
+        "quote",
+        "start_utf8",
+        "end_utf8"
+      ],
+      "evidence_id": "uuid",
+      "snapshot_digest": "sha256",
+      "record_id": "uuid",
+      "revision": "integer_1_to2147483647",
+      "unit": "explicit_null_or_integer_0_to1999",
+      "quote": "nonempty_string_max16384_utf8_bytes",
+      "attachment_sha256": "explicit_null_for_note_or_exact_original_source_part_attachment_sha256",
+      "start_utf8": "integer_0_to8191",
+      "end_utf8": "integer_1_to8192",
+      "range": "start_less_than_end_end_exclusive_relative_to_entire_exact_source_part_text",
+      "source_check": "exact_matching_binding_and_strict_utf8_source_byteslice_equals_quote_no_normalization",
+      "duplicate_identity": [
+        "evidence_id",
+        "record_id",
+        "revision",
+        "unit",
+        "quote"
+      ]
+    },
+    "public_history_pair": {
+      "exact_keys": [
+        "run_id",
+        "request_sha256",
+        "output_sha256",
+        "question",
+        "answer",
+        "citations"
+      ],
+      "run_id": "uuid",
+      "request_sha256": "sha256",
+      "question": "string_max8192_utf8_bytes",
+      "answer": "string_max8192_utf8_bytes",
+      "citations": "array_max50_citation",
+      "output_sha256": "sha256_canonical_encode_text_answer_and_original_citations",
+      "source_validation": "all_historical_citations_require_explicit_root_source_parts"
+    },
+    "migration_binding": {
+      "exact_keys": [
+        "from_request_format",
+        "from_output_format",
+        "from_history_version",
+        "parent_run_id",
+        "parent_fingerprint",
+        "source_request_sha256",
+        "encrypted_reasoning_replayed"
+      ],
+      "from_request_format": "nonempty_string_max200_utf8_bytes",
+      "from_output_format": "nonempty_string_max200_utf8_bytes",
+      "from_history_version": "nonempty_string_max200_utf8_bytes",
+      "parent_run_id": "uuid",
+      "parent_fingerprint": "sha256",
+      "source_request_sha256": "sha256",
+      "encrypted_reasoning_replayed": false
+    }
+  },
+  "descriptor": {
+    "version": 2,
+    "format": "tisra.codex.v2",
+    "maximumOutputTokens": null,
+    "exact_keys": [
+      "version",
+      "executionID",
+      "threadID",
+      "sequence",
+      "parentRunID",
+      "parentFingerprint",
+      "startsAlternatePath",
+      "model",
+      "format",
+      "requestDigest",
+      "requestBytes",
+      "maximumResponseBytes",
+      "maximumOutputTokens",
+      "maximumTextBytes",
+      "evidence"
+    ],
+    "maximumTextBytes": "integer_1_to32768",
+    "maximumResponseBytes": "integer_1_to262144",
+    "request_binding": "original_execution_id_model_request_sha256_and_complete_byte_count_match_submit",
+    "evidence": "ordered_unique_snapshot_id_digest_first_appearance_from_flat_parts"
+  },
+  "generated_body": {
+    "exact_keys": [
+      "text",
+      "citations"
+    ],
+    "text": "nonempty_nonwhitespace_string_max_granted_text_bytes",
+    "citations": "array_max50_citation_zero_allowed",
+    "provider_json_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "evidence_id": {
+                "type": "string"
+              },
+              "snapshot_digest": {
+                "type": "string"
+              },
+              "record_id": {
+                "type": "string"
+              },
+              "revision": {
+                "type": "integer"
+              },
+              "unit": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "quote": {
+                "type": "string"
+              },
+              "attachment_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "start_utf8": {
+                "type": "integer"
+              },
+              "end_utf8": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "evidence_id",
+              "snapshot_digest",
+              "record_id",
+              "revision",
+              "unit",
+              "attachment_sha256",
+              "quote",
+              "start_utf8",
+              "end_utf8"
+            ]
+          }
+        }
+      },
+      "required": [
+        "text",
+        "citations"
+      ]
+    },
+    "validation": "all_present_citations_match_exact_original_sources_or_reject_whole_result_no_filter_repair",
+    "missing_citations": "allowed_consumer_may_show_missing_citation_notice",
+    "citation_meaning": "proves_exact_source_passage_exists_not_that_each_inference_is_true"
+  },
+  "result_envelope": {
+    "schema_version": 2,
+    "exact_keys": [
+      "schema_version",
+      "request_format",
+      "output_format",
+      "history_version",
+      "owner",
+      "job_id",
+      "run_id",
+      "request_sha256",
+      "provider_input_sha256",
+      "epoch",
+      "auth_epoch",
+      "provider",
+      "model",
+      "model_fingerprint",
+      "model_evidence",
+      "native",
+      "text",
+      "citations",
+      "output_sha256",
+      "reviewed_evidence_bindings",
+      "usage",
+      "token_hard_cap_supported"
+    ],
+    "output_sha256": "sha256_canonical_encode_text_and_all_original_generated_citations",
+    "canonical_encoding": "arl.contracts.encode_json_ensure_ascii_false_sort_keys_true_allow_nan_false_default_separators",
+    "reviewed_evidence_bindings": "ordered_original_flat_part_metadata_exact_evidence_keys_not_generated_citations",
+    "source_validation": "host_always_requires_original_request_consumer_requires_trusted_sources_for_quote_range_validation",
+    "source_absent_validation": "shape_uniqueness_hash_pins_and_reviewed_binding_only_no_source_quote_claim",
+    "model_evidence": {
+      "exact_keys": [
+        "source",
+        "confirmed_identifier",
+        "adapter_binary_sha256",
+        "protocol_version",
+        "control_contract_sha256",
+        "backend_weights_revision"
+      ],
+      "source": "thread_start_confirmed_identifier",
+      "protocol_version": "0.159.0",
+      "confirmed_identifier": "matches_original_granted_model_and_thread_start_response",
+      "adapter_binary_sha256": "sha256",
+      "control_contract_sha256": "sha256",
+      "backend_weights_revision": null
+    },
+    "model_fingerprint": {
+      "basis": [
+        "adapter_binary_sha256",
+        "protocol_version",
+        "control_contract_sha256",
+        "confirmed_identifier"
+      ],
+      "digest": "sha256_canonical_encode_basis_fields_not_backend_weights"
+    },
+    "native": {
+      "exact_keys": [
+        "thread_id",
+        "turn_id",
+        "terminal",
+        "interrupt"
+      ],
+      "thread_id": "acknowledged_nonempty_string_max100_characters",
+      "turn_id": "acknowledged_nonempty_string_max100_characters",
+      "terminal": "completed",
+      "interrupt": "not_requested"
+    },
+    "usage": {
+      "exact_keys": [
+        "tokens",
+        "cost"
+      ],
+      "tokens": null,
+      "cost": null
+    },
+    "token_hard_cap_supported": false
+  },
+  "receipt_binding": [
+    "owner",
+    "job_id",
+    "run_id",
+    "request_sha256",
+    "epoch",
+    "auth_epoch",
+    "provider",
+    "model",
+    "model_fingerprint",
+    "request_format",
+    "output_format",
+    "history_version"
+  ],
+  "reviewed_binding": {
+    "exact_keys": [
+      "evidence_id",
+      "snapshot_digest",
+      "record_id",
+      "revision",
+      "unit",
+      "attachment_sha256"
+    ],
+    "ordered": true,
+    "unique_by": [
+      "evidence_id",
+      "record_id",
+      "revision",
+      "unit"
+    ],
+    "consistency": "one_digest_per_evidence_id_one_revision_per_evidence_id_record_id_one_attachment_sha256_per_extracted_record"
+  },
+  "native_evidence": {
+    "terminal": [
+      "completed",
+      "failed",
+      "interrupted",
+      "not_started",
+      "unknown"
+    ],
+    "interrupt": [
+      "acknowledged",
+      "not_requested",
+      "rejected",
+      "sent",
+      "unknown"
+    ],
+    "ack_is_terminal": false,
+    "backend_weights_revision": null
+  },
+  "recovery": {
+    "persist_before_start": "original_immutable_receipt_binding_and_uncertainty",
+    "persist_on_ack": "matching_native_ids_and_original_model_control_pins",
+    "cancel": "close_publication_gate_first_then_one_bounded_interrupt",
+    "lost_ack": "needs_review_no_replay",
+    "late_output": "discard_after_gate_closes",
+    "restore": "validate_original_pins_status_cancel_cleanup_only_no_start_or_resubmit",
+    "durable_record": "metadata_only_no_source_answer_quote_or_private_reasoning_plaintext"
+  },
+  "tools": "deny_all_actions_and_non_text_provider_items",
+  "workspace": "host_owned_empty_ephemeral_read_only_network_disabled_inherited_mcp_disabled",
+  "capability_advertisement": "none_without_explicit_matching_consumer_grant_and_host_opt_in"
+}

@@ -1,0 +1,61 @@
+# Tisra Codex-native research: source proposal, not a published capability
+
+2026-10-01, source proposal revision 2. This responds to the Tisra consumer's source-contract request. No deployment, identity grant, provider enablement or model call is part of this proposal. `tisra.research.v1` currently accepts only the three Responses formats. The existing Codex adapter is a separate text tool and cannot be passed off as that implementation. This document is authoritative for the proposed names; the older `codex.research.*` names in TISRA-CODEX-MIGRATION.md are historical, unpublished draft aliases, not accepted wire formats.
+
+## Actual source limits today
+
+`arl/codex_server.py`, `CodexTextAdapter.run`: one explicit turn, UTF-8 input <=8192 bytes, accepted text output <=32768 bytes, existing ChatGPT account and configured model only. Its sessions use `context.remaining(30)`; a host policy with a fixed <=30-second job deadline, such as the source Friday profile, bounds the whole job including setup. The adapter restarts a session after reading/disabling inherited MCP, so its per-session30 cap alone is **not** an independent30-second whole-call guarantee with a more permissive host deadline. The proposed Tisra path must pin one absolute <=30-second deadline before any provider process launch and use it through both sessions/cancel drain; that integration does not exist yet. No upstream output-token or cost hard cap, token count/cost evidence null. No automatic truncation, retry, paid fallback, account/model switching or hidden summarization. Tools/permission requests and unexpected item types are rejected; inherited MCP is disabled; workspace is empty, ephemeral and read-only with network disabled. A completed successful turn is not interrupted. In-flight interrupt acknowledgement and terminal interrupted evidence are distinct; no refund or guaranteed immediate upstream stop is claimed.
+
+Success currently returns `codex.appserver.text.v1`, text, native thread/turn IDs, request/output hashes and model label checked against thread/start. Thread/turn IDs are not yet durably written to the typed research run before completion, and failure/cancel receipts do not provide the proposed persistent native identity envelope. Adapter `inference_tested:false` discovery is generic metadata, not the acceptance record of the earlier isolated synthetic tests.
+
+`arl/research.py` currently supports 524288-byte immutable Responses request payloads, separate 32768-byte descriptor, 1048576-byte result storage, 8192-byte upload chunks and 32768-byte read chunks. **Storage capacity does not make the Codex provider accept 512KiB.** Its FORMATS gate rejects Codex formats. No matching Codex typed research implementation or capabilities advertisement exists today.
+
+## Proposed distinct format negotiation
+
+| Field | Proposed value | Meaning |
+| --- | --- | --- |
+| request_format | `tisra.codex.request.v1` | Reviewed Codex-native input, never an OpenAI Responses body |
+| output_format | `tisra.codex.result.v1` | Native text plus verified thread/turn evidence and references |
+| history_version | `tisra.codex.history.v1` | Explicit public-text/citation/evidence history, no encrypted reasoning |
+| provider | `codex_app_server` | Existing account/configuration, explicit product grant required |
+| execution implementation | `not_implemented` | Must remain absent from published capabilities until source and boundary tests exist |
+
+Request grammar proposed for consumer review is in `integrations/tisra/codex-native-proposal-v1.json`. It has exact root keys `schema_version`, `text`, `public_history`, `evidence`, `migration`. `schema_version=1`; history contains reviewed public question/answer pairs, original run/hash references and citations; evidence contains the selected exact text as well as ID/digest/record/revision/unit. References do not authorize server-side evidence retrieval. No arbitrary path, URL, attachment, encrypted reasoning, tools, automatic summarization or raw Responses body is accepted. Nullable fields must be present as explicit null. All objects reject unknown or duplicate keys. UUIDs are canonical lowercase and digests lowercase SHA256.
+
+The initial renderer proposal is deliberately byte-preserving: after strict UTF-8/JSON/schema validation, `tisra.codex.raw-json.v1` passes the original reviewed request bytes decoded as UTF-8 directly as the sole Codex text input, without reserializing, prefixing, dropping fields or fetching content. The request digest and provider-input digest therefore match. Whole original request **and** rendered input each must be <=8192 bytes, including its JSON/whitespace. Descriptor has a separate <=32768-byte bound and never consumes that budget. Up to20 history pairs are syntactically allowed, but are accepted only if the complete request fits; twenty full rounds are not promised. The proposed grammar/renderer has no execution endpoint or implemented validator yet; consumer agreement and source tests are required before advertisement.
+
+There is no promised 20-round or 512KiB acceptance. If the selected evidence/history exceeds this complete-request/rendered-input limit, reject with `codex_input_too_large` before external start. The user may explicitly review a new smaller request/path. ARL must not automatically select excerpts, summarize, drop citations/history or re-submit. Increasing input to 512KiB or deadline above30s requires a separately implemented, provider-verified contract; this document does not authorize it.
+
+The proposed result keeps text <=32768 UTF-8 bytes. A separately stored immutable result envelope may be <=262144 serialized bytes to allow JSON escaping and metadata, still downloaded in bounded chunks; it is not a promise of larger generated text. The existing App Server parser also caps each complete upstream JSON line at65536 bytes, so a highly escaped32KiB answer can be rejected by the framing bound; there is no guaranteed32KiB yield. Envelope keys include format versions, native thread_id/turn_id, model identifier and evidence source, requested/observed adapter fingerprint basis, backend model revision nullable, original request/rendered/output hashes, reviewed evidence bindings, terminal state and external_stop evidence. Do not put tool results or encrypted reasoning in it. Responses envelope/model/provider fields cannot be fabricated. Existing `{text}` output does not produce a validated structured citation result: reviewed input citations/evidence are retained as bindings, not presented as model-generated citation evidence. A consumer requiring structured generated citations must continue to reject this initial text contract until a separate output validator is implemented and agreed.
+
+Model identity evidence currently reaches the identifier confirmed by thread/start, not immutable backend weights/revision. A future fingerprint must disclose its basis (binary SHA/protocol/model/control contract) and report backend revision unknown. Tisra must explicitly accept that different evidence basis; matching a string or hashing a requested model name is not verified backend identity.
+
+### Native identity and terminal evidence
+
+The proposed native record is attached to the immutable owner/job/run/request-hash/epoch/auth-epoch binding, never a replacement for it. `thread_id` and `turn_id` start null and are populated only from genuine acknowledgements; a lost acknowledgement stays unknown. No successful result is possible without both matching identities and a matching `turn/completed` status `completed`. `native_terminal` is `not_started|unknown|completed|interrupted|failed`; `interrupt` is `not_requested|sent|acknowledged|rejected|unknown`. These are independent axes. An interrupt acknowledgement alone does not mean interrupted. Native `completed` after local cancellation does not reopen the local publication gate.
+
+| Observed boundary | Local receipt/publication | Recovery |
+| --- | --- | --- |
+| No external-start admission; queued cancellation/expiry/revocation | cancelled/failed as applicable; no result | no invocation |
+| External-start admitted; start acknowledgement lost or process/transport/deadline lost | needs_review; native identities may be null, terminal unknown | status/cancel/cleanup only; no replay |
+| Matching native completed; binding/current grant/deadline/publication gate still valid | succeeded with immutable result reference | read original result only |
+| Matching native interrupted after local cancel | cancellation gate remains closed; terminal interrupted recorded | no result and no replay |
+| Matching native failed or an action request/item is rejected | failure evidence retained; no success | if external outcome remains uncertain, needs_review; no replay |
+| Matching completed arrives after cancellation/revocation/expiry/auth-epoch drift | late output discarded | retain evidence, no reopen/resubmit |
+
+The current generic queue can conservatively retain needs_review for an already-started non-idempotent canceled call even when the observer saw interrupted; the proposed research receipt must preserve the terminal evidence without claiming that the current queue already publishes a richer canceled envelope. Status/restore must not initiate a new App Server process or claim that an ephemeral upstream thread can be recovered. Preserving the acknowledged IDs is correlation evidence, not a promise of upstream resumability. Native evidence is private durable execution metadata, excluded from diagnostic logs.
+
+## Binding and durable recovery requirements
+
+Reuse the consumer-accepted immutable payload/upload and owner-isolated run/receipt semantics, with the new formats independently negotiated: owner, canonical run UUID, job UUID, original request hash, epoch, first auth_epoch, provider/model/fingerprint and all three format versions remain fixed. Persist original receipt/params bytes and original pin without recomputing it on restore. Submit one logical run once; reconnect/status/cancel/cleanup cannot cause a new inference. Unsupported formats/budgets fail before creating an executable job or consuming an inference budget.
+
+Before the provider turn begins, durably record external-start uncertainty; after each genuine thread/start and turn/start acknowledgement, persist native identities and their original binding. Record terminal completed/interrupted/failed evidence separately from interrupt acknowledgement. Proposed local states remain queued/running/succeeded/failed/cancelled/needs_review. Cancelled/invalidation/expired/auth_epoch-changed runs cannot publish late success. Uncertain external start/stop or lost acknowledgement is needs_review and never replayed. A local cancellation request first closes the product gate; its durable job/run binding is preserved across UI close/restart and explicitly reconciled without inference replay.
+
+The current text adapter result/observer and typed research store do not yet implement all of those persistent native-ID/terminal bindings. That is a concrete code gap, not something product authorization alone fixes. Existing Responses durable records, raw bodies, encrypted reasoning, lineage/citations and backup migration stay unchanged. Cross-format continuation is an explicit new user-reviewed path carrying only approved public answers/citations/evidence.
+
+## Minimal implementation sequence
+
+1. Consumer accepts/rejects the strict 8KiB native contract and truthful no-token-hard-cap/fingerprint limits; freeze exact history/evidence grammar.
+2. Add an opt-in native-format typed research adapter using existing payload/receipt machinery, with deterministic rendering and provider-byte/deadline rejection before external start; retain separate Responses adapter.
+3. Persist acknowledged native identities and actual terminal/cancel evidence atomically with the immutable run binding; add provider doubles for oversize, tools, cancellation, authorization drift, lost ack and restore-no-replay.
+4. Only then advertise the distinct formats/provider evidence in source capabilities and coordinate SDK consumption. Real caller deployment, grants and inference quota approval remain separate. No real model call is needed for this source phase.

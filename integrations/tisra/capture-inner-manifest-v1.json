@@ -1,0 +1,209 @@
+{
+  "arl_outer_contract": {
+    "activation": false,
+    "exact_request_bytes": 524288,
+    "host_commit_confirmation_implemented": false,
+    "local_commit": "c9e040b570c290c2ef887206f401fdc23cc3a6e4",
+    "outer_metadata_pin": "acfd368accaf445b0b57021b49f1821479afea61f28a2af87a52b0a3f6b7fb4e",
+    "result_bytes": 32768
+  },
+  "codec": "tisra.link-capture.inner.v1",
+  "consumer_schema_sha256": "f6a6618c280e78389cce1846f24613689ba4c166604597f93aafe9904cef3ce8",
+  "consumer_source_commit": "676aed1204a0528605406c50b1035f35625c813a",
+  "fixtures": [
+    {
+      "bytes": 2313,
+      "path": "capture-inner-v1/adoption-created.receipt.json",
+      "sha256": "84f2f91c289628ed245a9ab04715a3d258a6d3c6cb6a44dd95256cf7781a3f8b"
+    },
+    {
+      "bytes": 1522,
+      "path": "capture-inner-v1/adoption-request.json",
+      "sha256": "427e5550fafd44cb9b629033f59ee83a734c6ea29afbc281ebe905396557cff5"
+    },
+    {
+      "bytes": 1140,
+      "path": "capture-inner-v1/adoption.envelope.json",
+      "sha256": "4003942066e1d87d3651fe48980afd9563b2c37fc7ee8bfee9fe31a29dd439bc"
+    },
+    {
+      "bytes": 920,
+      "path": "capture-inner-v1/analysis.envelope.json",
+      "sha256": "0ae61a8cf980a709fcb8ceb09af2bdc724f9824c0fd1c494a9598b70a4f24fbf"
+    },
+    {
+      "bytes": 1733,
+      "path": "capture-inner-v1/body-deduplicated.receipt.json",
+      "sha256": "6d7aa2480eafa61e06a6b05f67d9eb32c6fcec198f2689a4d3ba097ad53b63a0"
+    },
+    {
+      "bytes": 1017,
+      "path": "capture-inner-v1/body-request.json",
+      "sha256": "9056f312ccb9a6476344b45b99436f60734425a92c5e8cc613b0e0a36d6f2df4"
+    },
+    {
+      "bytes": 1723,
+      "path": "capture-inner-v1/body-version.receipt.json",
+      "sha256": "df1b2300bd8f545b156db40645f929f8e62a486ad6c793c3c872a457c34c6de4"
+    },
+    {
+      "bytes": 13150,
+      "path": "capture-inner-v1/link-capture-inner-v1.schema.json",
+      "sha256": "f6a6618c280e78389cce1846f24613689ba4c166604597f93aafe9904cef3ce8"
+    },
+    {
+      "bytes": 615,
+      "path": "capture-inner-v1/metadata-created.receipt.json",
+      "sha256": "8f1d1204091c73db59460111cd963e9f2cfa293a49a47b2fac4784c327de26fc"
+    },
+    {
+      "bytes": 619,
+      "path": "capture-inner-v1/metadata-deduplicated.receipt.json",
+      "sha256": "92ee1f545dea839e6f7ef3e405bd424bbabdd30f4fedf7a8ba03074d449a4b97"
+    },
+    {
+      "bytes": 376,
+      "path": "capture-inner-v1/metadata-request.json",
+      "sha256": "da08a1188dacec509dc152561ec8df7bc4fd8db4e2c69b701b0d5c0ef2c930a2"
+    },
+    {
+      "bytes": 998,
+      "path": "capture-inner-v1/partial-request.json",
+      "sha256": "9039ac3fd8211d99a267486ae866f1fc2a07ae79279434c257aaef8be82f823b"
+    },
+    {
+      "bytes": 1245,
+      "path": "capture-inner-v1/partial.receipt.json",
+      "sha256": "92b8ebd1e0ae35dca23856b2d2fd4a8b00b6b746efec324d5011c91d21daed7a"
+    },
+    {
+      "bytes": 890,
+      "path": "capture-inner-v1/recovered-analysis.envelope.json",
+      "sha256": "0cd46aa1a99b57832ee6434dadd96fc81c68ea4e2fa65a99e2284bddeac74654"
+    },
+    {
+      "bytes": 1729,
+      "path": "capture-inner-v1/recovered.receipt.json",
+      "sha256": "d2c653c8e6e00f11d6359105a40029e8473b709fd4491647fe95012833b42e1e"
+    },
+    {
+      "bytes": 732,
+      "path": "capture-inner-v1/source.envelope.json",
+      "sha256": "a3d3eb373a1945c08064244cee8589f6671d40f08e4c77fa675d52dbe18b029a"
+    },
+    {
+      "bytes": 897,
+      "path": "capture-inner-v1/summary.envelope.json",
+      "sha256": "3fc4231e3225ada9bb48c0ea1a4b517b05fc5e023e6a871d4f55e9af4cf27232"
+    },
+    {
+      "bytes": 400,
+      "path": "capture-inner-v1/peer-retry-request.json",
+      "sha256": "70a1080bb07602e608712f7cd9f0e996c289cb2992a4771467ccccf308b65410"
+    },
+    {
+      "bytes": 619,
+      "path": "capture-inner-v1/peer-deduplicated.receipt.json",
+      "sha256": "92ee1f545dea839e6f7ef3e405bd424bbabdd30f4fedf7a8ba03074d449a4b97"
+    }
+  ],
+  "notes": [
+    "Pins exact schema bytes including final LF, not a Swift source hash or ARL outer metadata pin.",
+    "Fixture receipts are real isolated local CLI outcomes, not authenticated ARL identity/grants or durable ARL journal confirmations.",
+    "Stock JSON Schema alone cannot enforce normative x-* semantics and live reference checks.",
+    "Uncertain/lost acknowledgement or cancelled calls without a confirmed exact receipt require needs_review; this inner seam adds no ARL transaction_id.",
+    "A different declared peer can deliver an unchanged source version: source receipt writer must match stored first-write provenance, not overwrite it with the retry request writer. Contributions keep their own writer in their version hash."
+  ],
+  "packaging_commit": "36a69a26afd25306eb0964137048e037ec78807c",
+  "receipt_cases": [
+    {
+      "outer_state_candidate": "created",
+      "receipt": "metadata-created.receipt.json",
+      "request": "metadata-request.json"
+    },
+    {
+      "outer_state_candidate": "deduplicated",
+      "receipt": "metadata-deduplicated.receipt.json",
+      "request": "metadata-request.json"
+    },
+    {
+      "outer_state_candidate": "created",
+      "receipt": "body-version.receipt.json",
+      "request": "body-request.json"
+    },
+    {
+      "outer_state_candidate": "deduplicated",
+      "receipt": "body-deduplicated.receipt.json",
+      "request": "body-request.json"
+    },
+    {
+      "outer_state_candidate": "created",
+      "receipt": "adoption-created.receipt.json",
+      "request": "adoption-request.json"
+    },
+    {
+      "outer_state_candidate": "partial",
+      "receipt": "partial.receipt.json",
+      "request": "partial-request.json"
+    },
+    {
+      "outer_state_candidate": "created",
+      "receipt": "recovered.receipt.json",
+      "request": "partial-request.json"
+    },
+    {
+      "outer_state_candidate": "deduplicated",
+      "receipt": "peer-deduplicated.receipt.json",
+      "request": "peer-retry-request.json"
+    }
+  ],
+  "schema_entries": {
+    "provenance": "#/$defs/envelope",
+    "receipt": "#/$defs/receipt",
+    "request": "#/$defs/request"
+  },
+  "schema_file": "capture-inner-v1/link-capture-inner-v1.schema.json",
+  "schema_version": 1,
+  "source_files": [
+    {
+      "bytes": 3446,
+      "path": "Sources/TisraCLI/LinkCaptureCommand.swift",
+      "sha256": "6a38678de3571077788e5e03b6681b7d56e7fa243cfa5cb62705e747e19c66d9"
+    },
+    {
+      "bytes": 13884,
+      "path": "Sources/TisraCLI/main.swift",
+      "sha256": "5a1911ffc07e6d7ce9b175ca395d527422fbc88169fc66fc89d73bf38bf48e13"
+    },
+    {
+      "bytes": 8577,
+      "path": "Sources/TisraCore/Import/LinkCaptureCodec.swift",
+      "sha256": "7f7ea67925c4070667d702c54666cead9cbf198754a981bc9bcff859af08d3e2"
+    },
+    {
+      "bytes": 6508,
+      "path": "Sources/TisraCore/Import/LinkCaptureModels.swift",
+      "sha256": "7a80d13e9af95cc658ebde2b624e049917a711af6489e85b31b2ba8bcb7ec292"
+    },
+    {
+      "bytes": 16284,
+      "path": "Sources/TisraCore/Import/LinkCaptureService.swift",
+      "sha256": "8418f40be97ad0a00c7cf2911ce2146c38319b6c211b4dc9d8c3ac3c9e4c319e"
+    },
+    {
+      "bytes": 17812,
+      "path": "Tests/TisraCoreTests/LinkCaptureTests.swift",
+      "sha256": "eed7636482d6d468d275ff28ff7bd475af75a748ce6389f25b5ced91ecec4b3f"
+    }
+  ],
+  "validation": {
+    "capture_tests": 8,
+    "cli_calls": 29,
+    "core_failures": 0,
+    "core_tests": 195,
+    "external_network_calls": 0,
+    "history_tests": 27,
+    "native_ui_operations": 0,
+    "synthetic": true
+  }
+}

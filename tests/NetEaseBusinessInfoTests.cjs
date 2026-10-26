@@ -1,0 +1,34 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=process.cwd(),file=path.join(root,'integrations/service_runtime/netease_bridge.cjs'),src=fs.readFileSync(file,'utf8');
+const setup=src.slice(0,src.lastIndexOf('\ntry {\n  const request=readRequest();'));
+const api=new Function('require','__dirname',setup+`\nreturn {set(operation,isWrite=false){readContext={operation,stage:operation,isWrite,arguments:{},failure:null};diagnostic=null;},project:projectRead,metadata:songMetadata,failure(){return publicReadFailure(readContext.failure,'00000000-0000-4000-8000-000000000002');}};`)(require,path.dirname(file));
+const sample=JSON.parse(fs.readFileSync(path.join(root,'tests/fixtures/netease_business_public_shape.json'))).song;
+const observed={code:200,data:{records:[sample],recordCount:1}};
+function projected(row,operation='search'){api.set(operation);return api.project({code:200,data:operation==='cloud_songs'?{records:[row],hasMore:false}:{records:[row],recordCount:1}},operation).items?.[0] ?? null;}
+api.set('search');const row=api.project(observed,'search').items[0],b=row.metadata.business_info,raw=observed.data.records[0];
+assert.equal(Object.keys(raw).length,33);assert.equal(b.duration_raw,raw.duration);assert.equal(b.duration_unit,null);
+assert.deepEqual(b.artists.map(a=>a.name),raw.fullArtists.map(a=>a.name));assert.equal(b.artists[0].id,null);assert.equal(b.unknown_reasons['artists[0].id'],'upstream_null');
+assert.equal(b.album.id,raw.album.id);assert.equal(b.album.name,raw.album.name);
+assert.equal(row.play_flag,raw.playFlag);assert.equal(row.private_cloud_song,raw.privateCloudSong);
+assert.equal(b.provider_flags.payPlayFlag,raw.payPlayFlag);assert.equal(b.provider_flags.freeTrailFlag,raw.freeTrailFlag);
+assert.equal(b.provider_flags['freeTrialPrivilege.resConsumable'],raw.freeTrialPrivilege.resConsumable);
+assert.equal(row.metadata.recording_version,'original_performer');assert.equal(b.origin_cover_category,'original_performer');assert.equal(b.recording_edition,null);
+assert.equal(b.legacy_recording_version_semantics,'origin_cover_classification');assert.equal(b.unknown_reasons.duration_unit,'unit_unconfirmed');assert.equal(b.unknown_reasons.recording_edition,'not_requested');
+assert.deepEqual(JSON.parse(JSON.stringify(row.provider_record.fields)),raw);assert.deepEqual(row.provider_record.omitted_authentication_fields,[]);
+assert.ok(!Object.hasOwn(b,'alg'));assert.ok(!Object.hasOwn(b,'liked'));assert.ok(!Object.hasOwn(b,'coverImgUrl'));
+const synthetic={id:'f'.repeat(32),name:'Sample (2019 Mix) [Take 5]',fullArtists:[{id:123,name:'Sample artist'}],album:{id:'b'.repeat(32),name:'Sample album'},duration:240001,originCoverType:2,playFlag:true,privateCloudSong:false,accessToken:'DO_NOT_LEAK_TOKEN',sessionKey:'DO_NOT_LEAK_SESSION'};
+const synth=projected(synthetic);assert.equal(synth.name,synthetic.name);assert.equal(synth.metadata.business_info.artists[0].id,'123');assert.equal(synth.metadata.business_info.artists[0].id_source_type,'integer');assert.equal(synth.metadata.business_info.origin_cover_category,'cover');assert.ok(!JSON.stringify(synth).includes('DO_NOT_LEAK'));assert.deepEqual(synth.provider_record.omitted_authentication_fields,['accesstoken','sessionkey']);
+const nested=projected({...synthetic,extra:{nullable:null,list:[false,3.25,'3.25'],futureField:'preserved',privateKey:'DO_NOT_LEAK_KEY'},coverImgUrl:'https://example.invalid/a?token=DO_NOT_LEAK_URL'});assert.deepEqual(JSON.parse(JSON.stringify(nested.provider_record.fields.extra)),{nullable:null,list:[false,3.25,'3.25'],futureField:'preserved'});assert.ok(!JSON.stringify(nested).includes('DO_NOT_LEAK'));
+const partial=projected({...synthetic,fullArtists:null,artists:[{name:'Partial artist'}]});assert.deepEqual(partial.metadata.artists,['Partial artist']);assert.equal(partial.metadata.business_info.artists_source_field,'artists');assert.equal(partial.provider_record.fields.fullArtists,null);assert.deepEqual(JSON.parse(JSON.stringify(partial.provider_record.fields.artists)),[{name:'Partial artist'}]);
+const auth=projected({...synthetic,extra:{authToken:'SYNTHETIC-UPSTREAM-AUTH',id_token:'SYNTHETIC-UPSTREAM-ID',sessionKey:'SYNTHETIC-UPSTREAM-SESSION',auth:{session:'SYNTHETIC-UPSTREAM-CONTEXT'},link:'https://example.invalid/#access_token=SYNTHETIC-UPSTREAM-FRAGMENT',links:['https://example.invalid/#/?id_token=SYNTHETIC-UPSTREAM-FRAGMENT','appscheme://callback#access_token=SYNTHETIC-UPSTREAM-CUSTOM']},recording:{session:{date:'1932',studio:'Example studio'}},artist:{signature:'Public artist biography',profile:'https://example.invalid/public?signature=artist-biography&key=public-business-id'}});
+assert.ok(!JSON.stringify(auth).includes('SYNTHETIC-UPSTREAM-'));assert.deepEqual(JSON.parse(JSON.stringify(auth.provider_record.fields.recording.session)),{date:'1932',studio:'Example studio'});assert.equal(auth.provider_record.fields.artist.signature,'Public artist biography');assert.equal(auth.provider_record.fields.artist.profile,'https://example.invalid/public?signature=artist-biography&key=public-business-id');
+const worst=projected({id:'e'.repeat(32),name:'Sample',fullArtists:Array.from({length:20},()=>({id:null,name:null})),album:{id:null,name:null}});assert.ok(Object.keys(worst.metadata.business_info.unknown_reasons).length>70);
+const reasons=[];
+for(const [present,value] of [[false,undefined],[true,null],[true,''],[true,true]]){const v={...synthetic};if(present)v.duration=value;else delete v.duration;reasons.push(projected(v).metadata.business_info.unknown_reasons.duration_raw);}
+assert.deepEqual(reasons,['not_in_response','upstream_null','empty_value','invalid_shape']);
+api.set('tracks');let failed=false;try{api.project({code:200,subCode:'10007',message:'DO_NOT_LEAK_TOKEN',data:null},'tracks');}catch{failed=true;}assert.ok(failed);const failure=api.failure();assert.equal(failure.reason,'provider_resource_missing');assert.deepEqual(failure.provider_status,{code:200,sub_code:'10007',classification:'resource_missing'});assert.ok(!JSON.stringify(failure).includes('DO_NOT_LEAK'));
+api.set('search',true);const legacy=api.metadata({artists:[{name:'Sample artist'}],album:{name:'Sample album'}});assert.ok(!Object.hasOwn(legacy,'business_info'));
+const result={state:'authorized_read',session:'present',payload:{songs:[row],complete:true,search_page:{offset:0,limit:20,total:1,continuation_supported:true,next_offset:null}}};
+fs.writeFileSync(process.argv[2],JSON.stringify({read:result,failure:{state:'provider_rejected',session:'present',payload:null,failure},synthetic:synth,worst},null,2)+'\n',{mode:0o600});
+console.log(JSON.stringify({status:'PASS',public_document_fields:33,business_values_preserved:true,origin_is_not_recording_edition:true,write_projection_unchanged:true,credentials_forwarded:false,real_provider_calls:0}));

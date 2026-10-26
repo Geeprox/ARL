@@ -1,0 +1,15 @@
+# Playlist POST contracts and existing-request reconciliation
+
+The two effects remain fixed: create the explicitly named playlist, or add the explicitly selected encrypted song ID to the selected owned playlist. The bridge projects write descriptors separately from GET read descriptors. Only known display annotations are discarded. Parameter names, types and locations, route, authentication, the explicit user intent, and exact signed POST business values remain guarded.
+
+The pinned CLI assigns `fixed_params` last into its POST body. Consequently nonempty fixed parameters are retained only when every key/value is an exact duplicate of the owner's explicit business values. Additional business keys or target overrides are rejected before command dispatch. A null fixed-parameter value has the same inactive behavior as absence. Preprocessing, transformations, unknown required or optional business parameters, incompatible routes/authentication, and GET effects remain refused. There is no generic write command or fallback endpoint.
+
+The official-CLI synthetic fixture covers create and append together. It executes the production projection, signed-business and HTTPS boundaries with generated synthetic credentials and disabled real networking. Its descriptor examples qualify these compatibility rules, not a capture of the current provider's entire live write contract.
+
+A fresh transport `not_submitted` reply is recorded durably as `effectDisposition=not_dispatched` after child cleanup is confirmed. The journal reservation remains; the same ID is never resubmitted. Returned submitted/unknown dispositions also remain bound to the original intent, target, account epoch and UUID. A missing disposition on an older record remains unknown. No empty list, source upgrade, log inference or new schema can relabel it as not_dispatched.
+
+`mio_netease_playlist_reconcile` is a separate named read-only tool. Its only argument is `request_id`; intent and targets come from the existing journal. The SDK query has no reserve, preflight or sendWrite branch. Missing records return `record_missing` without creating a journal directory or an effect. Existing records may be read back, and only verified readback can update their result. All replies keep automatic replay and new submission disabled. Query completion is distinct from `readback_verified`.
+
+The legacy twenty descriptors retain their exact object hashes. The reconciliation descriptor is appended through the existing registry and checked by the Mio consumer against the same fixed descriptor. It needs publication in the actual connected tool catalog after a reviewed paired ARL/Mio build. Calling create again, adding undeclared parameters, or using a local transport is not a substitute when the exposed catalog lacks the read-only tool.
+
+Swift journal/actor and registry fixtures are separate from the CLI fixture. Source review and synthetic evidence do not establish a compiled package, deployment, or successful real write. No automatic replay is introduced during packaging, restart, reconciliation or recovery.

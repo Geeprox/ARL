@@ -1,0 +1,21 @@
+{
+  "schema_version": 2,
+  "session_id": "1111111111111111111111111111111111111111111111111111111111111111",
+  "request_id": "c65d163b-d81f-48fe-8ab0-997b02e36cda",
+  "catalog_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "content_sha256": "d7180a67f4850531aca060a34a07da85de8c83f5368db78dc7bb52ce633463a2",
+  "task_kind": "text.translate",
+  "selector": {
+    "kind": "package",
+    "package_id": "medium"
+  },
+  "schedule": {
+    "priority": "explicit",
+    "execution_timeout_ms": 180000,
+    "queue_timeout_ms": 300000
+  },
+  "output": {
+    "max_bytes": 32768
+  },
+  "service_tier": "default"
+}

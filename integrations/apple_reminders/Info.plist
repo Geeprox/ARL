@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>local.arl.remindersbridge</string>
+<key>CFBundleExecutable</key><string>ARLRemindersBridge</string>
+<key>CFBundleName</key><string>ARL Reminders Bridge</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>14.0</string>
+<key>LSUIElement</key><true/>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+<key>NSRemindersFullAccessUsageDescription</key><string>经你确认后，在显示的系统默认列表创建一条提醒。macOS 要求完整访问；本程序不读取已有提醒或枚举列表。</string>
+</dict></plist>

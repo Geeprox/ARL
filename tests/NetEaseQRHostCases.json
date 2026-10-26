@@ -1,0 +1,23 @@
+[
+  {"name":"official_short", "url":"https://163cn.tv/ARL-SYNTHETIC", "reason":null},
+  {"name":"official_query", "url":"https://163cn.tv/ARL-SYNTHETIC?uniKey=ARL-SYNTHETIC-KEY", "reason":null},
+  {"name":"official_tls_port", "url":"https://163cn.tv:443/ARL-SYNTHETIC", "reason":null},
+  {"name":"existing_music", "url":"https://music.163.com/login?codekey=ARL-SYNTHETIC", "reason":null},
+  {"name":"existing_subdomain", "url":"https://openncm.music.163.com/login?codekey=ARL-SYNTHETIC", "reason":null},
+  {"name":"short_subdomain", "url":"https://www.163cn.tv/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"suffix_attack", "url":"https://163cn.tv.evil.invalid/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"prefix_attack", "url":"https://evil163cn.tv/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"trailing_dot", "url":"https://163cn.tv./ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"different_tld", "url":"https://163cn.com/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"music_suffix_attack", "url":"https://music.163.com.evil.invalid/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"image_cdn", "url":"https://p5.music.126.net/ARL-SYNTHETIC.png", "reason":"qr_url_host"},
+  {"name":"loopback", "url":"https://127.0.0.1/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"foreign", "url":"https://example.invalid/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"insecure", "url":"http://163cn.tv/ARL-SYNTHETIC", "reason":"qr_url_scheme"},
+  {"name":"userinfo", "url":"https://ARL-SYNTHETIC@163cn.tv/ARL-SYNTHETIC", "reason":"qr_url_credentials"},
+  {"name":"password", "url":"https://ARL-SYNTHETIC:ARL-SYNTHETIC@163cn.tv/ARL-SYNTHETIC", "reason":"qr_url_credentials"},
+  {"name":"userinfo_target", "url":"https://163cn.tv@evil.invalid/ARL-SYNTHETIC", "reason":"qr_url_host"},
+  {"name":"other_port", "url":"https://163cn.tv:8443/ARL-SYNTHETIC", "reason":"qr_url_port"},
+  {"name":"file_scheme", "url":"file:///ARL-SYNTHETIC", "reason":"qr_url_scheme"},
+  {"name":"data_scheme", "url":"data:text/plain,ARL-SYNTHETIC", "reason":"qr_url_scheme"}
+]

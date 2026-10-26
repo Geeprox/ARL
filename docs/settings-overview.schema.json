@@ -1,0 +1,280 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "protocol": {
+      "const": "arl/1"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "health": {
+      "type": "object",
+      "properties": {
+        "live": {
+          "type": "boolean"
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "ui_required": {
+          "const": false
+        }
+      },
+      "required": [
+        "live",
+        "ready",
+        "ui_required"
+      ],
+      "additionalProperties": false
+    },
+    "queue": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "queued": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "running": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "succeeded": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failed": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cancelled": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "needs_unlock": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "needs_review": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled",
+            "needs_unlock",
+            "needs_review"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "available",
+        "counts"
+      ],
+      "additionalProperties": false
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "unavailable",
+              "not_ready",
+              "disabled",
+              "unknown"
+            ]
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "maxItems": 100
+          },
+          "paid": {
+            "type": "boolean"
+          },
+          "inference_policy": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "explicit_route_only"
+            ]
+          },
+          "allowed_apps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "maxItems": 100
+          }
+        },
+        "required": [
+          "name",
+          "availability",
+          "models",
+          "paid",
+          "inference_policy",
+          "allowed_apps"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "needs_permission",
+              "adapter",
+              "disabled",
+              "unavailable",
+              "unknown"
+            ]
+          },
+          "identity_gate": {
+            "type": "string",
+            "enum": [
+              "verified_peer_required",
+              "none"
+            ]
+          },
+          "authorization_gate": {
+            "type": "string",
+            "enum": [
+              "permission_required",
+              "authorization_not_checked",
+              "not_required"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "availability",
+          "identity_gate",
+          "authorization_gate"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "local_inference_enabled": {
+          "type": "boolean"
+        },
+        "paid_inference_enabled": {
+          "const": false
+        },
+        "automatic_fallback": {
+          "const": false
+        },
+        "model_downloads": {
+          "const": false
+        },
+        "identity_verifier_configured": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "local_inference_enabled",
+        "paid_inference_enabled",
+        "automatic_fallback",
+        "model_downloads",
+        "identity_verifier_configured"
+      ],
+      "additionalProperties": false
+    },
+    "budgets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "app": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "max_pending": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_calls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_prompt_utf8_bytes": {
+            "const": 1024
+          }
+        },
+        "required": [
+          "app",
+          "max_pending",
+          "max_calls",
+          "max_output_tokens",
+          "max_prompt_utf8_bytes"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    }
+  },
+  "required": [
+    "schema_version",
+    "protocol",
+    "version",
+    "health",
+    "queue",
+    "providers",
+    "capabilities",
+    "policy",
+    "budgets"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arl:settings:overview:1",
+  "title": "ARL read-only settings overview result"
+}

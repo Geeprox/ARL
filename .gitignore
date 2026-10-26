@@ -1,0 +1,28 @@
+__pycache__/
+*.pyc
+.run/
+build/
+.DS_Store
+/vendor/release/
+
+# Generated historical packages/caches; source remains explicitly tracked.
+**/dist/
+**/module-cache/
+**/ModuleCache/
+**/node_modules/
+**/*.app/
+/deployment/packages/
+/deployment/*/package/
+/deployment/*/source-snapshot/
+/docs/evidence/
+
+# Reproducible NAS runtime cache; source lock is tracked separately.
+/vendor/nas/python/
+/vendor/nas/wheels/
+/vendor/nas/*.tar.gz
+
+/vendor/nas/*.tar.zst
+/vendor/nas/license-source/
+
+# Offline, pinned image-decoder cache for Moments.
+/vendor/moments/pillow/

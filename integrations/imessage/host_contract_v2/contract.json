@@ -1,0 +1,93 @@
+{
+  "schema_version": 2,
+  "status": "isolated_source_candidate_default_held",
+  "future_control_base": "0eff41b12e4f8b42e0a28b4b4951aaedef3046c4",
+  "frozen_messages_base": "1628ea94c2847ab26d7fea129efc82cd65546c64",
+  "request": {
+    "schema_version": 2,
+    "fields": [
+      "schema_version",
+      "request_id",
+      "command",
+      "arguments"
+    ],
+    "finite_backend_frame": "native/Support/MessagesStrictJSON.swift:MessagesControlFrame",
+    "excluded_command": "verify_mio",
+    "new_bootstrap_command": false,
+    "launch_command": "explicit begin only, fixed reviewed bundle --serve"
+  },
+  "reply": {
+    "schema_version": 2,
+    "success_authority_required": true,
+    "core_snapshot_schema_version": 1,
+    "authority_type": "MessagesNativeAuthorityV2",
+    "v1_fallback": false,
+    "cleanup_operation_id_required": true
+  },
+  "availability": {
+    "inspection": "sealed candidate identity/closure/policy only",
+    "inspection_is_running_evidence": false,
+    "first_begin_requires_prior_snapshot": false,
+    "first_begin_requires_reviewed_candidate_and_unexpired_admission": true,
+    "passive_snapshot_launches": false,
+    "backend_ready_source": "owned sealed pipe initialize response and exact identity echo",
+    "backend_ready_is_OS_or_group_readiness": false
+  },
+  "authority": {
+    "native_record": "run-v2.json",
+    "replaces_native_records": [
+      "ceiling.json",
+      "scope.json"
+    ],
+    "existing_v1_or_partial_state": "reject_without_renewal_or_automatic_migration",
+    "deadline": "persist once: min(first_native_start + 900, sealed run_not_after)",
+    "lifetime_send_limit": 1,
+    "send_outcomes": [
+      "unused",
+      "consumed_unknown",
+      "accepted"
+    ],
+    "unknown_consumption": "durable_and_never_retry",
+    "cleanup_states": [
+      "not_required",
+      "pending",
+      "in_progress",
+      "completed",
+      "unknown"
+    ],
+    "snapshot_metadata_write": "durable native clock high-water and sticky expiry only",
+    "restart": "preserve deadline/send; revoke old lease; unclosed boot cleanup unknown; no effect resumption",
+    "native_record_format": 3,
+    "old_v2_record": "reject_preserve_bytes_no_reset_or_migration",
+    "cleanup_completion": "exact captured operation UUID + epoch + host generation + scoped actual owned-pipe stop proof; never core snapshot",
+    "cleanup_history": {
+      "limit": 64,
+      "eviction": false,
+      "identity": "request UUID plus canonical finite-command fingerprint",
+      "replay": "retain original operation, no redispatch or authority mutation, including intervening requests/restart"
+    },
+    "cleanup_effect_order": "serialize all owned stops, including native lifecycle; require backend reap for shutdown completion"
+  },
+  "policy": {
+    "schema_version": 2,
+    "additional_key": "run_not_after",
+    "bundle_info_key": "ARLMessagesWireVersion",
+    "bundle_info_value": 2,
+    "root_admission_not_after": "must_equal_sealed_run_not_after",
+    "default_admission": null,
+    "new_identity_policy_pins_required": true
+  },
+  "scope": {
+    "groups": 1,
+    "expected_remote_handles": "2..16 exact",
+    "metadata_groups_max": 20,
+    "seconds_max": 900,
+    "send_attempts_lifetime": 1,
+    "acceptance_challenges": 2,
+    "challenges_are_total_read_cap": false,
+    "media_admitted": false,
+    "model_understanding_performed": false,
+    "Mio_disclosure_admitted": false,
+    "same_Mio_wake_proven": false
+  }
+}

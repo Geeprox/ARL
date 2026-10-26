@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "status": "source_coordination_only_unpublished",
+  "proposal_version": 1,
+  "native_proposal_document_revision": 2,
+  "execution_implemented": false,
+  "Codex_research_RPC_available": false,
+  "installed_state_changed": false,
+  "real_model_calls_this_increment": 0,
+  "files": {
+    "arl/codex_server.py": {
+      "sha256": "43da710345f0a3f47926a9f6b012cd058d4931b16b1762ed55c4b37b367779af",
+      "byte_count": 16777
+    },
+    "arl/research.py": {
+      "sha256": "aff84f732484e26fda5860359ff755e7a07df108146f95ea57fac1de0b17754a",
+      "byte_count": 29697
+    },
+    "arl/service.py": {
+      "sha256": "1cef2a057c62d77b21bb2f37712ae7bfa2ca6f22ab535a1644ce53a4ffaf5e4c",
+      "byte_count": 22321
+    },
+    "arl/storage.py": {
+      "sha256": "e5ab5a9dc6ca6ee1d739a581c153218273e6a7c4f7d55a841e3878868371d889",
+      "byte_count": 12130
+    },
+    "integrations/tisra/ARLResearchClient.swift": {
+      "sha256": "09091d3a484661467a61f74ed61d828d7a10d3698a823b9527c5067e09f4dddb",
+      "byte_count": 20982
+    },
+    "docs/TISRA-RESEARCH-API.md": {
+      "sha256": "967d3052888f0c679d95a1b15942dd2e31b9095346657b986b90af8114f0b6f1",
+      "byte_count": 12909
+    },
+    "docs/TISRA-CODEX-NATIVE-PROPOSAL.md": {
+      "sha256": "e288c124d381fb651beca6a2595b2bed0621738be4e370361fbd82833543dea6",
+      "byte_count": 12233
+    },
+    "docs/TISRA-CODEX-MIGRATION.md": {
+      "sha256": "93844ef3d8c9996384a8e7196e397574e85a6edc30b8351ce76ed3800b2ffd35",
+      "byte_count": 6125
+    },
+    "integrations/tisra/codex-native-proposal-v1.json": {
+      "sha256": "9cdc14e57d1528f4d257c8a1cd79c9c96097b39652ba7272f0a47f650dddeed1",
+      "byte_count": 8926
+    },
+    "tests/test_codex_server.py": {
+      "sha256": "74457ea9fb9347739fe6f223a5b997aa10e439e0addd8e78f70e57b4858a9fe9",
+      "byte_count": 4979
+    },
+    "docs/evidence/codex-live-diagnostic-2.json": {
+      "sha256": "a1299c7f834fd982c35c20e63759d318602a5fb1006826f489f29d4a0f517dcf",
+      "byte_count": 3793
+    },
+    "docs/evidence/codex-live-cancel-1.json": {
+      "sha256": "5a1ff4df1379d3169e0d9b46bb0f94f4826ba090cee465380209e3d942709965",
+      "byte_count": 3727
+    }
+  },
+  "aggregate_sha256": "c96d0f526615e86689b084dbe8007feabf12ddb4d7364f54454164d2ca34188f",
+  "aggregate_basis": "SHA256(UTF8 compact sorted-key JSON of files map with sha256 and byte_count)",
+  "blocking_limits": [
+    "complete request/provider input8192bytes not512KiB",
+    "text32768bytes subject to upstream65536-byte frame; not1MiB answer",
+    "required wholecall30seconds/one turn/no automatic retry; pin an absolute deadline before both adapter sessions",
+    "no upstream output-token or cost hard cap",
+    "no structured generated citation validator",
+    "no durable native thread/turn/terminal binding in typed research yet",
+    "consumer acceptance and scoped product host/grant remain separate"
+  ]
+}

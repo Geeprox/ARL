@@ -1,0 +1,29 @@
+--- service/tunnel-experiment/travel-draft/server.py
++++ service/tunnel-experiment/travel-draft/server.py
+@@ -51,6 +51,8 @@
+ TOOLS.append({'name': 'mio_tunnel_ping', 'description': 'Constant connectivity probe.',
+               'inputSchema': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+               'annotations': dict(ANNOTATIONS, openWorldHint=False)})
++WEATHER = json.loads((ROOT / 'amap/weather/tool.json').read_text())
++TOOLS.append({k: v for k, v in WEATHER.items() if k != 'version'})
+ BY_NAME = {t['name']: t for t in TOOLS}
+ 
+ class InvalidArguments(ValueError):
+@@ -92,6 +94,17 @@
+     validate(name, args)
+     if name == 'mio_tunnel_ping':
+         return {'content': [{'type': 'text', 'text': 'pong from mac-mini'}], 'isError': False}
++    if name == 'mio_maps_weather':
++        try:
++            r = subprocess.run(['/usr/bin/python3', '-I', str(ROOT / 'amap/weather/cli.py')],
++                input=json.dumps(args, ensure_ascii=False), stdout=subprocess.PIPE,
++                stderr=subprocess.DEVNULL, text=True, timeout=8,
++                env={'PATH': '/usr/bin:/bin:/usr/sbin:/sbin'})
++            if r.returncode != 0 or len(r.stdout.encode()) > 65536:
++                raise ValueError()
++            return json.loads(r.stdout)
++        except (OSError, ValueError, subprocess.TimeoutExpired):
++            return {'content': [{'type': 'text', 'text': '{"schema_version":1,"error":{"code":"provider_unavailable","retryable":true}}'}], 'isError': True}
+     service, command = ROUTES[name]
+     argv = ['/usr/bin/python3', str(ROOT / 'query.py'), service, command]
+     if service == 'amap':

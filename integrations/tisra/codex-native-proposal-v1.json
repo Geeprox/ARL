@@ -1,0 +1,283 @@
+{
+  "proposal_version": 1,
+  "status": "source_proposal_unpublished",
+  "execution_implemented": false,
+  "provider": "codex_app_server",
+  "formats": {
+    "request": "tisra.codex.request.v1",
+    "output": "tisra.codex.result.v1",
+    "history": "tisra.codex.history.v1"
+  },
+  "renderer_version": "tisra.codex.raw-json.v1",
+  "renderer": "Strictly validate then pass the original UTF-8 JSON bytes as sole text input. Do not reserialize, fetch, truncate or summarize.",
+  "bounds": {
+    "original_request_bytes": 8192,
+    "provider_input_bytes": 8192,
+    "separate_descriptor_bytes": 32768,
+    "generated_text_bytes": 32768,
+    "stored_result_envelope_bytes": 262144,
+    "upstream_complete_json_line_bytes": 65536,
+    "whole_call_wall_time_ms": 30000,
+    "provider_turns": 1,
+    "automatic_retries": 0,
+    "output_token_hard_cap": null,
+    "cost_hard_cap": null,
+    "token_usage_without_upstream_evidence": null
+  },
+  "common_rules": {
+    "unknown_keys": "reject",
+    "duplicate_keys": "reject",
+    "nullable_keys": "explicit_null_required",
+    "uuid": "canonical_lowercase_uuid",
+    "sha256": "64_lowercase_hex",
+    "integer": "finite_integer_not_boolean",
+    "strings": "strict_utf8_no_unpaired_surrogates",
+    "budget_overflow": "reject_before_external_start_no_truncation",
+    "citation_bindings": "Each citation must match an included evidence snapshot's ID/digest/record/revision/unit; its quote must be an exact substring of that snapshot text. Input bindings are not generated citation evidence."
+  },
+  "request": {
+    "exact_keys": [
+      "schema_version",
+      "text",
+      "public_history",
+      "evidence",
+      "migration"
+    ],
+    "schema_version": {
+      "const": 1
+    },
+    "text": {
+      "type": "string",
+      "min_utf8_bytes": 1,
+      "max_utf8_bytes": 8192
+    },
+    "public_history": {
+      "type": "array",
+      "max_items": 20,
+      "item": "public_history_pair"
+    },
+    "evidence": {
+      "type": "array",
+      "max_items": 100,
+      "unique_by": "evidence_id",
+      "item": "evidence_snapshot"
+    },
+    "migration": {
+      "type": [
+        "null",
+        "migration_binding"
+      ]
+    }
+  },
+  "objects": {
+    "public_history_pair": {
+      "exact_keys": [
+        "run_id",
+        "request_sha256",
+        "output_sha256",
+        "question",
+        "answer",
+        "citations"
+      ],
+      "run_id": "uuid",
+      "request_sha256": "sha256",
+      "output_sha256": "sha256",
+      "question": "string_max8192_utf8_bytes",
+      "answer": "string_max8192_utf8_bytes",
+      "citations": {
+        "type": "array",
+        "max_items": 50,
+        "item": "public_citation"
+      }
+    },
+    "evidence_snapshot": {
+      "exact_keys": [
+        "evidence_id",
+        "snapshot_digest",
+        "record_id",
+        "revision",
+        "unit",
+        "text"
+      ],
+      "evidence_id": "uuid",
+      "snapshot_digest": "sha256",
+      "record_id": "uuid",
+      "revision": {
+        "type": "integer",
+        "min": 0,
+        "max": 2147483647
+      },
+      "unit": "null_or_string_max200_utf8_bytes",
+      "text": "string_max8192_utf8_bytes"
+    },
+    "public_citation": {
+      "exact_keys": [
+        "evidence_id",
+        "snapshot_digest",
+        "record_id",
+        "revision",
+        "unit",
+        "quote"
+      ],
+      "evidence_id": "uuid",
+      "snapshot_digest": "sha256",
+      "record_id": "uuid",
+      "revision": {
+        "type": "integer",
+        "min": 0,
+        "max": 2147483647
+      },
+      "unit": "null_or_string_max200_utf8_bytes",
+      "quote": "nonempty_string_max1024_utf8_bytes"
+    },
+    "migration_binding": {
+      "exact_keys": [
+        "from_request_format",
+        "from_output_format",
+        "from_history_version",
+        "parent_run_id",
+        "parent_fingerprint",
+        "source_request_sha256",
+        "encrypted_reasoning_replayed"
+      ],
+      "from_request_format": "nonempty_string_max200_utf8_bytes",
+      "from_output_format": "nonempty_string_max200_utf8_bytes",
+      "from_history_version": "nonempty_string_max200_utf8_bytes",
+      "parent_run_id": "uuid",
+      "parent_fingerprint": "sha256",
+      "source_request_sha256": "sha256",
+      "encrypted_reasoning_replayed": {
+        "const": false
+      }
+    }
+  },
+  "native_evidence": {
+    "thread_id": "null_or_acknowledged_string_1_to100_characters",
+    "turn_id": "null_or_acknowledged_string_1_to100_characters",
+    "model_evidence_source": "thread_start_confirmed_identifier",
+    "backend_weights_revision": null,
+    "fingerprint_basis": "pinned_adapter_binary_protocol_control_contract_and_confirmed_model_identifier_not_backend_weights",
+    "native_terminal": [
+      "not_started",
+      "unknown",
+      "completed",
+      "interrupted",
+      "failed"
+    ],
+    "interrupt": [
+      "not_requested",
+      "sent",
+      "acknowledged",
+      "rejected",
+      "unknown"
+    ],
+    "success_requires": "matching native completed and matching still-valid owner/job/run/request hash/epoch/first auth_epoch/model/provider/formats/publication gate"
+  },
+  "receipt_binding": [
+    "owner",
+    "job_id",
+    "run_id",
+    "request_sha256",
+    "epoch",
+    "auth_epoch",
+    "provider",
+    "model",
+    "model_fingerprint",
+    "request_format",
+    "output_format",
+    "history_version"
+  ],
+  "recovery": {
+    "persist_before_start": "external_start_admission_and_uncertainty",
+    "persist_on_ack": "native thread/turn IDs with original immutable receipt binding",
+    "lost_ack": "needs_review_no_replay",
+    "cancel": "close_local_publication_gate_first_then_bounded_single_interrupt_if_active",
+    "ack_is_terminal": false,
+    "late_output": "discard_after_cancel_revoke_expiry_or_auth_epoch_drift",
+    "restore": "validate_original_pins_status_cancel_cleanup_only_no_start_or_resubmit",
+    "ephemeral_thread_resume_supported": false
+  },
+  "tools": "deny_all_action_requests_and_non_text_item_types",
+  "workspace": "host_owned_empty_ephemeral_read_only_network_disabled_inherited_MCP_disabled",
+  "capability_advertisement": "none_until_validator_adapter_durable_native_evidence_and_consumer_acceptance_are_implemented",
+  "result_envelope": {
+    "exact_keys": [
+      "schema_version",
+      "request_format",
+      "output_format",
+      "history_version",
+      "owner",
+      "job_id",
+      "run_id",
+      "request_sha256",
+      "provider_input_sha256",
+      "epoch",
+      "auth_epoch",
+      "provider",
+      "model",
+      "model_fingerprint",
+      "model_evidence",
+      "native",
+      "text",
+      "output_sha256",
+      "reviewed_evidence_bindings",
+      "usage",
+      "token_hard_cap_supported"
+    ],
+    "schema_version": {
+      "const": 1
+    },
+    "binding": "Exact original receipt fields, never recomputed on restore. Result reference SHA256 covers the complete original serialized envelope.",
+    "model_evidence": {
+      "exact_keys": [
+        "source",
+        "confirmed_identifier",
+        "adapter_binary_sha256",
+        "protocol_version",
+        "control_contract_sha256",
+        "backend_weights_revision"
+      ],
+      "source": {
+        "const": "thread_start_confirmed_identifier"
+      },
+      "confirmed_identifier": "matches thread/start response and originally granted configured model",
+      "adapter_binary_sha256": "sha256",
+      "protocol_version": "0.159.0",
+      "control_contract_sha256": "sha256",
+      "backend_weights_revision": null
+    },
+    "native": {
+      "exact_keys": [
+        "thread_id",
+        "turn_id",
+        "terminal",
+        "interrupt"
+      ],
+      "thread_id": "acknowledged_string_1_to100_characters",
+      "turn_id": "acknowledged_string_1_to100_characters",
+      "terminal": {
+        "const": "completed"
+      },
+      "interrupt": {
+        "const": "not_requested"
+      }
+    },
+    "text": "string_max32768_utf8_bytes",
+    "output_sha256": "hash_of_text_utf8_bytes",
+    "reviewed_evidence_bindings": "Ordered original evidence ID/digest/record/revision/unit bindings; not generated citations or an independent integrity check of source Ledger contents.",
+    "usage": {
+      "exact_keys": [
+        "tokens",
+        "cost"
+      ],
+      "tokens": null,
+      "cost": null
+    },
+    "token_hard_cap_supported": {
+      "const": false
+    },
+    "failed_or_cancelled": "No successful result envelope; retain independent native evidence in bound durable receipt/state record."
+  },
+  "proposed_method_status": "No Codex research RPC exists. A separately named opt-in typed path/SDK must be implemented after consumer acceptance; existing research.v1 stays Responses-only.",
+  "bound_enforcement_requirement": "Pin one absolute whole-call deadline at most30000ms before process launch; use it through MCP-discovery session replacement and interrupt drain. Existing per-session30-second cap alone is not that guarantee if the host job deadline is longer."
+}

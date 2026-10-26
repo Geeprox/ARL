@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:arl:codex:selection-request:v2",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 32,
+      "maxLength": 256
+    },
+    "request_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "catalog_version": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "task_kind": {
+      "enum": [
+        "text.generate",
+        "text.translate",
+        "text.summarize"
+      ]
+    },
+    "selector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "package"
+            },
+            "package_id": {
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "very_high",
+                "highest"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "package_id"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "model"
+            },
+            "model": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._/-]{0,149}$"
+            },
+            "reasoning_effort": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "kind",
+            "model"
+          ]
+        }
+      ]
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "priority": {
+          "enum": [
+            "background",
+            "explicit",
+            "interactive"
+          ]
+        },
+        "execution_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000
+        },
+        "queue_timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3600000
+        }
+      },
+      "required": [
+        "priority",
+        "execution_timeout_ms",
+        "queue_timeout_ms"
+      ]
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 1048576
+        }
+      },
+      "required": [
+        "max_bytes"
+      ]
+    },
+    "service_tier": {
+      "enum": [
+        "default",
+        "fast"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "session_id",
+    "request_id",
+    "catalog_version",
+    "content_sha256",
+    "task_kind",
+    "selector",
+    "schedule",
+    "output",
+    "service_tier"
+  ]
+}

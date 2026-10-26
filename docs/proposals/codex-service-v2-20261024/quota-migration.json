@@ -1,0 +1,15 @@
+{
+  "at": 1792779533.732718,
+  "status": "ready",
+  "before_admitted_requests": 7,
+  "local_lifetime_call_limit": null,
+  "quota_policy": "inherit_account",
+  "changed_scope": "friday-nas-llm only",
+  "nas_configuration_changed": false,
+  "arl_primary_installation_changed": false,
+  "tests_passed": 18,
+  "after_admitted_requests": 7,
+  "route_enabled": true,
+  "local_remaining_calls": null,
+  "source_closure_verified": true
+}

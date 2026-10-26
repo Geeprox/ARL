@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "root_service_id": "service.hub",
+  "manifests": [
+    {
+      "schema_version": 1,
+      "service_id": "service.hub",
+      "name": "Synthetic hub",
+      "version": "1.0.0",
+      "icon_ref": "sf:server.rack",
+      "repository_url": "https://code.example.invalid/synthetic/hub",
+      "revision": "cccccccccccccccccccccccccccccccccccccccc",
+      "license_spdx": "MIT",
+      "runtimes": [
+        {
+          "backend": "docker",
+          "image": "registry.example.invalid/synthetic/hub@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "ports": [
+        {
+          "name": "web",
+          "service_port": 8080,
+          "protocol": "tcp",
+          "required": true
+        }
+      ],
+      "mounts": [
+        {
+          "name": "library",
+          "destination": "/library",
+          "access": "ro",
+          "kind": "directory",
+          "required": true
+        }
+      ],
+      "parameters": [
+        {
+          "key": "READ_ONLY",
+          "kind": "boolean",
+          "required": true
+        },
+        {
+          "key": "WORKERS",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 4
+        },
+        {
+          "key": "DISPLAY_MODE",
+          "kind": "enum",
+          "required": false,
+          "choices": [
+            "compact",
+            "comfortable"
+          ]
+        }
+      ],
+      "credential_requirements": [],
+      "dependencies": [
+        {
+          "service_id": "service.indexer",
+          "version": "1.0.0",
+          "required": true
+        }
+      ],
+      "portal": {
+        "scheme": "http",
+        "port": "web",
+        "path": "/"
+      },
+      "health": {
+        "endpoint": {
+          "scheme": "http",
+          "port": "web",
+          "path": "/health"
+        },
+        "expected_status": 200,
+        "timeout_ms": 1000,
+        "interval_ms": 30000,
+        "stale_after_ms": 90000
+      }
+    },
+    {
+      "schema_version": 1,
+      "service_id": "service.indexer",
+      "name": "Synthetic indexer",
+      "version": "1.0.0",
+      "icon_ref": "sf:server.rack",
+      "repository_url": "https://code.example.invalid/synthetic/indexer",
+      "revision": "cccccccccccccccccccccccccccccccccccccccc",
+      "license_spdx": "MIT",
+      "runtimes": [
+        {
+          "backend": "docker",
+          "image": "registry.example.invalid/synthetic/indexer@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "ports": [
+        {
+          "name": "web",
+          "service_port": 8081,
+          "protocol": "tcp",
+          "required": true
+        }
+      ],
+      "mounts": [],
+      "parameters": [
+        {
+          "key": "READ_ONLY",
+          "kind": "boolean",
+          "required": true
+        },
+        {
+          "key": "WORKERS",
+          "kind": "integer",
+          "required": false,
+          "minimum": 1,
+          "maximum": 4
+        },
+        {
+          "key": "DISPLAY_MODE",
+          "kind": "enum",
+          "required": false,
+          "choices": [
+            "compact",
+            "comfortable"
+          ]
+        }
+      ],
+      "credential_requirements": [],
+      "dependencies": [],
+      "portal": {
+        "scheme": "http",
+        "port": "web",
+        "path": "/"
+      },
+      "health": {
+        "endpoint": {
+          "scheme": "http",
+          "port": "web",
+          "path": "/health"
+        },
+        "expected_status": 200,
+        "timeout_ms": 1000,
+        "interval_ms": 30000,
+        "stale_after_ms": 90000
+      }
+    }
+  ],
+  "configurations": [
+    {
+      "schema_version": 1,
+      "service_id": "service.hub",
+      "deployment_id": "hub-fixture",
+      "target_id": "synthetic-mac",
+      "backend": "docker",
+      "port_bindings": [
+        {
+          "name": "web",
+          "host_port": 48080,
+          "exposure": "target_loopback"
+        }
+      ],
+      "mount_bindings": [
+        {
+          "name": "library",
+          "source": "/Volumes/Synthetic Library/library"
+        }
+      ],
+      "parameters": {
+        "READ_ONLY": true
+      },
+      "credential_refs": {}
+    },
+    {
+      "schema_version": 1,
+      "service_id": "service.indexer",
+      "deployment_id": "indexer-fixture",
+      "target_id": "synthetic-mac",
+      "backend": "docker",
+      "port_bindings": [
+        {
+          "name": "web",
+          "host_port": 48081,
+          "exposure": "target_loopback"
+        }
+      ],
+      "mount_bindings": [],
+      "parameters": {
+        "READ_ONLY": true
+      },
+      "credential_refs": {}
+    }
+  ],
+  "inventory": {
+    "schema_version": 1,
+    "target_id": "synthetic-mac",
+    "supported_backends": [
+      "docker"
+    ],
+    "occupied_ports": [],
+    "source": "synthetic",
+    "observed_at_ms": 1000000
+  }
+}

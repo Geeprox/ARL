@@ -1,0 +1,50 @@
+{
+  "provenance": "33-field official keyword-song documented response shape; names/IDs/URL neutralized; not a live response",
+  "song": {
+    "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "name": "Sample song",
+    "duration": 243487,
+    "artists": [],
+    "fullArtists": [
+      {
+        "id": null,
+        "name": "Sample artist"
+      }
+    ],
+    "album": {
+      "id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "name": "Sample album"
+    },
+    "playFlag": true,
+    "downloadFlag": true,
+    "payPlayFlag": false,
+    "payDownloadFlag": false,
+    "vipFlag": false,
+    "liked": false,
+    "coverImgUrl": "https://example.invalid/unused.jpg",
+    "vipPlayFlag": false,
+    "accompanyFlag": null,
+    "songMaxBr": 320000,
+    "userMaxBr": 320000,
+    "maxBrLevel": "exhigh",
+    "plLevel": "exhigh",
+    "dlLevel": "exhigh",
+    "songTag": null,
+    "alg": "synthetic-unused",
+    "privateCloudSong": false,
+    "freeTrailFlag": false,
+    "songFtFlag": false,
+    "freeTrialPrivilege": {
+      "cannotListenReason": null,
+      "resConsumable": false,
+      "userConsumable": false
+    },
+    "songFee": 0,
+    "playMaxbr": 320000,
+    "qualities": null,
+    "originCoverType": 1,
+    "emotionTag": null,
+    "vocalFlag": false,
+    "visible": true
+  }
+}

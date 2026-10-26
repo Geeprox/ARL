@@ -1,0 +1,148 @@
+--- a/host.py
++++ b/host.py
+@@ -26,7 +26,7 @@
+     signed=SignedPeerVerifier(ROOT/'PeerSignatureHelper',{config['caller']:config['signature_requirement']})
+     adapter=CodexTextAdapter(binary=config['codex_binary'],enabled=True,max_wall_seconds=180)
+     if adapter.pin!=config['codex_sha256']:raise RuntimeError('provider_binary_changed')
+-    service=CodexService(adapter,caller=config['caller'],model=config['model'],max_calls=32,max_output_bytes=32768,reasoning_effort=config['reasoning_effort'],service_tier='default',scope_generation=config['scope_generation'],authorization_current=closure_current,peer_current=lambda: child.poll() is None and lease.is_current())
++    service=CodexService(adapter,caller=config['caller'],model=config['model'],max_calls=None,max_output_bytes=32768,reasoning_effort=config['reasoning_effort'],service_tier='default',scope_generation=config['scope_generation'],authorization_current=closure_current,peer_current=lambda: child.poll() is None and lease.is_current())
+     runtime=None;stop=threading.Event()
+     def shutdown(*_):stop.set()
+     signal.signal(signal.SIGTERM,shutdown);signal.signal(signal.SIGINT,shutdown)
+@@ -40,9 +40,12 @@
+         thread=threading.Thread(target=serve);thread.start()
+         if not runtime.ready.wait(10):raise RuntimeError('runtime_not_ready')
+         child.stdin.write('go\n');child.stdin.flush()
++        last_status=0
+         while not stop.wait(1):
+             if child.poll() is not None or errors or not closure_current():break
+             status=service.status()
++            if time.monotonic()-last_status>15:
++                temporary=home/'status.tmp';temporary.write_text(json.dumps(status));temporary.chmod(0o600);os.replace(temporary,home/'status.json');last_status=time.monotonic()
+             if time.monotonic()-(service.checked_mono or 0)>60:
+                 try:service.preflight()
+                 except Exception:pass
+--- a/worker.py
++++ b/worker.py
+@@ -8,6 +8,25 @@
+ from contract import APPS,MODEL,PREFIX,encode
+ from local_api import atomic,read_json
+ 
++def archive_terminal(queue):
++    for app in APPS:
++        directory=queue/app;archive=directory/'archive'
++        try:
++            if archive.is_symlink():continue
++            archive.mkdir(mode=0o700,exist_ok=True)
++            for request_path in (directory/'requests').glob('*.json'):
++                response=directory/'responses'/request_path.name
++                if not response.exists():continue
++                answer=read_json(response,131072);request=read_json(request_path,16384)
++                if answer.get('state')!='succeeded' or answer.get('app')!=app or answer.get('id')!=request_path.stem:continue
++                if time.time()-answer.get('at',time.time())<600 or time.time()-response.stat().st_mtime<600 or request.get('expires_at',time.time())>time.time():continue
++                archived=archive/request_path.name
++                if not archived.exists():atomic(archived,answer)
++                if read_json(archived,131072)!=answer:continue
++                # Archive verified terminal receipts; preserve uncertain and active work.
++                response.unlink();request_path.unlink()
++        except (OSError,ValueError,KeyError,TypeError):pass
++
+ def run(config):
+     home=Path(config['state_home']);queue=Path(config['queue_root']);ledger=home/'requests'
+     ledger.mkdir(mode=0o700,exist_ok=True)
+@@ -15,6 +34,7 @@
+     accepted=c.open_app_session('Friday NAS text adapter',('codex.text.plan.v1',),icon_ref='sf:doc.text')
+     if accepted!=['codex.text.plan.v1']:raise Fault('capability_not_accepted')
+     atomic(home/'handshake.json',{'at':time.time(),'protocol':'arl/1','identity':'registered_kernel_peer_and_pinned_signature','accepted_capabilities':accepted,'confirmed':True})
++    last_archive=0
+     while True:
+         for app in APPS:
+             directory=queue/app
+@@ -38,6 +58,11 @@
+                         record=read_json(record_path,131072)
+                         if record.get('input_sha256')!=hashlib.sha256(text.encode()).hexdigest():raise ValueError('intent_changed')
+                     else:record={'app':app,'id':identity,'input_sha256':hashlib.sha256(text.encode()).hexdigest(),'state':'prepared'}
++                    archived=directory/'archive'/path.name
++                    if archived.exists():
++                        answer=read_json(archived,131072)
++                        if answer.get('id')!=identity or answer.get('app')!=app or answer.get('state')!='succeeded':raise ValueError('archive_binding_invalid')
++                        atomic(response,answer);continue
+                     if request['expires_at']<now and not record.get('job_id'):raise ValueError('request_expired')
+                     if not record.get('job_id'):
+                         atomic(record_path,record)
+@@ -65,6 +90,9 @@
+                     if 'identity' in locals() and path.stem==identity:
+                         atomic(directory/'responses'/path.name,{'app':app,'id':identity,'state':'failed','error':code,'at':time.time()})
+                 except OSError:pass
++        if time.monotonic()-last_archive>30:
++            last_archive=time.monotonic()
++            archive_terminal(queue)
+         time.sleep(.5)
+ 
+ if __name__=='__main__':
+--- a/core/arl/contracts.py
++++ b/core/arl/contracts.py
+@@ -105,7 +105,7 @@
+     providers: frozenset = frozenset({"mock"})
+     max_tokens: int = 256
+     max_pending: int = 64
+-    max_calls: int = 1000
++    max_calls: int | None = 1000
+     methods: frozenset = frozenset({"health", "ready", "capabilities", "providers",
+         "submit", "get", "cancel", "resume", "wake", "poll_wakes", "stop", "heartbeat"})
+     public_metadata: bool = False
+--- a/core/arl/codex_server.py
++++ b/core/arl/codex_server.py
+@@ -385,7 +385,7 @@
+       type(caller) is not str or re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', caller) is None or caller == 'settings' or
+       type(model) is not str or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]{0,149}', model) is None or
+       not callable(authorization_current) or not callable(peer_current) or
+-      type(max_calls) is not int or not 1 <= max_calls <= 1000 or
++      (max_calls is not None and (type(max_calls) is not int or not 1 <= max_calls <= 1000)) or
+       type(max_output_bytes) is not int or not 128 <= max_output_bytes <= 32768):
+    raise Fault('codex_service_not_admitted')
+   self.adapter, self.caller, self.model = adapter, caller, model
+@@ -438,19 +438,20 @@
+ 
+  def status(self):
+   active = self.current()
+-  remaining, pending = self.max_calls, 0
++  remaining, pending, admitted = self.max_calls, 0, 0
+   runtime = self.runtime
+   if runtime is not None and runtime.store is not None:
+    try:
+     with runtime.store.lock:
+      row = runtime.store.db.execute('SELECT calls FROM budget WHERE owner=?', (self.caller,)).fetchone()
+-     remaining = max(0, self.max_calls-(row[0] if row is not None else 0))
++     admitted = row[0] if row is not None else 0
++     remaining = None if self.max_calls is None else max(0, self.max_calls-admitted)
+      pending = runtime.store.db.execute("SELECT COUNT(*) FROM jobs WHERE owner=? AND tool=? AND state IN ('queued','running')",
+        (self.caller, self.name)).fetchone()[0]
+    except Exception:active = False
+   with self.lock:
+    fresh = self.checked_mono is not None and 0 <= time.monotonic()-self.checked_mono <= 90
+-   enabled = bool(active and fresh and (remaining > 0 or pending > 0))
++   enabled = bool(active and fresh and (remaining is None or remaining > 0 or pending > 0))
+    state = 'unavailable' if not active else 'preflight_pending' if not fresh else 'ready' if enabled else 'budget_exhausted'
+    return {'schema_version':1, 'state':state,
+     'caller':self.caller, 'model':self.model, 'reasoning_effort':self.reasoning_effort, 'service_tier':self.service_tier,
+@@ -459,6 +460,8 @@
+     'checked_at_ms':self.checked_at_ms, 'stale_after_ms':90000, 'last_error_code':self.error,
+     'last_inference_at_ms':self.last_inference_at_ms,
+     'inference_verified':self.last_inference_at_ms is not None and self.adapter.test_command is None,
++    'quota_policy':'inherit_account' if self.max_calls is None else 'local_cap',
++    'admitted_requests_total':admitted,
+     'max_pending':1, 'max_calls':self.max_calls, 'max_input_bytes':8192,
+     'max_output_bytes':self.max_output_bytes, 'max_wall_ms':self.adapter.max_wall_seconds*1000,
+     'token_hard_cap_supported':False, 'cost_hard_cap_supported':False,
+--- a/core/arl/storage.py
++++ b/core/arl/storage.py
+@@ -118,7 +118,7 @@
+             if count >= policy.max_pending:
+                 raise Fault("queue_budget_exceeded")
+             calls = self.db.execute("SELECT calls FROM budget WHERE owner=?", (owner,)).fetchone()
+-            if calls and calls[0] >= policy.max_calls:
++            if policy.max_calls is not None and calls and calls[0] >= policy.max_calls:
+                 raise Fault("call_budget_exceeded")
+             priority_plan = None
+             now = time.time()

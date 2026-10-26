@@ -1,0 +1,24 @@
+{
+  "at": 1792779825.6578639,
+  "status": "design_validated",
+  "tests": {
+    "original_arl_server": 13,
+    "account_quota_after_32": 1,
+    "queue_archive": 5,
+    "protocol_schema": 9
+  },
+  "total_passed": 28,
+  "live_change": "NAS host inherit_account only",
+  "new_real_inferences": 0,
+  "v2_rpc_and_settings_deployed": false,
+  "artifacts": {
+    "package-config.schema.json": "1ff577722c88cf7825b449ba45c85f4b650cc0847736eb3e66e2967d019f7f81",
+    "submit.schema.json": "ad1abf8e67cb9bc645bf34460c225f66e34eee01a8681609dc20029332440ba8",
+    "nas-account-quota.patch": "ebf376ae40692793476e66707782dd92f32e113497ab56a5398d283a5fb22446",
+    "README.md": "f1a9e243afa86196ddfefeb7a664654c7478e05ff68adf5b60bba2a519a4a975",
+    "WIRE-EXAMPLES.md": "adb053a0e4cc1ab12d831f1984bd6eadaaa3e3d0c6972378d3b0034058f36a79",
+    "selection-request.schema.json": "e92eace12fe676ebd4e5b6913e9496442d76d9f1ac56433fe9835c76d4542617",
+    "quota-migration.json": "409ebe40b4526487a10a1cdb525319279cab67a7376cf8e3c0493e7e7291d09c",
+    "PROTOCOL.md": "aee7e897838548ea14c4b774aab03f0b1d6902b9d24c2f7525d97546ed20687e"
+  }
+}

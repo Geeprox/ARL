@@ -1,0 +1,386 @@
+{
+  "search_all": {
+    "group": "search",
+    "method": {
+      "name": "all",
+      "path": "/openapi/music/basic/complex/search",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "keyword",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "搜索关键字",
+          "hidden": false
+        },
+        {
+          "name": "trialScene",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "试听场景",
+          "hidden": true,
+          "default": "cli"
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "keyword": "Synthetic query"
+    },
+    "public_arguments": {
+      "keyword": "Synthetic query"
+    }
+  },
+  "search_album": {
+    "group": "search",
+    "method": {
+      "name": "album",
+      "path": "/openapi/music/basic/search/album/get/v2",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "keyword",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "搜索关键字",
+          "hidden": false
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "返回数量（最多 300，建议 100 以内）",
+          "hidden": false,
+          "default": 30
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "偏移量",
+          "hidden": false,
+          "default": 0
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "keyword": "Synthetic query",
+      "limit": "2",
+      "offset": "0"
+    },
+    "public_arguments": {
+      "keyword": "Synthetic query",
+      "limit": 2,
+      "offset": 0
+    }
+  },
+  "search_playlist": {
+    "group": "search",
+    "method": {
+      "name": "playlist",
+      "path": "/openapi/music/basic/search/playlist/get/v2",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "keyword",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "搜索关键字",
+          "hidden": false
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "返回数量",
+          "hidden": false,
+          "default": 30
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "偏移量",
+          "hidden": false,
+          "default": 0
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "keyword": "Synthetic query"
+    },
+    "public_arguments": {
+      "keyword": "Synthetic query"
+    }
+  },
+  "album_get": {
+    "group": "album",
+    "method": {
+      "name": "get",
+      "path": "/openapi/music/basic/album/detail/get/v2",
+      "http_method": "POST",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "albumId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密专辑ID",
+          "hidden": false
+        },
+        {
+          "name": "descFlag",
+          "in": "query",
+          "type": "boolean",
+          "required": false,
+          "description": "是否需要专辑介绍",
+          "hidden": false,
+          "default": false
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "albumId": "11111111111111111111111111111111",
+      "descFlag": "true"
+    },
+    "public_arguments": {
+      "album_id": "11111111111111111111111111111111",
+      "desc_flag": true
+    }
+  },
+  "album_tracks": {
+    "group": "album",
+    "method": {
+      "name": "tracks",
+      "path": "/openapi/music/basic/album/song/list/get/v2",
+      "http_method": "POST",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "albumId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密专辑ID",
+          "hidden": false
+        },
+        {
+          "name": "qualityFlag",
+          "in": "query",
+          "type": "boolean",
+          "required": false,
+          "description": "是否返回音质信息",
+          "hidden": true,
+          "default": false
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "albumId": "11111111111111111111111111111111",
+      "qualityFlag": "true"
+    },
+    "public_arguments": {
+      "album_id": "11111111111111111111111111111111",
+      "quality_flag": true
+    }
+  },
+  "album_collected": {
+    "group": "album",
+    "method": {
+      "name": "collected",
+      "path": "/openapi/music/basic/album/subed/get/v2",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "每页数量",
+          "hidden": false
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "偏移量",
+          "hidden": false
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "limit": "2",
+      "offset": "0"
+    },
+    "public_arguments": {
+      "limit": 2,
+      "offset": 0
+    }
+  },
+  "artist_songs": {
+    "group": "artist",
+    "method": {
+      "name": "songs",
+      "path": "/openapi/music/basic/song/artist/bypubtime/get/v2",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "artistId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密艺人ID",
+          "hidden": false
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "返回数量",
+          "hidden": false
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "偏移量",
+          "hidden": false
+        },
+        {
+          "name": "startTime",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "起始发布时间（时间戳，毫秒）",
+          "hidden": false
+        },
+        {
+          "name": "endTime",
+          "in": "query",
+          "type": "number",
+          "required": true,
+          "description": "结束发布时间（时间戳，毫秒）",
+          "hidden": false
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "artistId": "22222222222222222222222222222222",
+      "limit": "2",
+      "offset": "0",
+      "startTime": "0",
+      "endTime": "1792627200000"
+    },
+    "public_arguments": {
+      "artist_id": "22222222222222222222222222222222",
+      "limit": 2,
+      "offset": 0,
+      "start_time": 0,
+      "end_time": 1792627200000
+    }
+  },
+  "song_lyric": {
+    "group": "song",
+    "method": {
+      "name": "lyric",
+      "path": "/openapi/music/basic/song/lyric/get/v2",
+      "http_method": "GET",
+      "auth_required": true,
+      "parameters": [
+        {
+          "name": "songId",
+          "in": "query",
+          "type": "string",
+          "required": true,
+          "description": "加密歌曲ID",
+          "hidden": false
+        }
+      ],
+      "fixed_params": null
+    },
+    "arguments": {
+      "songId": "33333333333333333333333333333333"
+    },
+    "public_arguments": {
+      "song_id": "33333333333333333333333333333333"
+    }
+  },
+  "playlist_collected": {
+    "group": "playlist",
+    "method": {
+      "name": "collected",
+      "description": "获取我收藏的歌单列表",
+      "path": "/openapi/music/basic/playlist/subed/get/v2",
+      "parameters": [
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "每页数量（最多 500 条）",
+          "hidden": false,
+          "default": 20
+        },
+        {
+          "name": "offset",
+          "in": "query",
+          "type": "number",
+          "required": false,
+          "description": "偏移量",
+          "hidden": false,
+          "default": 0
+        }
+      ],
+      "http_method": "GET",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    },
+    "arguments": {
+      "limit": "500",
+      "offset": "100000"
+    },
+    "public_arguments": {
+      "limit": 500,
+      "offset": 100000
+    }
+  },
+  "playlist_get_tags": {
+    "group": "playlist",
+    "method": {
+      "name": "getTags",
+      "description": "获取可选歌单标签列表",
+      "path": "/openapi/music/basic/playlist/tag/get/v2",
+      "parameters": [],
+      "http_method": "GET",
+      "auth_required": true,
+      "fixed_params": null,
+      "min_cli_version": null
+    },
+    "arguments": {},
+    "public_arguments": {}
+  }
+}

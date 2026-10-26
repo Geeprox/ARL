@@ -1,0 +1,98 @@
+--- a/core/arl/contracts.py
++++ b/core/arl/contracts.py
+@@ -74,7 +74,7 @@
+     kind = schema["type"]
+     good = {"object": type(value) is dict, "string": type(value) is str,
+             "integer": type(value) is int, "number": type(value) in (int, float),
+-            "boolean": type(value) is bool}.get(kind, False)
++            "boolean": type(value) is bool, "array": type(value) is list}.get(kind, False)
+     if not good:
+         raise Fault("invalid_arguments", "Wrong argument type")
+     if kind == "object":
+@@ -83,6 +83,10 @@
+             raise Fault("invalid_arguments", "Unknown or missing argument")
+         for key, item in value.items():
+             validate(item, props[key])
++    elif kind == "array":
++        if len(value) < schema.get("minItems",0) or ("maxItems" in schema and len(value) > schema["maxItems"]):
++            raise Fault("invalid_arguments", "Array exceeds bounds")
++        for item in value:validate(item,schema["items"])
+     elif kind == "string":
+         if not schema.get("minLength", 0) <= len(value) <= schema.get("maxLength", 4096):
+             raise Fault("invalid_arguments", "String exceeds bounds")
+--- a/core/arl/compat_host.py
++++ b/core/arl/compat_host.py
+@@ -124,8 +124,9 @@
+     existing native owner supplies the reviewed scope and current parent peer.
+     """
+     from .codex_server import CodexService
++    from .codex_service_v2 import CodexServiceV2, CodexGatewayV2, METHODS as CODEX_V2_METHODS
+     from .identity import RegisteredPeerVerifier
+-    if (type(service) is not CodexService or service.runtime is not None or not service.current() or
++    if (type(service) not in (CodexService,CodexServiceV2) or service.runtime is not None or not service.current() or
+             (type(peer_verifier) is not CodexCallerPeer and not (
+                 isolated is True and type(peer_verifier) is RegisteredPeerVerifier)) or
+             (isolated is not True and service.adapter.test_command is not None) or
+@@ -143,7 +144,7 @@
+     if formal_tisra_peer is not None:policies['tisra'] = application_metadata_policy()
+     if service.caller in policies:raise Fault('codex_caller_conflict')
+     policies[service.caller] = AppPolicy(frozenset({service.name}), frozenset(), 0, 1, service.max_calls,
+-        methods=frozenset({'health','ready','capabilities','submit','get','cancel','heartbeat'}),
++        methods=frozenset({'health','ready','capabilities','submit','get','cancel','heartbeat'}) | (CODEX_V2_METHODS if type(service) is CodexServiceV2 else frozenset()),
+         max_deadline_ms=service.adapter.max_wall_seconds*1000)
+     runtime = Runtime(home, policies=policies, providers={}, local_enabled=False,
+         extra_tools=[service.tool()], identity_verifier=PeerComposition((peer_verifier,) + ((formal_tisra_peer,) if formal_tisra_peer is not None else ())),
+@@ -151,9 +152,10 @@
+         work_scope=frozenset({(service.caller, service.name)}), service_portal=service_portal,
+         application_catalog=(lambda app: service.status().get('execution_catalog')) if formal_tisra_peer is not None else None)
+     service.runtime = runtime
++    if type(service) is CodexServiceV2:runtime.codex_v2=CodexGatewayV2(runtime,service)
+     from .control import AppDescriptor
+     runtime.control.apps.register(AppDescriptor(service.caller, 'ARL Codex', 'sf:cpu',
+-        capabilities=('codex.text.plan.v1',)))
++        capabilities=(service.name,)))
+     if formal_tisra_peer is not None:
+         runtime.control.apps.register(AppDescriptor('tisra', 'Tisra', 'sf:text.book.closed'))
+     return runtime
+--- a/core/arl/service.py
++++ b/core/arl/service.py
+@@ -13,6 +13,8 @@
+ from .control import ControlPlane
+ from .app_connections import AppConnections, METHODS as CONNECTION_METHODS
+ from .application_models import ApplicationModels, METHODS as APPLICATION_METHODS
++from .codex_service_v2 import METHODS as CODEX_V2_METHODS, decode_request as decode_codex_v2_request
++APPLICATION_METHODS = APPLICATION_METHODS | CODEX_V2_METHODS
+ from .diagnostics import CODES, log_schema, log_v3_schema
+ from .lifecycle import InstanceLock, peer_uid, private_home
+ from .overview import overview
+@@ -129,7 +131,7 @@
+                     raise Fault("invalid_frame")
+             if not raw.endswith(b"\n") or raw.count(b"\n") != 1:
+                 raise Fault("invalid_frame")
+-            request = json.loads(raw)
++            request = decode_codex_v2_request(bytes(raw))
+             if type(request) is dict and request.get('method') in set(SERVICE_PORTAL_METHODS) | CONNECTION_METHODS | APPLICATION_METHODS | {'settings.app_icon.v1'}:
+                 from .service_deployment.validation import strict_json as service_portal_json
+                 request = service_portal_json(bytes(raw))
+@@ -139,7 +141,7 @@
+             runtime = self.server.runtime
+             verified = runtime.identity_verifier(self.request, request.get("app")) if runtime.identity_verifier and type(request) is dict else None
+             binding = None
+-            if verified is not None and request.get('method') in CONNECTION_METHODS | APPLICATION_METHODS:
++            if verified is not None and (request.get('method') in CONNECTION_METHODS | APPLICATION_METHODS or request.get('method') == 'submit' and isinstance(request.get('params'),dict) and request['params'].get('tool') == 'codex.text.generate.v2'):
+                 binder = getattr(runtime.identity_verifier, 'session_binding', None)
+                 if binder is None: raise Fault('app_identity_unverified')
+                 binding = binder(self.request, verified)
+@@ -291,6 +293,12 @@
+             if verified_app != owner or self.identity_verifier is None:
+                 raise Fault('app_identity_unverified')
+             return self.app_connections.dispatch(owner, method, params, peer_binding, policy)
++        if method in CODEX_V2_METHODS:
++            if getattr(self, 'codex_v2', None) is None:raise Fault('unknown_method')
++            return self.codex_v2.dispatch(owner, method, params, peer_binding)
++        if method == 'submit' and params.get('tool') == 'codex.text.generate.v2':
++            if getattr(self, 'codex_v2', None) is None:raise Fault('unknown_tool')
++            return self.codex_v2.submit(owner, params, peer_binding)
+         if method in APPLICATION_METHODS:
+             if verified_app != owner or self.identity_verifier is None or peer_binding is None:
+                 raise Fault('app_identity_unverified')

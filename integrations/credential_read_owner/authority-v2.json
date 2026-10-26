@@ -1,0 +1,24 @@
+{
+  "capabilities": [
+    "travel_read",
+    "music_read",
+    "music_status",
+    "music_playlist_create",
+    "music_playlist_append",
+    "apple_reminders_task",
+    "nas_saved_scope_read",
+    "apple_product_v1",
+    "music_playlist_cover"
+  ],
+  "executionAllowed": true,
+  "mio": {
+    "certificateSHA1": "859332B7FFFBBBB33B80C7B78D30C27D2D81583F",
+    "identifier": "local.arl.mioapplebridge"
+  },
+  "owner": {
+    "certificateSHA1": "CD85BA24208488935F9AC0BEC63E4BE6AAE189C4",
+    "identifier": "local.arl.control"
+  },
+  "reviewID": "e8600ba9-019f-4bda-b48f-8927c3ef88fa",
+  "schema": 2
+}

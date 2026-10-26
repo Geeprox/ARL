@@ -1,0 +1,38 @@
+# ARL source review — 2026-10-27
+
+This review covers the current source and the separately prepared public source snapshot. It does not certify an installed app, provider account, physical device, cloud synchronization, or a distributable signed release.
+
+## Repaired execution paths
+
+- Music write verification now reads ordered membership independently of display metadata and byte pagination. It keeps both consistency sweeps, target identity, count and drift checks. Internal large read results use hashed chunk frames. Redundant complete re-reads were removed. Cover selection can resolve a song beyond the display page.
+- Cloud music search retains all scanned rows, resumes incomplete scans on an explicit request, exposes the real continuation, and does not impose a twelve-hour failure lockout. Search continuation no longer stops at the local offset 980.
+- NAS reads no longer consume a lifetime 1 MiB or 64-call allowance. Failed IO does not consume read quota. UTF-8 pages preserve byte offsets and character boundaries; Chinese text is not dropped due to JSON escaping. Recursive search retains continuation beyond 64 pages, depth eight and 128 directories. Completed downloads release the single active download slot for another operation.
+- NAS file targets accept valid Unicode names. Attachment inspection streams hashing without the upload-size restriction. Document extraction pages across units and within a long unit, preserving revision and source digest; the parser memory budget is separate from upload limits. ZIP parsing bounds each actually read XML part, rather than rejecting unused package parts.
+- Reminders, Notes and Calendar queries support offset continuation. Reminder inventory is not rejected at 101 items or by an aggregate JSON threshold before pagination. Calendar queries sort before paging and honor the selected default calendar. Notes bodies support UTF-8 continuation; partial reads cannot seed an editable prefix. Rich Notes or complex Calendar events can be deleted after the existing exact-target confirmation without requiring edit support.
+- Raw music/NAS diagnostic log failures no longer replace the business outcome. Durable mutation admission and recovery journals remain mandatory. Failures before owner dispatch report `not_dispatched`; known owner rejection also stays unsubmitted. Outer deadlines cover the inner read deadline. Travel continuation can be read again after a lost response.
+- Codex accepts the declared decoded text budget despite nested JSON escaping. Model catalog discovery follows provider continuation and bounds display text without rejecting the whole catalog. NAS v2 intents receive fresh IDs; retries can supply an explicit stable ID. Terminal queue records include failures in archival handling. An admitted completion retains its frozen selection beyond discovery freshness while still checking current authority and provider identity.
+- Packaged core imports now include both sourced-execution contract modules. An explicit source manifest replaces dependence on Git tracking, so a source ZIP cannot accidentally resolve a parent checkout or omit required modules. Capture validation no longer shadows scheduling validation.
+
+## Verification and limits
+
+The current SDK and complete Control sources have been compiled with the production source groups. No installed application was replaced or launched. Focused Python, real SDK Swift, Node bridge and synthetic Apple owner checks use no real credentials or business writes. Machine receipts are kept in ignored `build/` in the reviewing checkout.
+
+The latest broad Python discovery run recorded 1,056 tests, no assertion failures, 21 setup/runtime errors and 11 skips. Three build-preflight errors were subsequently corrected and the 13 build-driver tests passed on their own. The other 18 errors require external Capture application/host fixtures or the separately owned Friday actor review/SDK source. These external acceptance prerequisites remain unavailable; this is not an all-green full-suite result. Targeted passes do not override it.
+
+The separately exported source candidate passed all 78 selected Python regressions and all five native compilation steps without Git ancestry, a private recipe or an installed resource shell. Additional actual-source checks passed: 150 Notes backend checks, 139 NAS read-contract checks, 17 music aggregate groups, three write-recovery groups and 53 synthetic Apple owner checks. These counts overlap other regression suites and must not be added as a single total. The fixed Mio schema digest anchors are retained and checked against the reviewed static descriptor bytes.
+
+The NAS v2 directory is a separate experimental integration against a frozen NAS baseline. Its patch must not be blindly applied to the main runtime. Focused payload and completion-fence checks can run in this tree; its complete original integration suite still requires that separately staged runtime.
+
+The default local Codex lifetime policy of 32 calls was not reinterpreted as an account quota or silently removed. It is an explicit existing grant policy whose product migration needs a separate decision. Authorization, signed identity, scope revocation, revision checks, immutable effect receipts and destructive-operation confirmation remain enforced.
+
+Notes search currently searches titles within the selected folder. Rich-content editing, full Apple Notes history migration/attachments, PDF OCR, unsupported encrypted Office documents and whole-account absence proofs are not implemented by these repairs. Snapshot TTLs and real process, memory, parser and transport bounds remain resource constraints; continuation never establishes a stable provider snapshot across independent queries.
+
+## Public source preparation
+
+`script/export_public_source.py` creates a separate snapshot with every production Swift input. It omits private deployment plans, acceptance evidence, historical source copies, installed binaries, caches, `.codex` files and Git ancestry. The original checkout remains intact. A private export receipt lists omitted files; the public inventory contains only selected source hashes.
+
+`script/privacy_audit.py` scans working files, untracked files, the exact index, reachable Git blobs, commit/tag metadata and an explicit candidate. Reports contain categories and paths, without matched secret values; report writes are private and atomic. Pattern matches in test fixtures, product/module names, image scale filenames and public verification material need an explicit review; a pattern match is not automatically a real secret, and a clean pattern report is not proof of absence.
+
+The public source snapshot is distinct from the existing private repository's history. All remote branches and tags must be checked before a visibility change. A local private mirror is retained for recovery; it must never be added to the public source snapshot. No production credentials, signed state, operational manifests or private history should be published.
+
+The native release still requires the user's own offline dependencies and signing configuration. Source compilation is supported separately from signing, packaging, installation and provider acceptance. No ready-to-install public binary is claimed here.

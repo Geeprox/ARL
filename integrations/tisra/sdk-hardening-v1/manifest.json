@@ -1,0 +1,37 @@
+{
+  "changed_and_new_files": {
+    "arl/research_client.py": "c863d322adb99076b970abbb5f3e04cf9dcc501a46da6aebbdf33a3f9b2a4772",
+    "docs/TISRA-RESEARCH-SDK-HARDENING.md": "54eea84b1d5dc5edd702edaa49efb341f8916de03c34f4899e271b8c11c9a1d2",
+    "integrations/tisra/ARLResearchClient.swift": "55bce82b7e044d5d280f3fe4e961569a5a8af4d280cc1df559a5698d9ac7f945",
+    "integrations/tisra/ResearchClientFixture.swift": "74d648dd6dc5bd386919aaaa71e5064252951c93036a0ffe6054e140feea073e",
+    "tests/test_research_client.py": "3f57dd18684ed6b0ac74fa8665994659cf5e8b25482247ecaefe7741b95a79c4",
+    "tests/test_research_sdk_swift.py": "37273c417ff207c27f78c511db7d99bd8a2b501551fd8a56f7398c99e0620c4d"
+  },
+  "delta_sha256": "66eee4fb0c36da20d490fefa1c8568dd50b838834edaa6a157e8f985935cfbc6",
+  "notes_frozen_manifest_sha256": "f0ebc89d12f2978ac2db2246674596953e9eeab980acd8d3752680a8c0ef6bad",
+  "production_changed": false,
+  "read_only_context_hashes": {
+    "arl/contracts.py": "060b3cef49e20d7822df26455d2dee703fa6effa979992d02f7dd9185cb49ad4",
+    "arl/research.py": "aff84f732484e26fda5860359ff755e7a07df108146f95ea57fac1de0b17754a",
+    "arl/service.py": "1cef2a057c62d77b21bb2f37712ae7bfa2ca6f22ab535a1644ce53a4ffaf5e4c",
+    "arl/storage.py": "e5ab5a9dc6ca6ee1d739a581c153218273e6a7c4f7d55a841e3878868371d889",
+    "examples/ARLClient.swift": "20ce4e56e9967a9bce412bbdc9c1c9593013fdea84b8493065c4901c26c470d6"
+  },
+  "remaining": [
+    "consumer durable callback/Ledger integration and strict capabilities acceptance",
+    "lost begin ack cannot revoke an unknown server-assigned ID using unchanged v1",
+    "Notes controlled product IPC/duplex cancel/actual UI/TCC/effect acceptance"
+  ],
+  "schema_version": 1,
+  "scope": "source SDK only; no wire/server/authorization/Ledger/product/production changes",
+  "tests": {
+    "execution": "private SQLite/direct dispatch and injected Swift RPC only",
+    "provider_calls": "test doubles only; no real call",
+    "python_sdk_groups": 10,
+    "result": "passed",
+    "selected_existing_groups": 6,
+    "socket_registered_roundtrip": "not rerun; mistaken first collection bind rejected by sandbox, corrected selection",
+    "swift_sdk_groups": 7,
+    "typecheck": "Swift6 production configuration passed"
+  }
+}

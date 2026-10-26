@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-10-09T16:03:25.734620+00:00",
+  "application": {
+    "CFBundleIdentifier": "com.taobao.desktop",
+    "CFBundleShortVersionString": "3.0.0",
+    "CFBundleVersion": "3.0.0"
+  },
+  "catalog_sha256": "b8cc2b59a0a1fadcc2fea9b24d2143a9d3a24f632488fb5538b6f1a0a67deec2",
+  "catalog_fixture": "tests/fixtures/taobao-300-official-tools.json",
+  "catalog_fixture_sha256": "6d24757eaa4b90da17a0ab7c635eb6127dc6a27d6ecee2b986aa6a42ee55759f",
+  "official_tool_names": [
+    "add_to_cart",
+    "click_element",
+    "close_page",
+    "get_browse_history",
+    "get_current_tab",
+    "input_text",
+    "inspect_page",
+    "keyboard",
+    "list_available_pages",
+    "navigate",
+    "navigate_to_url",
+    "open_chat",
+    "open_page_panel",
+    "read_image",
+    "read_page_content",
+    "scan_page_elements",
+    "scroll_page",
+    "send_chat_message",
+    "shop_subscribe",
+    "submit_product_rating"
+  ],
+  "sources": {
+    "configuration_guide": {
+      "name": "official-guide",
+      "url": "https://jianghu.taobao.com/detail/47301_68957160",
+      "status": 200,
+      "bytes": 120554,
+      "sha256": "0e514a715191fdeb20f6d91491cb5da060e17178b64f6e229a4f623ccaab33da"
+    },
+    "release_300": {
+      "name": "release300",
+      "url": "https://pc.taobao.com/download/41918f50ba6886bb343cf9fa4fe49c78.html",
+      "status": 200,
+      "bytes": 12879,
+      "sha256": "ddd9ff1bc3ff10c6fad3b5cdbac85592f03ffb3e53639e74cff75f53b377beb4"
+    },
+    "current_public_reference": {
+      "at_utc": "2026-10-09T16:11:48.891511+00:00",
+      "url": "https://tblifecdn.taobao.com/taobaopc/skills/taobao-native/SKILL.md",
+      "status": 200,
+      "bytes": 8745,
+      "sha256": "6088190f0305812f56d2d5a89cdf66f29fd4c911586b8a3e0bdfd9a81acac15e",
+      "reference_only": true,
+      "tools_are_not_assumed_present_from_reference": true,
+      "instructions_not_executed": true
+    },
+    "signed_installed_public_bundle": {
+      "Info.plist": "c0af6f8e580e4781679176be4ede9e9d527f5282be994267677b88c319e5c147",
+      "MacOS/淘宝桌面版": "c00d253969a9e00ff0bbd1e30e088eae358e4756c7292505cbe8ef034520fa14",
+      "Resources/app.asar": "d9c9412e22d99e89a6ce95732304d8192b8e71c7ebd870ee7b47956d2a9b450a"
+    }
+  },
+  "reference_directory_discrepancy": "The current public reference describes search_products, but exact 3.0.0 external tools/list omits it. The signed public program contains a legacy search_products definition, internal detail/SKU definitions and a separate external registry. These definitions are not an advertised ARL contract. Public user comments are not official API contracts.",
+  "capabilities": [
+    {
+      "capability": "product_search",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": true,
+      "mechanism": "ARL combination of navigate_to_url, get_current_tab, scoped read_page_content",
+      "fields": [
+        "title",
+        "visible_price"
+      ],
+      "limits": {
+        "max_results": 3,
+        "max_keyword_characters": 64
+      },
+      "unknown": [
+        "product_id",
+        "product_url",
+        "details",
+        "SKU"
+      ],
+      "evidence": "Existing qualified source, prior live search evidence, and current identical catalog; new App consumer is not yet installed."
+    },
+    {
+      "capability": "product_detail",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": false,
+      "mechanism": "Public reference describes navigation and page text. Fixed-selector known-URL candidate is unqualified and excluded from the product patch.",
+      "blocker": "get_product_detail is defined in signed public code but excluded from the external MCP registry. Generic page text is available; a reliable bounded detail workflow is still unqualified."
+    },
+    {
+      "capability": "product_specs_SKU",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": false,
+      "blocker": "request_sku_selection is an internal TaoClaw panel excluded from the external registry; get_product_skus is explicitly filtered from the legacy tool array. Neither is in current tools/list."
+    },
+    {
+      "capability": "price",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": true,
+      "mechanism": "Visible numeric search-card price; ambiguous/missing values remain null.",
+      "final_checkout_price_verified": false,
+      "SKU_price_verified": false
+    },
+    {
+      "capability": "product_link",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": false,
+      "blocker": "Search read/scan provides no stable verified href/itemId. Title, result rank, history and guessed URLs cannot supply it."
+    },
+    {
+      "capability": "cart_read",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": false,
+      "mechanism": "Official navigate supports a cart preset; no dedicated structured get_cart or scoped privacy contract is qualified.",
+      "blocker": "No proven bounded cart reader."
+    },
+    {
+      "capability": "cart_add",
+      "official_direct_tool": "add_to_cart",
+      "available_in_qualified_ARL_Mio": false,
+      "blocker": "External add_to_cart is legacy DOM compatibility. The supplier requires internal request_sku_selection for the new flow, but does not advertise that panel externally to ARL. No permission or click fallback is introduced.",
+      "real_write_tests": 0
+    },
+    {
+      "capability": "account_status",
+      "official_direct_tool": null,
+      "available_in_qualified_ARL_Mio": false,
+      "blocker": "No dedicated account-status API; protocol success and completed public search do not prove login."
+    },
+    {
+      "capability": "orders_and_payment",
+      "available_in_qualified_ARL_Mio": false,
+      "real_tests": 0,
+      "blocker": "Outside this task and public adapter scope."
+    }
+  ],
+  "this_increment": {
+    "canonical_writes": 0,
+    "service_restarts": 0,
+    "real_business_calls": 0,
+    "credential_reads": 0,
+    "native_validation": {
+      "status": "PASS",
+      "search_checks": 78,
+      "diagnostic_checks": 144,
+      "real_SwiftUI_panel_typecheck": "PASS",
+      "full_paired_app_build": "not_run",
+      "live_test_mode": false
+    },
+    "installed_ARL_Mio_acceptance": "not_run",
+    "App_consumer": "isolated_source_candidate"
+  },
+  "external_directory_observation": {
+    "at_utc": "2026-10-09T16:31:59.756358+00:00",
+    "count": 20,
+    "pagination": "two identical tools/list calls; nextCursor absent on both",
+    "source_identity": "ARL",
+    "business_calls": 0,
+    "login_state": "not_checked"
+  },
+  "signed_public_program_boundary": {
+    "current_installed_entry": "out/main/index.js",
+    "entry_sha256": "b0b6563b7552aa089a8ca045a9570e835e06d035749db012be1c2b2a90786759",
+    "current_installed_entry_matches": true,
+    "method": "Restricted integer AST + literal base64 decoding; application code never executed",
+    "source_offsets_are_decoded_character_offsets": true,
+    "external_registry": "Cu()",
+    "external_registry_composition": "ic + rc + Cc + Ac + Dc + cl.filter(name == add_to_cart) + ml + wl + Nc + kl; every schema requires sourceApp",
+    "internal_SKU_registry": "Mu() additionally selects request_sku_selection, show_order_confirmation and show_payment_card from cl",
+    "legacy_definitions_not_externally_registered": [
+      "search_products",
+      "get_product_detail"
+    ],
+    "explicitly_filtered_legacy_tool": "get_product_skus",
+    "external_call_guard": "For source=mcp, the dispatch handler rejects names outside Cu(); no source impersonation was attempted.",
+    "page_and_login_catalog_boundary": "Observed built-in tools are registered from Cu before calls; this registration has no page/login predicate. This does not prove login or all business authorization.",
+    "code_mode_boundary": "registerCodeModeTool exposes execute_code over Cu plus separately registered externalTools. It does not include internal Mu SKU tools by default. No mode was read from private settings or changed, and no execute_code was invoked.",
+    "evidence_windows": [
+      {
+        "name": "external_and_internal_registry",
+        "source_char_start": 3739153,
+        "source_char_end": 3743200,
+        "sha256": "4cf9e4cd9dc0b398a90c2d72ac557016765cd60ae91feb2f8c1819a96345ca28"
+      },
+      {
+        "name": "legacy_direct_search_definition",
+        "source_char_start": 1728755,
+        "source_char_end": 1729200,
+        "sha256": "5310619a22f153a37d77e90f5ab9ee4e40d32a0364eda886a6b78f872fb2c0dc"
+      },
+      {
+        "name": "sku_panel_definition",
+        "source_char_start": 3294294,
+        "source_char_end": 3294950,
+        "sha256": "675c2cccf48c805f6059f5007f12f6cc01c09eda4ddebf2d684b5838b09a5963"
+      },
+      {
+        "name": "internal_detail_filter",
+        "source_char_start": 3335800,
+        "source_char_end": 3336600,
+        "sha256": "c9ced7831753b6e016d883fd5d8a9dc382ca751046f61d868106773a627ce7a0"
+      },
+      {
+        "name": "external_call_gate",
+        "source_char_start": 3790800,
+        "source_char_end": 3792250,
+        "sha256": "aa33b7fb8bc7b20f03dadcf0842c7cca7e8783b897b346cc38bed5f22675067f"
+      },
+      {
+        "name": "external_registration",
+        "source_char_start": 3957400,
+        "source_char_end": 3958350,
+        "sha256": "c5acd96294b15e5c3e3db75ece875d83222af10c42a3e495081d11aee28488c5"
+      },
+      {
+        "name": "code_mode_registration",
+        "source_char_start": 3961500,
+        "source_char_end": 3967450,
+        "sha256": "d6d2fa6c63acecf2b22f23d5f143cf65f4046bb727a57187eae5e4337ee6bb64"
+      },
+      {
+        "name": "code_mode_switch",
+        "source_char_start": 3967450,
+        "source_char_end": 3971000,
+        "sha256": "17d47ebc7c8b7cb66553384db74ae5d1de47bc006dcab9a960705b1d3e50394d"
+      },
+      {
+        "name": "mcp_tools_list",
+        "source_char_start": 2404000,
+        "source_char_end": 2406000,
+        "sha256": "393f2ad493c5a5aa6c5c5579c526942317ae2607cb5fe1e47487e94c0896be8b"
+      }
+    ],
+    "next_supplier_step": "Provide an officially documented external request_sku_selection/detail or bounded product/cart contract, or confirm an official mode that advertises it to sourceApp=ARL. Recheck actual tools/list and qualify its schemas before enabling it; no private dispatch, added permissions, DOM cart fallback or unqualified detail selectors."
+  },
+  "record_kind": "HISTORICAL_2026_10_09_CATALOG_AND_12_PATH_QUALIFICATION",
+  "qualification_update": {
+    "at_utc": "2026-10-10T05:03:06.724000+00:00",
+    "record": "docs/TAOBAO-PUBLIC-PRODUCT-QUALIFICATION.json",
+    "scope": "One real public Tmall known-link ID/URL/title route; named source consumer native 37/77 and UI passed; other product-detail fields remain unknown; new installed App/Mio acceptance not run",
+    "historical_capability_rows_retained": true
+  }
+}

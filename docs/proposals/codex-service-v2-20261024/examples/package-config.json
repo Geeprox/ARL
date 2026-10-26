@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "base_revision": 7,
+  "catalog_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "packages": {
+    "low": {
+      "display_name": "低",
+      "model": "demo-model-a",
+      "reasoning_effort": "low"
+    },
+    "medium": {
+      "display_name": "中",
+      "model": "demo-model-a",
+      "reasoning_effort": "medium"
+    },
+    "high": {
+      "display_name": "高",
+      "model": "demo-model-a",
+      "reasoning_effort": "high"
+    },
+    "very_high": {
+      "display_name": "极高",
+      "model": "demo-model-b",
+      "reasoning_effort": "xhigh"
+    },
+    "highest": {
+      "display_name": "最高",
+      "model": "demo-model-b",
+      "reasoning_effort": "max"
+    }
+  }
+}

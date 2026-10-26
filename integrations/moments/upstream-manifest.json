@@ -1,0 +1,23 @@
+{
+  "source": "REA independent local archive",
+  "source_files": {
+    "wechat_faces.py": "9736633d4fecb49a6544bffb5c2db6ac006a389bb3c0777b26452a48cde3c87d",
+    "refresh_local.py": "859e6331c9d3d7b9b0d6fcd0f5a4c998cfb1989267ec9dbf65fc80388b246ed8",
+    "sns_crypto.py": "4482fe6ed599074cfa442609e4c7ee2ce8a9e132cfd0c12e57eba7a7abbd30ef",
+    "contact_names.py": "190103d15d5ad3089bcbd4ebdefa7ee0fd0d0195e6d6f16db930ef72ef1bc595",
+    "local_service.py": "a8d24a238c6d0688b2b0f5a160c61066fc91628b3d68198c3a79a8b6d0d2540b",
+    "comment_media.py": "b8b6529a357e8765f7918d6069eacf97834e4d5a07b41d516eebbc0acdf56038",
+    "image_integrity.py": "a38113ceb3a12538763c0f581f73eeaf57be9d94687ae0d9a7357ebecb82c544",
+    "local_sns_snapshot.py": "93209702afef5b646ef24c7d6e8dbbaadfb7ef4eff315a9447810173cbdf0aeb",
+    "viewer.template.html": "4ad69f2e288c0ec1a03a73bcf95ceec3a946cc6e6a363f64092275e78cdb1607",
+    "viewer_server.py": "0249164d038ad6607b3a5b09946e968d8882d5cb7873446ae047bff3fe0a429d",
+    "async_media.py": "81ad306eea2d1e2546fe1959a267363561ca730356e49557cfdf0db90b3f9a02",
+    "moments_backup.py": "05ca9dd451749a7984033a8248ad8834b06d716f5df24943c7a02e06d3a09b2d",
+    "legacy-emoji-map.json": "5d835e12702a633292ad80522d784ba5a3158ba548582d843c897a79c48fb98f",
+    "media_backup.py": "619b1ba1132d8fb7a59e72e895753b7e3441d283d0983d298c409e1239f1881a",
+    "independent/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent/moments_protocol/finder.py": "6855e957f75f8e019d6f99d776e8c073ca2401c35b2c3ce7e4f92f7a74beff27",
+    "independent/moments_protocol/__init__.py": "84212c8105c2600970460fce601a31624c738fdf99594cfab96817f31f4be664",
+    "independent/moments_protocol/share_link.py": "bd320ec2613fbc43568323c2319c488510366b579beaea1da90dc89d7af1e302"
+  }
+}

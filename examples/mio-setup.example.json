@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "kind": "agent_setup_plan",
+  "gateway": {"listen": "127.0.0.1", "transport": "mcp", "tools": ["constant_ping"]},
+  "tunnel": {"provider": "secure_mcp_tunnel", "account": "user_interaction", "scope": "user_review_required"},
+  "checks": ["local_health", "local_ready", "remote_ping", "published_tools", "per_tool_authorization"],
+  "credentials": "native_private_storage_only"
+}
