@@ -686,7 +686,7 @@ enum MusicReadProtocol {
             else { throw CredentialError.uncertainLocalState }
             let songs = try rows.map(song)
             try require(Set(songs.map(\.songID)).count == songs.count)
-            try require(page["total"] is NSNull || integer(page["total"]).map({ (songs.count...100000).contains($0) }) == true)
+            try require(page["total"] is NSNull || integer(page["total"]).map({ $0 >= songs.count }) == true)
             try require(page["has_more"] is NSNull || bool(page["has_more"]) != nil)
             let next = page["next_cursor"] as? String, more = bool(page["has_more"])
             try require(page["next_cursor"] is NSNull || next.map({ validCursor($0) && $0 != cursor }) == true)

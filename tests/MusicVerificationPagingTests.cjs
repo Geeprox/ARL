@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const file=path.resolve(__dirname,'../integrations/service_runtime/netease_bridge.cjs');
 const source=fs.readFileSync(file,'utf8').split('\ntry {\n  const request=readRequest();')[0];
-const api=new Function('require','__dirname',source+'\nreturn {collectMusicPages,projectItem,context:value=>{readContext=value;}};')(require,path.dirname(file));
+const api=new Function('require','__dirname',source+'\nreturn {collectMusicPages,projectItem,projectCloudSongs,context:value=>{readContext=value;}};')(require,path.dirname(file));
 const id=i=>i.toString(16).padStart(32,'0');
 const records=Array.from({length:32},(_,i)=>({encryptedId:id(i+1),name:'Song '+i,
  ar:[{name:'Artist'}],al:{name:'Album'},extraBusinessField:'x'.repeat(4000)}));
@@ -15,6 +15,8 @@ async function collect(items,extra={}) {
  const display=records.map(r=>api.projectItem(r,'song'));
  const first=await collect(display);
  assert.equal(first.complete,false);assert.equal(first.pagination.state,'budget_exhausted');assert(first.items.length<32);
+ api.context({isWrite:false,verification:false,arguments:{}});
+ assert.equal(api.projectCloudSongs({code:200,data:{songs:[records[0]],hasMore:true,cursor:'next',total:200001}}).cloud_page.total,200001);
  api.context({isWrite:false,verification:true});
  const compact=records.map(r=>api.projectItem(r,'song'));
  assert(compact.every(r=>!Object.hasOwn(r,'provider_record')));

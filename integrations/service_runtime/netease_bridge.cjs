@@ -1449,7 +1449,7 @@ function projectItem(value,kind,rowIndex=-1) {
   if((typeof original==='string'&&/^[1-9][0-9]{0,19}$/.test(original))||(Number.isSafeInteger(original)&&original>0))
     result.url='https://music.163.com/#/'+kind+'?id='+String(original);
   if(kind==='playlist'&&(value.trackCount!==undefined||value.songCount!==undefined)) {
-    const count=value.trackCount??value.songCount;if(Number.isSafeInteger(count)&&count>=0&&count<=100000)result.track_count=count;
+    const count=value.trackCount??value.songCount;if(Number.isSafeInteger(count)&&count>=0)result.track_count=count;
   }
   if(kind==='playlist')result.provider_record=providerRecord(readContext?.providerRecords?.get(id)??value);
   // Internal write verification carries membership, not repeated display fields.
@@ -1582,7 +1582,7 @@ function projectCloudSongs(raw) {
   if(cursor!==null)check(cursor!==(readContext?.arguments?.cursor??null),'inconsistent_pagination');
   let total=null;
   for(const k of ['recordCount','total','songCount'])if(Object.hasOwn(data,k)) {
-    check(Number.isSafeInteger(data[k])&&data[k]>=items.length&&data[k]<=100000&&
+    check(Number.isSafeInteger(data[k])&&data[k]>=items.length&&
       (total===null||total===data[k]),'invalid_result_total');total=data[k];
   }
   const value={songs:items,complete:hasMore===false,cloud_page:{limit:readContext?.cloudLimit??50,total,has_more:hasMore,next_cursor:cursor}};
@@ -1649,7 +1649,7 @@ function projectReadValue(raw,operation,offset=0) {
   let total=null,hasMore=null;
   if(object(data)) {
     for(const name of ['recordCount','total','songCount'])if(Object.hasOwn(data,name)) {
-      check(Number.isSafeInteger(data[name])&&data[name]>=offset+items.length&&data[name]<=100000,'invalid_result_total');
+      check(Number.isSafeInteger(data[name])&&data[name]>=offset+items.length,'invalid_result_total');
       check(total===null||total===data[name],'inconsistent_result_total');total=data[name];
     }
     if(Object.hasOwn(data,'hasMore')){check(typeof data.hasMore==='boolean','invalid_has_more');hasMore=data.hasMore;}
