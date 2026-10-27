@@ -5,12 +5,12 @@
   "unresolved_sensitive_findings": 0,
   "history_included": false,
   "real_credentials_included": false,
-  "license_status": "MIT draft awaiting owner selection",
-  "upstream_history_cleanup_required_before_public": true,
+  "license_status": "MIT adopted by owner",
+  "upstream_history_cleanup_required_before_public": false,
   "reviewed_pattern_matches": [
     {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "68d425d49132c71cc94a691e73efad29e60e4eb70222773534f11079141c2cf4",
+      "sha256": "fc2bc62b437ed100e833ec8ddf0f9b03f40f369ae8d02467ca7ab3b87261012b",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -1562,5 +1562,7 @@
   "limits": [
     "Pattern review is not proof of absence.",
     "This source snapshot is not an installed or distributable signed application."
-  ]
+  ],
+  "private_upstream_history_excluded": true,
+  "publication_method": "Fresh non-fork repository; original repository remains private."
 }

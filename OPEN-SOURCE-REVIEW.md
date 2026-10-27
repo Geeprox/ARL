@@ -36,3 +36,5 @@ Notes search currently searches titles within the selected folder. Rich-content 
 The public source snapshot is distinct from the existing private repository's history. All remote branches and tags must be checked before a visibility change. A local private mirror is retained for recovery; it must never be added to the public source snapshot. No production credentials, signed state, operational manifests or private history should be published.
 
 The native release still requires the user's own offline dependencies and signing configuration. Source compilation is supported separately from signing, packaging, installation and provider acceptance. No ready-to-install public binary is claimed here.
+
+The owner selected the MIT license for original ARL source. Publication uses a fresh non-fork repository with only reviewed source ancestry; the original repository and its historical branches remain private. The source manifest and per-file pattern review describe this source distribution, while the verification limits above still apply.

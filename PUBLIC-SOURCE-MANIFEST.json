@@ -6,10 +6,10 @@
   "files": {
     ".gitignore": "7ffa71725902853a66001ef570ade55951f8a06a654635833d06b27227368e2d",
     "Build.command": "fa3ecaf2bd04687e50a34e4d661dd26b37a6688199eb50e7b7ebdc02a993f08a",
-    "LICENSE.proposed": "96e3cd51c55b19811c4ed860abdaf344d910fd359e271631a5552d89eb9d3675",
-    "NOTICE": "3005fa55aa3127775920eeab780c939cbd15c8c77197bd3ad8410c2122d84452",
-    "OPEN-SOURCE-REVIEW.md": "68d425d49132c71cc94a691e73efad29e60e4eb70222773534f11079141c2cf4",
-    "README.md": "e74f9a09bb7fb21de98a6d5f27cba63181b4e360ad0ebe9fd3779614f9cca65d",
+    "LICENSE": "96e3cd51c55b19811c4ed860abdaf344d910fd359e271631a5552d89eb9d3675",
+    "NOTICE": "06c3040fcea3ae35228cd5506fa7efd35ac133a5981d8e6ef3e9227de25700c8",
+    "OPEN-SOURCE-REVIEW.md": "fc2bc62b437ed100e833ec8ddf0f9b03f40f369ae8d02467ca7ab3b87261012b",
+    "README.md": "4ef8e5051512fc75e516938a7f505579a08c97b74c004dd9475ab51a15c32770",
     "apple/EventKitHelper.swift": "78611c41440385a08bbd58dc99e2a9d905164d7c1b9531da47cdb07c4d650bdc",
     "apple/PeerSignatureHelper.swift": "59d97c14e78f4ba2a630db9aa3f2692b8e3ee7625e3e70e3d8e3512f06d58201",
     "arl/__init__.py": "1ca7fa8cd52854ea11bec9d0f807ce19ca966e362a3333bf861f3e4f664b9a6e",
@@ -1079,5 +1079,6 @@
     "vendor/nas/DEPENDENCIES.lock.json": "bd489b9e801a9ae87236f2ee3479c0ba5e1814c4b17ac01089ce67edb7183861",
     "vendor/nas/python-source.json": "ce7c4fb282b1ef6f92f17e99e264b6d577445e4d3da6abe5ae65b14061ec4757"
   },
-  "publish_ready": false
+  "publish_ready": true,
+  "readiness_scope": "Reviewed source distribution; no signed binary or complete provider acceptance."
 }

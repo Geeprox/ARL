@@ -102,4 +102,4 @@ python3 -B script/check_native_source.py
 
 该命令只编译，不签名、安装或启动。正式打包仍需自行准备依赖与签名配置；历史部署证据和本地状态不属于公共源码分发。
 
-许可证待维护者确认；[LICENSE.proposed](LICENSE.proposed) 是供审阅的 MIT 草案。
+ARL 原创源码采用 [MIT 许可证](LICENSE)。第三方依赖及商标遵循各自条款，详见 [NOTICE](NOTICE)。
