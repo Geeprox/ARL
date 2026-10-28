@@ -323,9 +323,9 @@ class MacPlatform:
         require(1 <= len(raw) <= 4096 and sha(raw) == value['configuration_sha256'], 'codex_scope_plan_invalid')
         config = json.loads(raw, object_pairs_hook=unique)
         require(set(config) == {'schema_version','caller','provider','model','reasoning_effort','service_tier','scope_generation','max_calls','max_output_bytes','core_manifest_sha256','caller_requirement','explicit_submission_only'}
-                and config['schema_version'] == 1 and config['caller'] == 'arl-control' and config['provider'] == 'codex_app_server'
+                and type(config['schema_version']) is int and config['schema_version'] in (1, 2) and config['caller'] == 'arl-control' and config['provider'] == 'codex_app_server'
                 and config['model'] == 'gpt-6.1-sol' and config['reasoning_effort'] == 'xhigh' and config['service_tier'] == 'default'
-                and type(config['max_calls']) is int and config['max_calls'] == 32 and type(config['max_output_bytes']) is int and config['max_output_bytes'] == 32768
+                and (type(config['max_calls']) is int and 1 <= config['max_calls'] <= 1000 or config['schema_version'] == 2 and config['max_calls'] is None) and type(config['max_output_bytes']) is int and config['max_output_bytes'] == 32768
                 and config['explicit_submission_only'] is True and config['core_manifest_sha256'] == info['ARLCoreRuntimeManifestSHA256'], 'codex_scope_plan_invalid')
         try: require(str(uuid.UUID(config['scope_generation'])) == config['scope_generation'], 'codex_scope_plan_invalid')
         except (ValueError,TypeError,AttributeError):raise InstallFault('codex_scope_plan_invalid') from None

@@ -16,6 +16,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 PATTERNS = {
+    'private_platform_file_identifier': re.compile(rb'\blibfile_[a-z0-9]{24,}\b'),
     'personal_path': re.compile(rb'/(?:Users|home)/[A-Za-z0-9_.-]+/'),
     'private_app_reference': re.compile(rb'(?i)(?<![A-Za-z])(?:tisra|friday)(?![A-Za-z])'),
     'organization_or_tunnel_identifier': re.compile(rb'(?:org-[A-Za-z0-9]{12,}|tunnel_[a-f0-9]{24,}|plugin_asdk_app_[a-f0-9]{24,})'),

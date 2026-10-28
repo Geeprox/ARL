@@ -1,5 +1,7 @@
 import Foundation
 import CoreFoundation
+import CryptoKit
+import Darwin
 import ARLCredentialOnboarding
 
 /// One in-process boundary shared by local file UI and authenticated Mio.
@@ -14,10 +16,50 @@ import ARLCredentialOnboarding
     }
     private let port:Port
     private var paused=false
+    /// Unlinked owner-only temporary FD. Large downloads never retain the whole
+    /// file in memory or expose a local path to the caller.
+    private final class Spool {
+        private let fd: Int32
+        private(set) var count = 0
+        init() throws {
+            var path = Array((NSTemporaryDirectory() + "arl-download-XXXXXX").utf8CString)
+            let opened = mkstemp(&path)
+            guard opened >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+            guard unlink(path) == 0 else { let code = errno; close(opened); throw NSError(domain: NSPOSIXErrorDomain, code: Int(code)) }
+            fd = opened
+        }
+        deinit { close(fd) }
+        func append(_ bytes: Data) throws {
+            try bytes.withUnsafeBytes { raw in
+                var offset = 0
+                while offset < raw.count {
+                    let n = Darwin.write(fd, raw.baseAddress!.advanced(by: offset), raw.count - offset)
+                    if n < 0 && errno == EINTR { continue }
+                    guard n > 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+                    offset += n
+                }
+            }
+            count += bytes.count
+        }
+        func subdata(in range: Range<Int>) throws -> Data {
+            guard range.lowerBound >= 0, range.upperBound <= count else { throw OwnerReadFault.invalid }
+            var data = Data(count: range.count)
+            try data.withUnsafeMutableBytes { raw in
+                var offset = 0
+                while offset < raw.count {
+                    let n = pread(fd, raw.baseAddress!.advanced(by: offset), raw.count - offset, off_t(range.lowerBound + offset))
+                    if n < 0 && errno == EINTR { continue }
+                    guard n > 0 else { throw OwnerReadFault.invalid }
+                    offset += n
+                }
+            }
+            return data
+        }
+    }
     private struct Download {
         let args:Data
         let manifest:Data
-        let bytes:Data
+        let bytes:Spool
         let deadline:Double
         var delivered = false
     }
@@ -72,7 +114,7 @@ import ARLCredentialOnboarding
         guard !paused,port.allowed() else {throw CancellationError()}
     }
     /// Aggregate only the already reviewed range-reader; never introduce a
-    /// second SMB identity, reconnect, or bypass its cumulative epoch budget.
+    /// second SMB identity, reconnect, or bypass its authority, revision or per-request bounds.
     private func performDownload(tool:String,args input:Data) async throws->Data {
         let args=try OwnerReadJSON.object(input,limit:OwnerReadWire.requestLimit)
         try NASDownloadCapability.validate(tool:tool,args:args)
@@ -106,7 +148,7 @@ import ARLCredentialOnboarding
                 else { throw OwnerReadFault.busy }
             }
             let size=NASCapability.integer(args["size"])!,id=args["operation_id"] as! String
-            var data=Data();data.reserveCapacity(size)
+            let data=try Spool(); var digest=SHA256()
             repeat {
                 try await context(args)
                 let length=max(1,min(NASDownloadCapability.chunkBytes,size-data.count)),offset=data.count
@@ -124,13 +166,13 @@ import ARLCredentialOnboarding
                       (offset+bytes.count==size ? NASFileExecutor.boolean(page["eof"],true):NASFileExecutor.boolean(page["eof"],false)),
                       offset+bytes.count==size ? page["next_offset"] is NSNull:NASCapability.integer(page["next_offset"])==offset+bytes.count
                 else {throw OwnerReadFault.invalid}
-                data.append(bytes)
+                try data.append(bytes); digest.update(data: bytes)
                 try await context(args)
             } while data.count<size
             guard now().isFinite,now()<instant+120 else {throw NASRuntimeFailure.expired}
             var manifest=args
             manifest.merge(["schema_version":1,"operation":"download","transfer_ref":UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased()+UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),
-                "sha256":NASDownloadCapability.hash(data),"expires_in_seconds":120.0,"complete":true,"direction":"download",
+                "sha256":digest.finalize().map { String(format: "%02x", $0) }.joined(),"expires_in_seconds":120.0,"complete":true,"direction":"download",
                 "downloadable_artifact":false,"delivery_code":"platform_file_publisher_required"]) {_,new in new}
             guard manifest["operation_id"] as? String==id else {throw OwnerReadFault.invalid}
             let output=try OwnerReadWire.encode(manifest,limit:196608)
@@ -145,7 +187,7 @@ import ARLCredentialOnboarding
         guard NASCapability.integer(args["config_generation"])==NASCapability.integer(manifest["config_generation"]),
               NASCapability.integer(args["size"])==cached.bytes.count else {throw NASRuntimeFailure.sourceChanged}
         let offset=NASCapability.integer(args["offset"])!,length=NASCapability.integer(args["length"])!
-        let end=offset+min(length,cached.bytes.count-offset),bytes=cached.bytes.subdata(in:offset..<end)
+        let end=offset+min(length,cached.bytes.count-offset),bytes=try cached.bytes.subdata(in:offset..<end)
         var reply=args
         reply.merge(["schema_version":1,"operation":"transfer_read","bytes_read":bytes.count,"data_base64":bytes.base64EncodedString(),
             "chunk_sha256":NASDownloadCapability.hash(bytes),"eof":end==cached.bytes.count,"next_offset":end==cached.bytes.count ? NSNull():end as Any,

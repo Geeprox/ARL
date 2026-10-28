@@ -6,7 +6,7 @@
 
 | 格式 | 提取内容 | 明确边界 |
 |---|---|---|
-| PDF | PDFKit 读取内嵌文字，按页返回 | 图像型扫描件/空白页返回 no_extractable_text，不做 OCR；加密 PDF 返回 encrypted_pdf，不接受密码 |
+| PDF | PDFKit 读取内嵌文字；图片型页面使用本地 Vision OCR，按页返回 | 扫描件 OCR 可能识别不准，空白页无文字时返回 no_extractable_text；加密 PDF 返回 encrypted_pdf，不接受密码 |
 | DOCX | 正文、表格、文本框的段落文字、制表符与换行 | 不读取页眉、页脚、脚注、批注或图片文字；按文档 XML 结构提取，不承诺版面还原 |
 | XLSX | 工作簿顺序、工作表名/隐藏状态、单元格引用、共享/内联字符串、原始标量、公式及已有缓存值 | 不执行公式或外部连接；不推算未缓存值，不恢复日期/数字样式，不读取图表或图片 |
 | PPTX | presentation 关系定义的幻灯片顺序及页内文字 | 不提取演讲备注、图片或独立图表/SmartArt 部件 |
@@ -23,7 +23,7 @@ DOC/XLS/PPT、宏文档等其他扩展名返回 unsupported_document_format。�
 - PDF worker 路径由受信 host 在组合时传入，不能来自文档、Mio 参数、文件名或 URL。worker 仅从 stdin 接收原始 PDF、向 stdout 返回 JSON。134候选已将它纳入原应用闭包与既有验证链；当前未新增或更换身份 pin。
 - 不需要第三方 Python 包。Office 使用标准库 zipfile/ElementTree；PDF 使用系统 PDFKit。134候选已扩展原 owner、Mio 目录与recipe；正式运行进程未变。
 
-输入继续受原下载桥接1MiB限制；本组件最多处理512个ZIP部件、8MiB展开内容、128个提取单元（页、段落、工作表或幻灯片）、64KiB提取文字及192KiB紧凑UTF‑8 JSON。PDF worker 有10秒进程期限。它们是当前本地资源预算，不是供应商格式上限。到达文本/单元/JSON预算时 complete=false、truncated=true 并携带 stopped_reasons；覆盖范围始终单独列出。扫描件无内嵌文字不等于 OCR 完成。
+内存便利下载接口保留 1 MiB 界限；大文件使用磁盘暂存下载接口。正式文档读取链路另有 32 MiB 解析输入预算，每个实际读取的 XML 部件最多 8 MiB；每次最多返回 128 个提取单元、64 KiB 文字及192 KiB紧凑UTF-8 JSON。PDF worker 有45秒进程期限，单页渲染最长边为2048像素，约5秒后在页间返回续读位置。它们是当前本地资源预算，不是供应商格式上限。到达文本/单元/JSON预算时 complete=false、truncated=true 并携带 stopped_reasons；覆盖范围始终单独列出。coverage 明示本地 OCR 及其可能误差；无内嵌文字不能作为文档无内容的证据。
 
 ## 验证与交接
 
@@ -51,13 +51,13 @@ DOC/XLS/PPT、宏文档等其他扩展名返回 unsupported_document_format。�
 
 内建交付仍缺少：经过支持且授权的宿主/组件上传接线，能将已校验字节登记为真实平台文件、返回实际文件ID及可下载引用，并在当前Mio运行链中完成验收。现有入站fileParams只处理接收，不能替代这个出站接口。本轮不创建公网下载服务器、不借用客户端凭据、不伪造URL，也不将其他产品的返回文件字段套入MCP。
 
-已验证路径仍是客户端编排：真实NAS download/transfer → Library create → 官方下载助手 →37字节/SHA复验。回执在 build/audit/apple-nas-133-20261024.noindex/；对应文件 libfile_6f88c25521f48191abc5125bec166ab8。该路径无需改变NAS只读scope，可继续使用。
+已验证路径仍是客户端编排：真实NAS download/transfer → Library create → 官方下载助手 →37字节/SHA复验。回执在 build/audit/apple-nas-133-20261024.noindex/；对应文件 [private Library reference omitted]。该路径无需改变NAS只读scope，可继续使用。
 
 ## 134 候选的正式 host 接线（未发布）
 
 2026-10-24：新增兼容接口 mio_nas_read_document，读取指定 object_ref / revision / size / name 的 PDF、DOCX、XLSX、PPTX。mio_nas_read_text 继续严格 UTF-8；原始 download / transfer_read 保留。文档读取不恢复 scope、不重连，不接受 root、主机、凭据、worker 路径或模型执行参数。正式运行版本仍133。
 
-调用链为 MioReadOwnerAdapter → NASFileExecutor / 原 journal → NASFileRequest → 原 NASCredentialService 私有 pipe → nas_file_reader_host → ScopedFileReader.read_complete → 原 manager.file_operation 的 stat/read/stat → 冻结解析器 → SDK/owner/Mio 响应校验。解析前后继续核对原 source / generation / epoch 与授权期限；完整原字节在1MiB上限和原32KiB分块/累计预算下读取并计算SHA。解析失败保留有限原错误码，不自动重试或重连。
+调用链为 MioReadOwnerAdapter → NASFileExecutor / 原 journal → NASFileRequest → 原 NASCredentialService 私有 pipe → nas_file_reader_host → ScopedFileReader.read_complete → 原 manager.file_operation 的 stat/read/stat → 冻结解析器 → SDK/owner/Mio 响应校验。解析前后继续核对原 source / generation / epoch 与授权期限；完整原字节在32 MiB解析预算和原32 KiB分块读取链路下计算SHA，保留原权限与期限。解析失败保留有限原错误码，不自动重试或重连。
 
 候选纳入独立 NASDocumentContract、nas_document_host、标准库解析模块与 NASRuntime/Tools/NASPDFTextExtractor。PDF helper 由构建器在 staging 前编译，并进入原 NAS immutable inventory、来源哈希和正常发布的嵌套签名流程。Office 无新增第三方依赖，PDF 只依赖系统 PDFKit。私有 host 的192KiB默认JSON帧超限时显式标记 owner_frame_budget 并截断提取文本，原下载内容不变。
 

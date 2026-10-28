@@ -273,7 +273,7 @@ class Checks(unittest.TestCase):
         self.assertTrue(all(value is False for value in self.server.swaps))
 
     def test_one_mebibyte_chunk_ref_upload_and_download(self):
-        raw=bytes(range(256))*4096
+        raw=bytes(range(256))*12289
         sha=hashlib.sha256(raw).hexdigest()
         value=wire('upload_new');value.pop('attachment')
         transfer=FileTransfer(journal=self.journal,operation_id=value['operation_id'],fence=self.fence,
@@ -317,7 +317,7 @@ class Checks(unittest.TestCase):
             self.assertLess(len(files.canonical(page)),65536)
             returned.append(base64.b64decode(page['data_base64']))
         self.assertEqual(hashlib.sha256(b''.join(returned)).hexdigest(),sha)
-        self.assertEqual(len(reads),32)
+        self.assertEqual(len(reads),(len(raw)+CHUNK_BYTES-1)//CHUNK_BYTES)
         self.assertLess(max_frame,65536)
         OBSERVATIONS.append({'check':'one_mib_chunk_transfer','file_bytes':len(raw),
             'chunk_bytes':CHUNK_BYTES,'input_chunk_count':len(raw)//CHUNK_BYTES,'download_range_count':len(reads),
@@ -343,7 +343,7 @@ class Checks(unittest.TestCase):
         now[0]=131.
         self.assertFault('expired',lambda:transfer.read_chunk(**args,offset=0))
         self.assertFault('invalid_plan',lambda:FileTransfer(journal=self.journal,operation_id=str(uuid.uuid4()),fence=self.fence,
-            name='large.txt',size=1024*1024+1,sha256='a'*64,verify=lambda:None))
+            name='large.txt',size=2**53,sha256='a'*64,verify=lambda:None))
 
 
 if __name__=='__main__': unittest.main()

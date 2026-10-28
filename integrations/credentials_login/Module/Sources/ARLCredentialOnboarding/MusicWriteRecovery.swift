@@ -2,7 +2,7 @@ import Foundation
 
 /// Audit and attempts for the SAME original UUID. No token, extra permission,
 /// replacement request ID, or change to the original pending record.
-struct MusicWriteRecoveryRecord: Codable, Sendable {
+struct MusicWriteRecoveryRecord: Codable, Equatable, Sendable {
     enum Reason: String, Codable, Sendable { case notDispatched, userRequestedOnce, duplicateSafeAppendOnce }
     struct AppendDecision: Codable, Equatable, Sendable {
         // Public official contract: duplicate addition returns code 200/data [].

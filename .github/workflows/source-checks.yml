@@ -1,0 +1,33 @@
+name: Source checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  portable-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Core, policy, parser and publication regressions
+        run: >-
+          python -B -m unittest
+          tests.test_runtime tests.test_review_regressions
+          tests.test_codex_server tests.test_codex_execution_options tests.test_codex_binary_admission
+          tests.test_tisra_capture_contract tests.test_tisra_capture_runtime
+          tests.test_tisra_capture_uploads tests.test_application_models tests.test_application_host
+          tests.test_nas_document_text.OfficeChecks
+          tests.test_privacy_audit tests.test_core_import_closure
+          tests.test_public_catalog_pins tests.test_bootstrap_checks -q
+  native-source:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile complete native source without signing or launch
+        run: python3 -B script/check_native_source.py

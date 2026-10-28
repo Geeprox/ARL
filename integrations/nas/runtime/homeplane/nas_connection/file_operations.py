@@ -17,14 +17,14 @@ import time
 import uuid
 
 from arl_nas_upload_new.contracts import (
-    OwnerBinding, OwnerBoundary, UploadFault, UploadPlan, canonical, relative_target,
+    OwnerBinding, OwnerBoundary, UploadFault, UploadPlan, canonical, relative_target, MAX_BYTES,
 )
 from arl_nas_upload_new.storage import UploadNewStorage
 from arl_nas_upload_new.journal import UploadJournal
 from arl_nas_upload_new.source import SealedSource
 
 MAX_INLINE_BYTES = 32 * 1024  # Base64 + metadata fits current 64KiB owner request
-MAX_TRANSFER_BYTES = 1024 * 1024  # existing upload object/read-session cap, not SMB limit
+MAX_TRANSFER_BYTES = MAX_BYTES  # Whole objects stream; per-frame and authority deadlines remain bounded.
 READ_CHUNK_BYTES = 32 * 1024
 
 

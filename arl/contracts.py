@@ -110,7 +110,7 @@ class AppPolicy:
     providers: frozenset = frozenset({"mock"})
     max_tokens: int = 256
     max_pending: int = 64
-    max_calls: int = 1000
+    max_calls: int | None = 1000
     methods: frozenset = frozenset({"health", "ready", "capabilities", "providers",
         "submit", "get", "cancel", "resume", "wake", "poll_wakes", "stop", "heartbeat"})
     public_metadata: bool = False

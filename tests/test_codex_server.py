@@ -174,5 +174,12 @@ class ScopedCodexServiceTests(RuntimeCase):
    service,peer,state=build_codex_activation(self.home)
   self.assertIsNone(service);self.assertIsNone(peer)
   self.assertEqual(state,'codex_native_owner_unavailable');launch.assert_not_called()
+  scope['schema_version']=2;scope['max_calls']=None;path.write_text(json.dumps(scope))
+  self.assertIsNone(read_codex_configuration(self.home)[0]['max_calls'])
+  scope['schema_version']=1;path.write_text(json.dumps(scope))
+  self.assert_fault('codex_configuration_invalid',lambda:read_codex_configuration(self.home))
+  scope['schema_version']=2;scope['max_calls']=True;path.write_text(json.dumps(scope))
+  self.assert_fault('codex_configuration_invalid',lambda:read_codex_configuration(self.home))
+  scope['max_calls']=None
   scope['service_tier']='priority';path.write_text(json.dumps(scope))
   self.assert_fault('codex_configuration_invalid',lambda:read_codex_configuration(self.home))

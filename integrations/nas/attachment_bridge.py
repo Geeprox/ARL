@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+from contextlib import contextmanager
+import tempfile
 import hashlib
 import json
 import math
@@ -21,7 +23,8 @@ import unicodedata
 import uuid
 
 CHUNK_BYTES = 32768
-MAX_BYTES = 1048576
+MAX_BYTES = 1048576  # Explicit in-memory convenience bound.
+MAX_FILE_BYTES = 2**53 - 1  # Streamed whole-file JSON integer range.
 FRAME_BYTES = 196608
 COMMON = {"operation_id", "source_ref", "config_generation", "connection_epoch"}
 BINDING = COMMON | {"transfer_ref", "size", "sha256"}
@@ -115,7 +118,7 @@ def mcp_value(result):
     return _json(content[0]["text"])  # independent object, never mutable caller state
 
 
-def _manifest(value):
+def _manifest(value, *, max_bytes=MAX_BYTES):
     if type(value) is not dict or set(value) != MANIFEST_KEYS:
         fail()
     try:
@@ -128,7 +131,7 @@ def _manifest(value):
             or type(value["connection_epoch"]) is not str
             or re.fullmatch("[0-9a-f]{32}", value["connection_epoch"]) is None
             or not all(hex64(value[k]) for k in ("transfer_ref", "sha256", "object_ref", "revision"))
-            or not integer(value["size"]) or type(value["schema_version"]) is not int
+            or not integer(value["size"], high=max_bytes) or type(value["schema_version"]) is not int
             or value["schema_version"] != 1 or value["operation"] != "download"
             or value["downloadable_artifact"] is not False
             or value["delivery_code"] != "platform_file_publisher_required"
@@ -152,20 +155,12 @@ class VerifiedFile:
             fail("integrity_failed")
 
 
-def collect_download(result, *, expected, call, verify, clock=time.monotonic):
-    """Validate Mio manifest and every 32KiB result, return bounded verified bytes.
-
-    call(tool, arguments) invokes the existing connection once per chunk and
-    returns the actual tools/call result. expected is the original download
-    request captured by the host, never reconstructed from the response.
-    verify() checks the host's original
-    binding; it must raise on revocation. No callback is retried. No file is
-    published or marked downloadable here.
-    """
+def _receive_download(result, *, expected, call, verify, clock, sink, max_bytes):
+    """Common exact receipt/authority validator; yields nothing before completion."""
     if not callable(call) or not callable(verify):
         fail("owner_required")
     verify()
-    manifest = _manifest(mcp_value(result))
+    manifest = _manifest(mcp_value(result), max_bytes=max_bytes)
     if (type(expected) is not dict or set(expected) != DOWNLOAD_KEYS
             or any(type(manifest[k]) is not type(v) or manifest[k] != v for k, v in expected.items())):
         fail("binding_mismatch")
@@ -183,11 +178,12 @@ def collect_download(result, *, expected, call, verify, clock=time.monotonic):
         previous = now
         verify()
 
-    data = bytearray()
+    offset = 0
+    whole = hashlib.sha256()
     while True:  # empty files still receive a checked EOF page
         live()
         request = {key: manifest[key] for key in BINDING}
-        request.update(offset=len(data), length=CHUNK_BYTES)
+        request.update(offset=offset, length=CHUNK_BYTES)
         page = mcp_value(call("mio_nas_transfer_read", dict(request)))
         live()
         if (set(page) != PAGE_KEYS or any(type(page[k]) is not type(v) or page[k] != v for k, v in request.items())
@@ -195,7 +191,7 @@ def collect_download(result, *, expected, call, verify, clock=time.monotonic):
                 or page["operation"] != "transfer_read" or page["downloadable_artifact"] is not False
                 or page["delivery_code"] != "platform_file_publisher_required"):
             fail()
-        count = min(CHUNK_BYTES, manifest["size"] - len(data))
+        count = min(CHUNK_BYTES, manifest["size"] - offset)
         encoded = page["data_base64"]
         if (not integer(page["bytes_read"]) or page["bytes_read"] != count or type(encoded) is not str
                 or len(encoded) > 4*((CHUNK_BYTES+2)//3)):
@@ -204,27 +200,65 @@ def collect_download(result, *, expected, call, verify, clock=time.monotonic):
             raw = base64.b64decode(encoded, validate=True)
         except (ValueError, UnicodeError):
             fail()
-        end = len(data) + count
+        end = offset + count
         eof = end == manifest["size"]
         if (len(raw) != count or base64.b64encode(raw).decode("ascii") != encoded
                 or page["chunk_sha256"] != digest(raw) or type(page["eof"]) is not bool or page["eof"] != eof
                 or (page["next_offset"] is not None if eof else
-                    not integer(page["next_offset"]) or page["next_offset"] != end)):
+                    not integer(page["next_offset"], high=MAX_FILE_BYTES) or page["next_offset"] != end)):
             fail("integrity_failed")
-        data.extend(raw)
+        if sink(raw) != len(raw):
+            fail("local_write_failed")
+        whole.update(raw)
+        offset = end
         if eof:
             break
     live()
-    artifact = VerifiedFile(manifest["name"], bytes(data), manifest["sha256"])
-    artifact.check()
-    return artifact
+    if whole.hexdigest() != manifest["sha256"]:
+        fail("integrity_failed")
+    return manifest
+
+
+
+def collect_download(result, *, expected, call, verify, clock=time.monotonic):
+    """Small in-memory convenience API. Larger transfers use collect_download_file."""
+    data = bytearray()
+    def append(raw):
+        data.extend(raw)
+        return len(raw)
+    manifest = _receive_download(result, expected=expected, call=call, verify=verify,
+                                 clock=clock, sink=append, max_bytes=MAX_BYTES)
+    return VerifiedFile(manifest["name"], bytes(data), manifest["sha256"])
+
+
+@dataclass(frozen=True)
+class VerifiedDownloadFile:
+    name: str
+    size: int
+    sha256: str
+    fd: int  # Borrowed owner-only, unlinked FD; valid only inside the context.
+
+
+@contextmanager
+def collect_download_file(result, *, expected, call, verify, clock=time.monotonic):
+    """Stream checked Mio chunks to a private unlinked temporary file.
+
+    The trusted consumer gets a borrowed FD only after whole-file SHA validation.
+    Failure/revocation closes and removes it. No caller path or URL is resolved;
+    this never publishes a platform artifact or mints additional authority.
+    """
+    with tempfile.TemporaryFile(prefix="arl-download-") as file:
+        manifest = _receive_download(result, expected=expected, call=call, verify=verify,
+                                     clock=clock, sink=file.write, max_bytes=MAX_FILE_BYTES)
+        file.flush(); file.seek(0); verify()
+        yield VerifiedDownloadFile(manifest["name"], manifest["size"], manifest["sha256"], file.fileno())
 
 
 def _pin(fd):
     if type(fd) is not int or fd < 0:
         fail("invalid_source")
     row = os.fstat(fd)
-    if not stat.S_ISREG(row.st_mode) or row.st_nlink != 1 or not integer(row.st_size):
+    if not stat.S_ISREG(row.st_mode) or row.st_nlink != 1 or not integer(row.st_size, high=MAX_FILE_BYTES):
         fail("invalid_source")
     return (row.st_dev, row.st_ino, row.st_size, row.st_mtime_ns, row.st_ctime_ns, row.st_mode, row.st_uid)
 

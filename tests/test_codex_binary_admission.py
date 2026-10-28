@@ -13,7 +13,7 @@ OUT=ROOT/'build/tc23-admission'
 class BinaryAdmissionTests(unittest.TestCase):
  def setUp(self):
   OUT.mkdir(parents=True,exist_ok=True)
-  self.temp=tempfile.TemporaryDirectory(prefix='binary-admission-',dir=OUT)
+  self.temp=tempfile.TemporaryDirectory(prefix='binary-admission-',dir=Path('/tmp').resolve())
   self.binary=ROOT/'integrations/codex/fake_server.py'
   self.adapter=CodexTextAdapter(self.binary,enabled=True);self.pin=self.adapter.pin
   self.service=CodexService(self.adapter,caller='offline-pin-review',model='offline-model',

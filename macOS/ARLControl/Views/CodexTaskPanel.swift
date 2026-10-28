@@ -14,7 +14,7 @@ import SwiftUI
             }
             if let status = controller.status {
                 MetadataRow(title: "服务", value: title(status))
-                MetadataRow(title: "剩余调用", value: status.remaining_calls.map(String.init) ?? "待检查")
+                MetadataRow(title: "剩余调用", value: status.remaining_calls.map { "\($0) 次" } ?? (status.caller == nil ? "待检查" : "不设本地次数上限"))
                 MetadataRow(title: "真实推理", value: status.simulated == true ? "合成测试" : status.inference_verified == true ? "已有成功回执" : "尚未验证")
                 if let code = status.reason ?? status.last_error_code { Text(code).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
             }

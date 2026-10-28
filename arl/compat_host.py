@@ -195,12 +195,12 @@ def read_codex_configuration(home):
             'scope_generation','max_calls','max_output_bytes','core_manifest_sha256',
             'caller_requirement','explicit_submission_only'}
         if (type(value) is not dict or set(value) != fields or
-                type(value['schema_version']) is not int or value['schema_version'] != 1 or
+                type(value['schema_version']) is not int or value['schema_version'] not in (1, 2) or
                 value['caller'] != 'arl-control' or value['provider'] != 'codex_app_server' or
                 value['reasoning_effort'] != 'xhigh' or value['service_tier'] != 'default' or
                 value['explicit_submission_only'] is not True or
                 type(value['model']) is not str or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]{0,149}',value['model']) is None or
-                type(value['max_calls']) is not int or not 1 <= value['max_calls'] <= 1000 or
+                not (type(value['max_calls']) is int and 1 <= value['max_calls'] <= 1000 or value['schema_version'] == 2 and value['max_calls'] is None) or
                 type(value['max_output_bytes']) is not int or not 128 <= value['max_output_bytes'] <= 32768 or
                 type(value['core_manifest_sha256']) is not str or re.fullmatch(r'[a-f0-9]{64}',value['core_manifest_sha256']) is None or
                 type(value['caller_requirement']) is not str or not 1 <= len(value['caller_requirement']) <= 512 or

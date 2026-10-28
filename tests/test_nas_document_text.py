@@ -263,10 +263,12 @@ class PDFKitChecks(unittest.TestCase):
         cls.home = Path(cls.temporary.name)
         cls.helper = cls.home / "NASPDFTextExtractor"
         cls.protector = cls.home / "NASPDFProtectionFixture"
+        cls.scanned = cls.home / "NASScannedPDFFixture"
         base = ["xcrun", "swiftc", "-j", "1", "-swift-version", "6", "-parse-as-library",
                 "-module-cache-path", str(cls.home / "ModuleCache")]
         for source, target in [(ROOT / "integrations/nas/native/NASPDFTextExtractor.swift", cls.helper),
-                               (ROOT / "tests/fixtures/NASPDFProtectionFixture.swift", cls.protector)]:
+                               (ROOT / "tests/fixtures/NASPDFProtectionFixture.swift", cls.protector),
+                               (ROOT / "tests/fixtures/NASScannedPDFFixture.swift", cls.scanned)]:
             compiled = subprocess.run(base + [str(source), "-o", str(target)], capture_output=True, text=True, timeout=120)
             if compiled.returncode:
                 raise RuntimeError(compiled.stderr)
@@ -286,12 +288,20 @@ class PDFKitChecks(unittest.TestCase):
         self.assertTrue(result["complete"])
         self.assertEqual(result["format"], "pdf")
 
-    def test_scanned_image_only_and_blank_pdf_return_no_text_without_ocr(self):
+    def test_solid_image_and_blank_pdf_return_no_text_with_local_ocr(self):
         for raw in [sample.pdf(image=True), sample.pdf(blank=True)]:
             result = self.extract(raw)
             self.assertEqual(result["state"], "no_extractable_text")
             self.assertEqual(result["text"], "")
-            self.assertIn("no_OCR", result["coverage"])
+            self.assertIn("local_Vision_OCR", result["coverage"])
+
+    def test_image_only_pdf_is_read_with_real_local_vision(self):
+        generated = subprocess.run([str(self.scanned)], capture_output=True, timeout=15)
+        self.assertEqual(generated.returncode, 0, generated.stderr)
+        result = self.extract(generated.stdout)
+        self.assertIn("ARL SCANNED DOCUMENT 7429", result["text"])
+        self.assertIn("OCR_may_be_inaccurate", result["coverage"])
+        self.assertTrue(result["complete"])
 
     def test_actual_pdfkit_password_protected_pdf_is_refused(self):
         protected = subprocess.run([str(self.protector)], input=sample.pdf(), capture_output=True, timeout=15)

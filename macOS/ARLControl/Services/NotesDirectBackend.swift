@@ -101,11 +101,21 @@ final class NotesDirectBackend {
             try NotesDirectContract.identifier(noteID, entity: "ICNote")
             let stable = try AppleDirectDescriptor.object(note, id: noteID, parent: folder)
             guard try !flag(0x70777072, stable), try !flag(0x73687264, stable) else { continue }
-            let title = try text(name, stable, maximum: 4096)
-            guard query.isEmpty || title.localizedCaseInsensitiveContains(query) else { continue }
             _ = try noteRef(noteID, scope)
-            guard try text(name, stable, maximum: 4096) == title else { throw AppleDirectFault("revision_changed") }
-            rows.append(try NotesDirectRow(id: noteID, title: title, modified: modified(stable)))
+            let revision = try modified(stable)
+            let title = try text(name, stable, maximum: 4096)
+            var matches = query.isEmpty || title.localizedCaseInsensitiveContains(query)
+            if !matches {
+                // Read only the selected, unlocked, nonshared note. Search has
+                // the same parser-memory bound as paged plain-text reading.
+                matches = try text(0x74657874, stable, maximum: 32*1024*1024).localizedCaseInsensitiveContains(query)
+            }
+            guard try modified(stable) == revision, try text(name, stable, maximum: 4096) == title else {
+                throw AppleDirectFault("revision_changed")
+            }
+            _ = try noteRef(noteID, scope)
+            guard matches else { continue }
+            rows.append(try NotesDirectRow(id: noteID, title: title, modified: revision))
             if rows.count == limit { break }
         }
         try verify(scope)

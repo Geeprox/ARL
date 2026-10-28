@@ -166,6 +166,24 @@ import Darwin
         let empty=try paging.search(far.scope(),query:"",offset:Int.max,limit:50)
         try expect(empty.notes.isEmpty && empty.scanned==0 && empty.next_offset==nil,"out-of-range offset ends safely without integer overflow")
 
+        let searchable=Fixture()
+        var bodyReads=0
+        let searchBackend=NotesDirectBackend(send:{event,params in
+            if event==0x636e7465,params[0x6b6f636c]?.typeCodeValue==0x6e6f7465 {return .init(int32:205)}
+            if params[0x2d2d2d2d]?.forKeyword(0x73656c64)?.typeCodeValue==0x74657874 {bodyReads+=1}
+            return try searchable.send(event,params)
+        },check:{})
+        let bodyMatch=try searchBackend.search(searchable.scope(),query:"body",offset:200,limit:1)
+        try expect(bodyMatch.notes.count==1 && bodyMatch.offset==200 && bodyMatch.next_offset==201 && bodyReads==1,"body search continues beyond first inventory page")
+        _ = try searchBackend.search(searchable.scope(),query:"Synthetic",limit:1)
+        try expect(bodyReads==1,"title match does not read body")
+        searchable.locked=true
+        let hidden=try searchBackend.search(searchable.scope(),query:"body",offset:200,limit:1)
+        try expect(hidden.notes.isEmpty && bodyReads==1,"locked bodies never searched")
+        searchable.locked=false;searchable.shared=true
+        let shared=try searchBackend.search(searchable.scope(),query:"body",offset:200,limit:1)
+        try expect(shared.notes.isEmpty && bodyReads==1,"shared bodies never searched")
+
         let changedBody = Fixture(), q = changedBody.proposal(), bodyHome = try home("body")
         changedBody.html = "<div><b>Synthetic</b></div><div>Changed</div>"; changedBody.plaintext = "Synthetic\nChanged\n"
         try rejects("revision_changed", consumed: false) {

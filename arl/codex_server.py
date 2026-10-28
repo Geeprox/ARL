@@ -385,7 +385,7 @@ class CodexService:
       type(caller) is not str or re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', caller) is None or caller == 'settings' or
       type(model) is not str or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]{0,149}', model) is None or
       not callable(authorization_current) or not callable(peer_current) or
-      type(max_calls) is not int or not 1 <= max_calls <= 1000 or
+      (max_calls is not None and (type(max_calls) is not int or not 1 <= max_calls <= 1000)) or
       type(max_output_bytes) is not int or not 128 <= max_output_bytes <= 32768):
    raise Fault('codex_service_not_admitted')
   self.adapter, self.caller, self.model = adapter, caller, model
@@ -444,13 +444,13 @@ class CodexService:
    try:
     with runtime.store.lock:
      row = runtime.store.db.execute('SELECT calls FROM budget WHERE owner=?', (self.caller,)).fetchone()
-     remaining = max(0, self.max_calls-(row[0] if row is not None else 0))
+     remaining = None if self.max_calls is None else max(0, self.max_calls-(row[0] if row is not None else 0))
      pending = runtime.store.db.execute("SELECT COUNT(*) FROM jobs WHERE owner=? AND tool=? AND state IN ('queued','running')",
        (self.caller, self.name)).fetchone()[0]
    except Exception:active = False
   with self.lock:
    fresh = self.checked_mono is not None and 0 <= time.monotonic()-self.checked_mono <= 90
-   enabled = bool(active and fresh and (remaining > 0 or pending > 0))
+   enabled = bool(active and fresh and (remaining is None or remaining > 0 or pending > 0))
    state = 'unavailable' if not active else 'preflight_pending' if not fresh else 'ready' if enabled else 'budget_exhausted'
    return {'schema_version':1, 'state':state,
     'caller':self.caller, 'model':self.model, 'reasoning_effort':self.reasoning_effort, 'service_tier':self.service_tier,

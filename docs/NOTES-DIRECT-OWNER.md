@@ -1,25 +1,15 @@
-# 备忘录主应用接线
+# Notes Direct owner
 
-本功能由正式 ARL 主进程执行固定 Apple Events。保留现有稳定 CD85/Team designated requirement 与 hardened runtime，只添加 `com.apple.security.automation.apple-events=true`；签包检查器拒绝多余、缺失、非布尔或关闭值，检查固定 usage 文案。源码候选、演示和隔离启动均不可访问系统服务。
+当前源码（2026-10-28）由同一 ARL 原生 owner 使用固定公开 Apple Events；不读 Notes 私有数据库，不新增授权身份或后台授权路径。
 
-## 用户操作
+用户先授权并选择账号及非共享文件夹。每次请求重查范围、身份、权限与期限。共享、锁定或加密笔记不参与正文搜索和读取；切换范围后旧结果不能继续操作。
 
-首次需要系统权限时，用户点击“允许连接备忘录”进入系统 Automation 授权，不叠加应用确认框。已有权限使用 ask=false 检查。系统备忘录需要已运行，目标固定为系统包及其真实 PID、启动代和 Apple 签名；失效即停止，不启动脚本或寻找替代服务。
+搜索覆盖标题及纯文本正文。每次最多扫描 200 条、返回 50 条，`offset` / `next_offset` 指向实际扫描位置；可续读到后续页。标题已命中时无需读取正文。正文匹配前后核对稳定 ID、文件夹、标题和修改时间，发生变化则拒绝该次结果。单条正文保留 32 MiB 解析内存界限。
 
-“选择文件夹”仅列账户及顶层非共享文件夹。点击“使用此文件夹”完成明确范围选择，不再追问一次。保存的仅为显示偏好（精确账户/文件夹 ID 与名称），不是后台/RPC grant；每次在显示此目标的页面点击业务按钮时重新核验固定 ID、名称、container 和 shared 状态。账户/文件夹名存在歧义时不猜测。选择在切换页面及重新打开 ARL 后保留；操作期限只约束本次调用，不要求周期性重授权。
+读取使用精确结果行及其修订，按 UTF-8 字节分页；每页最多 64 KiB，字符不会被截断。分页内容可用于消费方自己的迁移读取，但不构成全账号历史导入、附件导出或云同步保证。部分正文不能成为可编辑前缀。
 
-搜索仅标题，最多扫描200条、返回50条，页面显示实际覆盖数量；先取得ID，再读取稳定ID的标题。共享、加密对象跳过。读取只能来自当前结果集中被用户点选的行，检查修订与 folder，显示纯文本（最多64KiB），不取 HTML、附件或其他文件夹内容。
+普通纯文本新建/改写沿用精确内容摘要、持久消费记录及本地回读。富文本和附件笔记的普通编辑继续拒绝。单条删除通过原有独立精确对象确认，检查修订和正文摘要；删除支持不以普通编辑能力为前提。取消和超时不承诺撤销已发生的效果，未知状态不能自动重放。
 
-新建目标、标题和全文直接显示在正常编辑界面。按一次“新建笔记”冻结该精确意图并执行，不追加“确定吗”弹窗。纯文本转义为固定HTML，仅一次make，随后仅核对新对象的范围、标题与纯文本；未确认云端同步。无追加、改写、删除、附件、Mio/RPC入口。
+Mio 的 `mio_notes_list` / `mio_notes_search` / `mio_notes_read` 复用同一 owner、选定范围和分页实现。调用方不能通过请求参数自报账号或文件夹来扩大授权。
 
-## 一次执行及取消
-
-RuntimeStore拥有单个后台串行队列。描述符只在该队列创建、发送、释放，跨队列仅传DTO。普通事件ask=false、no-interact、do-not-record、no-prompt，单事件≤5秒且共用20秒预算；首次系统授权API可能等待用户，取消不会声称已撤回系统弹窗。
-
-创建前持久保存opaque operation UUID与完整目标/内容摘要，O_EXCL并fsync文件/目录，再唯一一次make。任何claim部分失败、发送/回读超时或崩溃都保留consumed/unknown，不换ID自动重试。独立`apple-direct-once-v1`目录及anchor核对inode，缺失/替换后不自动重建；未知记录阻止后续新建，读取仍可用。无自动删除/重置旧v2或新记录。成功记录与claim摘要必须匹配。用户可在页面复制操作ID，内容和收件人不写入journal。
-
-## 验证边界
-
-本次源码新增不等于系统接通。需要新冻结树编译、合成fixture、独立review、签包/安装后再核真实ARL→Notes权限。真实业务仅在用户选择范围和按业务按钮之后执行。ARL48仍是此前Reminders修复安装，不含本候选。
-
-针对性fixture在`tests/NotesDirectTests.swift`，仅合成descriptor、注入状态机与owned目录日志；无真实Apple Event、TCC、备忘录、Contacts或聊天数据库调用。正常release Python测试覆盖精确entitlement和Info/checker联动。native尚需fresh串行槽。
+`tests/NotesDirectTests.swift` 和 `tests/NotesDeleteTests.swift` 注入合成 Apple Event transport，覆盖范围、修订、锁定/共享排除、长正文、续页与写入消费。使用 `python3 -B script/check_review_fixes.py` 编译并运行。它们不会请求 TCC 或访问真实笔记；安装、实际权限、真实写入与云同步仍须独立验收。

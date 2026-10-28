@@ -44,7 +44,30 @@ def synthetic_catalog():
 
 
 def actual_icon():
-    source = (TISRA / 'assets/Tisra.icns').read_bytes()
+    original = TISRA / 'assets/Tisra.icns'
+    if original.is_file():
+        source = original.read_bytes()
+    else:
+        # Public unit fixture: repack the bundled ARL 64px PNG into the tested
+        # icp6 container profile. This makes no external consumer acceptance claim.
+        bundled = (ROOT/'macOS/ARLControl/Resources/AppIcon/ARL.icns').read_bytes()
+        index = 8
+        while index < len(bundled):
+            size = int.from_bytes(bundled[index+4:index+8], 'big')
+            if bundled[index:index+4] == b'ic12':
+                original_png = bundled[index+8:index+size]
+                png = original_png[:8]
+                at = 8
+                while at < len(original_png):
+                    count = int.from_bytes(original_png[at:at+4], 'big') + 12
+                    if original_png[at+4:at+8] in {b'IHDR',b'IDAT',b'IEND'}:
+                        png += original_png[at:at+count]
+                    at += count
+                member = b'icp6' + (len(png)+8).to_bytes(4, 'big') + png
+                source = b'icns' + (len(member)+8).to_bytes(4, 'big') + member
+                break
+            index += size
+        else: raise AssertionError('bundled 64px icon fixture missing')
     offset, members = 8, []
     while offset < len(source):
         length = int.from_bytes(source[offset+4:offset+8], 'big')
@@ -203,7 +226,7 @@ class ApplicationModelTests(unittest.TestCase):
             reply = self.register_icon()
             read = self.gateway.read_icon('tisra', reply['sha256'])
             self.assertEqual(read['png_base64'], actual_icon()['png_base64'])
-            self.assertEqual(read['bytes'], 4213)
+            self.assertEqual(read['bytes'], actual_icon()['byte_count'])
             self.assertEqual(self.submit(self.request())['reasons'], ['package_unavailable'])
         self.assertEqual(self.gateway.requests, {})
 
@@ -318,7 +341,7 @@ class ApplicationModelTests(unittest.TestCase):
         self.assertEqual(set(ref), {'app_id', 'sha256', 'mime_type', 'width', 'height', 'bytes'})
         read = self.gateway.read_icon('tisra', icon['sha256'])
         self.assertEqual(base64.b64decode(read['png_base64']), base64.b64decode(icon['png_base64']))
-        self.assertEqual(ref['bytes'], 4213)
+        self.assertEqual(ref['bytes'], actual_icon()['byte_count'])
         self.assertEqual(self.registry.snapshot({'tisra': self.policy, 'other': self.policy})[1]['authorized_tools'], [])
         self.assertEqual(self.registry.snapshot({'tisra': self.policy, 'other': self.policy})[1]['authorization'], 'none')
         # Metadata registration works even when no inference catalog exists.

@@ -373,9 +373,10 @@ struct CodexServiceStatus: Decodable, Sendable {
             try WireSchema.constantInt(row["max_pending"], 1)
             try WireSchema.constantInt(row["max_input_bytes"], 8192)
             try WireSchema.constantInt(row["max_wall_ms"], 30000)
-            let calls = try WireSchema.integer(row["max_calls"])
+            let unlimited = row["max_calls"] is NSNull && row["remaining_calls"] is NSNull
+            let calls = unlimited ? 1 : try WireSchema.integer(row["max_calls"])
             let output = try WireSchema.integer(row["max_output_bytes"])
-            let remaining = try WireSchema.integer(row["remaining_calls"])
+            let remaining = unlimited ? 0 : try WireSchema.integer(row["remaining_calls"])
             guard (1...1000).contains(calls), (0...calls).contains(remaining), (128...32768).contains(output),
                   try !WireSchema.boolean(row["token_hard_cap_supported"]),
                   try !WireSchema.boolean(row["cost_hard_cap_supported"]) else { throw ARLError(code: "invalid_response") }

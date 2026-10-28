@@ -233,7 +233,7 @@ def pdf(raw, helper, budget):
     if helper is None or not Path(helper).is_absolute() or not Path(helper).is_file():
         fail("pdf_worker_unavailable")
     try:
-        response = subprocess.run([str(helper), str(budget.unit_offset), str(budget.text_offset)], input=raw, capture_output=True, timeout=10)
+        response = subprocess.run([str(helper), str(budget.unit_offset), str(budget.text_offset)], input=raw, capture_output=True, timeout=45)
     except subprocess.TimeoutExpired:
         fail("document_parser_timeout")
     except OSError:
@@ -246,7 +246,7 @@ def pdf(raw, helper, budget):
             fail("invalid_parser_reply")
         if not result["ok"]:
             code = result.get("code")
-            fail(code if code in {"invalid_pdf", "encrypted_pdf", "input_budget"} else "document_parser_failed")
+            fail(code if code in {"invalid_pdf", "encrypted_pdf", "input_budget", "pdf_ocr_failed"} else "document_parser_failed")
         if type(result.get("pages")) is not list or type(result.get("page_count")) is not int:
             fail("invalid_parser_reply")
         previous = budget.unit_offset - 1
@@ -269,7 +269,7 @@ def pdf(raw, helper, budget):
         if isinstance(error, DocumentFault):
             raise
         fail("invalid_parser_reply")
-    return "pdf_embedded_text; no_OCR; images_annotations_excluded"
+    return "pdf_embedded_text_or_local_Vision_OCR; OCR_may_be_inaccurate; annotations_excluded"
 
 
 

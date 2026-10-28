@@ -34,7 +34,7 @@ from arl.tisra_capture_runtime import (
     RegisteredCaptureParticipant,
 )
 
-FIXTURES = Path(__file__).resolve().parents[1] / 'integrations/tisra/capture-inner-v1'
+FIXTURES = Path(__file__).resolve().parents[1] / 'tests/fixtures/capture_transport'
 
 
 def uid(): return str(uuid.uuid4())

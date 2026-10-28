@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1074,
+  "source_files": 1082,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -9,8 +9,15 @@
   "upstream_history_cleanup_required_before_public": false,
   "reviewed_pattern_matches": [
     {
+      "path": ".github/workflows/source-checks.yml",
+      "sha256": "d61a62a2890a0c6dfb1b82e0bdd2e4039e7a16508983ffd0afa3df5134c0bf0e",
+      "categories": {
+        "private_app_reference": "Intentional integration module, fixture, test or documentation names."
+      }
+    },
+    {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "fc2bc62b437ed100e833ec8ddf0f9b03f40f369ae8d02467ca7ab3b87261012b",
+      "sha256": "e91686ee67bad2c9d3ce2f8db0759cca58e2f3b17241d69bb6a1205f27fcbe9b",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -94,7 +101,7 @@
     },
     {
       "path": "arl/compat_host.py",
-      "sha256": "978614775af88f5588f619fd9ef05fb2e9851e82cceb31739dec90e43f6d276b",
+      "sha256": "c594c6f6041a3b1398eab45c484fb259675d1929d40d3ffb1b6c905a661a6bf4",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -378,6 +385,13 @@
       "sha256": "4ad4b3b96485e59a31d3fd35233735138597f9fb48646d3c3745c77097269b4b",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
+      }
+    },
+    {
+      "path": "docs/REVIEW-COMPLETION-20261028.md",
+      "sha256": "378b78873852f23a98b940f899462411a5c1e9f5b9d3a4f3159ef218d47e7423",
+      "categories": {
+        "private_app_reference": "Intentional integration module, fixture, test or documentation names."
       }
     },
     {
@@ -922,7 +936,7 @@
     },
     {
       "path": "script/privacy_audit.py",
-      "sha256": "1340f9a1046b89fb865a5d08ca023f62dc87d4aa0db21f5bd44ccd19846a0643",
+      "sha256": "2a7bee215b7a75bc098789a53e4b71813d9729f4e08d778a9a05f55e8b0d835f",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -1194,14 +1208,14 @@
     },
     {
       "path": "tests/test_application_host.py",
-      "sha256": "d70016dd980aee17fe4e44580ac8a719e20e797a888a86c8d786d16f4346984b",
+      "sha256": "e710d6a853f4188a039f3a0cf3efc994da31ad0bd5d99376c97d295ae78d2044",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
     },
     {
       "path": "tests/test_application_models.py",
-      "sha256": "ffadad6bbdde0d2c78976d7d67bb0fe2da70e6c4137478ee8e4f7766ac4cf798",
+      "sha256": "d5282f68cf4eaebaacd13a8a65c19aeaa182307ddb4be4a7b7adaae004808db7",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -1257,7 +1271,7 @@
     },
     {
       "path": "tests/test_codex_server.py",
-      "sha256": "4ae1924a0e4f5161cb29b50eb506c003c0235a6145391d7f4926720dec3f79eb",
+      "sha256": "d8cd9491164433745b71a925f26604892fa7e75c36b9a597d17d8ab3841e4705",
       "categories": {
         "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname.",
         "private_app_reference": "Intentional integration product or module names."
@@ -1420,7 +1434,7 @@
     },
     {
       "path": "tests/test_privacy_audit.py",
-      "sha256": "81ba3db71f40b9beeb5100bc3523e697792b275e7e83e83829dc5cba374a15dd",
+      "sha256": "99ae0d2ae12527e9602a1b35af9ec87f9e531acc712267ce316648f4436a33f9",
       "categories": {
         "credential_url": "Synthetic credential-URL rejection test; no usable service credential."
       }
@@ -1469,7 +1483,7 @@
     },
     {
       "path": "tests/test_research_swift.py",
-      "sha256": "5b2ac390d0bfda2e5dc51dc019757fc557b4423264f480d1f20d7bc10a0e53d6",
+      "sha256": "4c9551476494310d80e2776060eb5d11420e3a69732126b74e345db5323935cb",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -1532,14 +1546,14 @@
     },
     {
       "path": "tests/test_tisra_capture_process.py",
-      "sha256": "2adc3bc72bb996c41648d74c2fa8ef5108da5231f58936b6552e6f9e0cb4d6d6",
+      "sha256": "70a4fbf91010f00b7e2dd7bdc26483f6cde9d65371762dbbc7877bc2a4b1f313",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
     },
     {
       "path": "tests/test_tisra_capture_runtime.py",
-      "sha256": "cc2c9f4a89ff9326842fef79b13276944d72b68b6ed67aa4213b213a79dbc369",
+      "sha256": "3ec113e3173fd07c3a6c23dae7ee067f19ff08f98eb275b079be995c2e5957de",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -1564,5 +1578,11 @@
     "This source snapshot is not an installed or distributable signed application."
   ],
   "private_upstream_history_excluded": true,
-  "publication_method": "Fresh non-fork repository; original repository remains private."
+  "publication_method": "Fast-forward update of the reviewed public source repository; private upstream ancestry remains excluded.",
+  "review_date": "2026-10-28",
+  "historical_reference_review": {
+    "current_source_references": 0,
+    "historical_files": 2,
+    "kind": "Opaque Library identifiers in prior public documentation; no credential or authorization. Removed from current source. Existing history preserved."
+  }
 }

@@ -1,4 +1,7 @@
 import json
+import sys
+import tempfile
+import unittest
 import subprocess
 import threading
 import time
@@ -11,11 +14,23 @@ from arl.service import Runtime
 from tests.test_research import Adapter, MODEL, FINGERPRINT, response
 from tests.test_runtime import RuntimeCase
 
+@unittest.skipUnless(sys.platform == 'darwin', 'real macOS peer identity required')
 class SwiftResearchTests(RuntimeCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory(prefix='arl-research-swift-')
+        cls.addClassCleanup(cls.temporary.cleanup)
+        home = Path(cls.temporary.name)
+        root = Path(__file__).resolve().parents[1]
+        cls.executable = home/'research-swift-smoke'
+        built = subprocess.run(['xcrun','swiftc','-swift-version','6','-module-cache-path',str(home/'cache'),
+            str(root/'examples/ARLClient.swift'),str(root/'integrations/tisra/ARLResearchClient.swift'),
+            str(root/'integrations/tisra/ResearchSmoke.swift'),'-o',str(cls.executable)],capture_output=True,timeout=120)
+        if built.returncode: raise RuntimeError(built.stderr.decode())
+
     def test_actual_swift_typed_consumer_registered_native_process(self):
         root=Path(__file__).resolve().parents[1]
-        executable=root/'.run/research-swift-smoke'
-        self.assertTrue(executable.is_file(),'Build ResearchSmoke.swift using documented command first')
+        executable=self.executable
         verifier=RegisteredPeerVerifier({'tisra'})
         adapter=Adapter(lambda *_:response(1048576))
         engine=ResearchEngine({'tisra':ResearchGrant('responses_fixture',frozenset({MODEL}),'swift-test-epoch')},{'responses_fixture':adapter})

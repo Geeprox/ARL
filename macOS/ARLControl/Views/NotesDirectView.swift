@@ -35,7 +35,7 @@ struct NotesDirectView: View {
                 Text("当前范围：\(scope.folder.label)").font(.callout.bold())
                 Text("每次操作前核对当前文件夹。").font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    TextField("搜索标题", text: $query)
+                    TextField("搜索标题和正文", text: $query)
                     Button(query.isEmpty ? "列出笔记" : "查找笔记") { let exactQuery = query; if let ticket = controller.ticket() { Task { await controller.search(query: exactQuery, ticket: ticket) } } }
                 }.disabled(controller.busy || !controller.scopeCurrent)
                 if let result = controller.searchResult {

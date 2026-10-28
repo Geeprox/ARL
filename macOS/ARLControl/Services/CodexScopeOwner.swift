@@ -12,22 +12,27 @@ import Darwin
         guard manifest.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
               !requirement.isEmpty, requirement.utf8.count <= 512 else { throw ARLError(code: "codex_configuration_invalid") }
         var generation = UUID().uuidString.lowercased()
+        var schema = 2
+        var calls: Any = NSNull()
         if let previous {
             let row = try OwnerReadJSON.object(previous, limit: 4096)
-            guard Set(row.keys) == fields, OwnerReadWire.integer(row["schema_version"], 1),
+            guard Set(row.keys) == fields, (OwnerReadWire.integer(row["schema_version"], 1) || OwnerReadWire.integer(row["schema_version"], 2)),
                   row["caller"] as? String == "arl-control", row["provider"] as? String == "codex_app_server",
                   row["model"] as? String == model, row["reasoning_effort"] as? String == "xhigh",
-                  row["service_tier"] as? String == "default", OwnerReadWire.integer(row["max_calls"], 32),
+                  row["service_tier"] as? String == "default", (NASCapability.integer(row["max_calls"]).map { (1...1000).contains($0) } == true || OwnerReadWire.integer(row["schema_version"], 2) && row["max_calls"] is NSNull),
                   OwnerReadWire.integer(row["max_output_bytes"], 32768), OwnerReadWire.trueBoolean(row["explicit_submission_only"]),
                   let oldGeneration = row["scope_generation"] as? String,
                   UUID(uuidString: oldGeneration)?.uuidString.lowercased() == oldGeneration,
                   let oldManifest = row["core_manifest_sha256"] as? String, oldManifest.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil,
                   let oldRequirement = row["caller_requirement"] as? String, !oldRequirement.isEmpty, oldRequirement.utf8.count <= 512
             else { throw ARLError(code: "codex_scope_review_required") }
+            // Existing scopes retain their explicit lifetime grant across updates.
+            schema = NASCapability.integer(row["schema_version"])!
+            calls = row["max_calls"]!
             if oldManifest == manifest && oldRequirement == requirement { generation = oldGeneration }
         }
-        return try OwnerReadWire.encode(["schema_version": 1, "caller": "arl-control", "provider": "codex_app_server", "model": model,
-            "reasoning_effort": "xhigh", "service_tier": "default", "scope_generation": generation, "max_calls": 32,
+        return try OwnerReadWire.encode(["schema_version": schema, "caller": "arl-control", "provider": "codex_app_server", "model": model,
+            "reasoning_effort": "xhigh", "service_tier": "default", "scope_generation": generation, "max_calls": calls,
             "max_output_bytes": 32768, "core_manifest_sha256": manifest, "caller_requirement": requirement,
             "explicit_submission_only": true], limit: 4096)
     }

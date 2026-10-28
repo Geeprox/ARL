@@ -10,10 +10,10 @@ from arl.storage import Store
 from tests.test_runtime import RuntimeCase
 FIXTURE=Path(__file__).parent/'fixtures/CodexExecutionOptionsServer.py'
 class OptionsTests(RuntimeCase):
- def route(self):
+ def route(self, max_calls=32):
   adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE)])
   service=CodexService(adapter,caller='options-fixture',model='synthetic-model',authorization_current=lambda:True,
-   peer_current=lambda:True,allow_test_command=True,allow_model_selection=True)
+   peer_current=lambda:True,max_calls=max_calls,allow_test_command=True,allow_model_selection=True)
   runtime=compose_codex_service(self.home/'host',service=service,peer_verifier=RegisteredPeerVerifier({'options-fixture'}),isolated=True)
   runtime.store=Store(self.home/'jobs.sqlite');runtime.ready.set();service.preflight();return runtime,service
  def test_selected_model_effort_and_fast_cross_real_stdio_and_receipt(self):
@@ -48,6 +48,28 @@ class OptionsTests(RuntimeCase):
    self.assert_fault('provider_model_change_not_authorized',lambda:service.admit(service.caller,NAME,dict(args,model='not-listed')))
    self.assertIsNone(runtime.store.db.execute('SELECT calls FROM budget WHERE owner=?',(service.caller,)).fetchone())
   finally:runtime.store.close();runtime.control.close();runtime.service_portal.close()
+ def test_unlimited_local_policy_keeps_usage_and_explicit_finite_policy(self):
+  from arl.contracts import AppPolicy
+  from arl.contracts import Tool
+  tool=Tool('synthetic.read',{},lambda args,ctx:None)
+  store=Store(self.home/'unlimited.sqlite')
+  policy=AppPolicy(frozenset({tool.name}),frozenset(),max_pending=1,max_calls=None)
+  try:
+   for index in range(40):
+    job=store.submit('synthetic',str(index),tool,{'prompt':'offline'},policy,verified=True)
+    store.db.execute("UPDATE jobs SET state='succeeded' WHERE id=?",(job['id'],))
+   self.assertEqual(store.db.execute("SELECT calls FROM budget WHERE owner='synthetic'").fetchone()[0],40)
+   finite=AppPolicy(frozenset({tool.name}),frozenset(),max_pending=1,max_calls=32)
+   self.assert_fault('call_budget_exceeded',lambda:store.submit('synthetic','finite',tool,{'prompt':'offline'},finite,verified=True))
+  finally:store.close()
+  runtime,service=self.route(max_calls=None)
+  try:
+   self.assertIsNone(runtime.policies[service.caller].max_calls)
+   runtime.store.db.execute('INSERT INTO budget(owner,calls) VALUES(?,4000)',(service.caller,))
+   status=service.status()
+   self.assertTrue(status['route_enabled']);self.assertIsNone(status['max_calls']);self.assertIsNone(status['remaining_calls'])
+  finally:runtime.store.close();runtime.control.close();runtime.service_portal.close()
+
  def test_ack_is_required_and_priority_is_not_fast(self):
   self.assert_fault('provider_preferences_unverified',lambda:confirmed_preferences({'reasoningEffort':'low','serviceTier':'default'},'low','fast'))
   self.assert_fault('provider_preferences_invalid',lambda:confirmed_preferences({},'low','priority'))

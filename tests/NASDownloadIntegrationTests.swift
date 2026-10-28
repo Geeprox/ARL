@@ -55,14 +55,14 @@ import CoreFoundation
     }
     static func error(_ v:[String:Any])->String? {(v["error"] as? [String:Any])?["code"] as? String}
     static func main()async throws {
-        let all=Data((0..<1048576).map{UInt8($0%251)}),f=Fixture(all),input=args(size:all.count)
+        let all=Data((0..<(3*1048576+17)).map{UInt8($0%251)}),f=Fixture(all),input=args(size:all.count)
         let manifest=try await f.call("mio_nas_download",input)
-        try expect(f.calls==32 && f.connections==0,"32 original native ranges, never reconnect")
+        try expect(f.calls==97 && f.connections==0,"97 original native ranges, never reconnect")
         try expect(manifest["name"] as? String=="中文原始文件.txt" && manifest["sha256"] as? String==NASDownloadCapability.hash(all),"Unicode output basename and whole SHA")
         try expect(manifest["object_ref"] as? String==ref && manifest["revision"] as? String==revision,"manifest binds exact source object/revision")
         try expect(OwnerReadWire.falseBoolean(manifest["downloadable_artifact"]),"never invent downloadable artifact")
         let duplicate=try await f.call("mio_nas_download",input)
-        try expect(f.calls==32 && duplicate["transfer_ref"] as? String==manifest["transfer_ref"] as? String,"same request reads cached manifest without NAS replay")
+        try expect(f.calls==97 && duplicate["transfer_ref"] as? String==manifest["transfer_ref"] as? String,"same request reads cached manifest without NAS replay")
         var collected=Data()
         for offset in stride(from:0,to:all.count,by:32768) {
             let args=chunkArgs(manifest,offset:offset),reply=try await f.call("mio_nas_transfer_read",args)
@@ -78,7 +78,7 @@ import CoreFoundation
             try expect(result["isError"] as? Bool==false && content[0]["text"] as? String==String(decoding:restored,as:UTF8.self),"owner framed payload survives MCP dual representation")
             try expect(envelope.count<196608 && (try JSONSerialization.data(withJSONObject:mcp)).count<196608,"32KiB block fits both final representations")
         }
-        try expect(collected==all && f.calls==32 && f.contexts>64,"complete one-MiB transfer SHA and live context revalidation, no additional SMB reads")
+        try expect(collected==all && f.calls==97 && f.contexts>64,"complete three-MiB transfer SHA and live context revalidation, no additional SMB reads")
         var rebound=chunkArgs(manifest,offset:0);rebound["connection_epoch"]=String(repeating:"f",count:32)
         try expect(error(await f.call("mio_nas_transfer_read",rebound)) != nil,"epoch change rejects cached bytes")
         rebound=chunkArgs(manifest,offset:0);rebound["transfer_ref"]=String(repeating:"0",count:64)
@@ -87,7 +87,7 @@ import CoreFoundation
         try expect(error(await f.call("mio_nas_transfer_read",chunkArgs(manifest,offset:0))) != nil,"native scope revocation prevents cached output")
         f.valid=true;f.now=221
         try expect(error(await f.call("mio_nas_transfer_read",chunkArgs(manifest,offset:0)))==NASRuntimeFailure.expired.rawValue,"expiry produces no bytes or rebind")
-        try expect(f.calls==32 && f.connections==0,"errors do not replay or reconnect")
+        try expect(f.calls==97 && f.connections==0,"errors do not replay or reconnect")
         let empty=Fixture(Data()),zero=try await empty.call("mio_nas_download",args(size:0))
         try expect(empty.calls==1 && zero["sha256"] as? String==NASDownloadCapability.hash(Data()),"empty file still receives checked EOF")
         let emptyChunk=try await empty.call("mio_nas_transfer_read",chunkArgs(zero,offset:0))
@@ -118,7 +118,9 @@ import CoreFoundation
         let catalog=try MioReadOwnerAdapter.respond(["jsonrpc":"2.0","id":7,"method":"tools/list"],ownerCall:{_,_ in throw OwnerReadFault.unavailable})
         let descriptors=(catalog["result"] as! [String:Any])["tools"] as! [[String:Any]]
         try validateMioPublishedDescriptors(descriptors)
-        try expect(descriptors.count==84 && NASCapability.descriptors.count==7,"actual catalog preserves81 and appends three reviewed read-only tools")
+        let names=descriptors.compactMap { $0["name"] as? String }
+        let expectedNAS:Set<String>=["mio_nas_list","mio_nas_search","mio_nas_read","mio_nas_download","mio_nas_transfer_read","mio_nas_search_recursive","mio_nas_read_text","mio_nas_read_document"]
+        try expect(Set(names).count==names.count && expectedNAS.isSubset(of:Set(names)) && NASCapability.descriptors.count==8,"actual catalog contains each NAS read tool once and retains checked published anchors")
         try expect(NASDownloadCapability.descriptors.allSatisfy{($0["annotations"] as? [String:Any])?["readOnlyHint"] as? Bool==true},"no write permission is advertised")
         try expect(NASCapability.names.allSatisfy { OwnerReadWire.seconds(for:$0)==110 && OwnerReadWire.seconds(for:$0)<120 },"composed NAS read deadlines remain bounded by native120 second lease")
         try expect(OwnerReadWire.seconds(for:"mio_calendar_create")==210 && OwnerReadWire.seconds(for:"mio_notes_read")==210 && OwnerReadWire.seconds(for:"mio_reminders_create")==210,"Apple execution budgets unchanged")

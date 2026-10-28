@@ -13,7 +13,7 @@ from script.stage_core_runtime import ROOT, inputs
 
 class CoreImportClosureTests(unittest.TestCase):
     def test_private_research_entry_imports_from_the_actual_package_inputs(self):
-        with tempfile.TemporaryDirectory(prefix='arl-core-import-', dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(prefix='arl-core-import-', dir=tempfile.gettempdir()) as directory:
             target = Path(directory)
             for name in inputs(private=True):
                 if name.startswith('arl/'):
@@ -25,7 +25,7 @@ class CoreImportClosureTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr.decode())
 
     def test_public_entry_imports_without_private_composition(self):
-        with tempfile.TemporaryDirectory(prefix='arl-public-import-', dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(prefix='arl-public-import-', dir=tempfile.gettempdir()) as directory:
             target = Path(directory)
             for name in inputs(private=False):
                 if name.startswith('arl/'):
@@ -37,7 +37,7 @@ class CoreImportClosureTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr.decode())
 
     def test_zip_checkout_uses_explicit_manifest_and_rejects_unlisted_source(self):
-        with tempfile.TemporaryDirectory(prefix='arl-source-archive-',dir='/private/tmp') as directory:
+        with tempfile.TemporaryDirectory(prefix='arl-source-archive-',dir=tempfile.gettempdir()) as directory:
             target=Path(directory)
             shutil.copytree(ROOT/'arl',target/'arl',ignore=shutil.ignore_patterns('__pycache__'))
             (target/'script').mkdir()

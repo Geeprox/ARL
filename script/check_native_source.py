@@ -22,7 +22,7 @@ def main():
  sdk=subprocess.check_output(['xcrun','--show-sdk-path'],text=True).strip()
  header=ROOT/recipe['compression_header'];module=output/'FlyAICompression';module.mkdir()
  (module/'module.modulemap').write_text('module FlyAICompression { header "'+str(header)+'" export * }\n')
- common=['xcrun','swiftc','-sdk',sdk,'-j','1','-swift-version','6','-target',recipe['product']['target'],'-module-cache-path',str(output/'ModuleCache')]
+ common=['xcrun','swiftc','-sdk',sdk,'-j','1','-swift-version','6','-enable-testing','-target',recipe['product']['target'],'-module-cache-path',str(output/'ModuleCache')]
  records=[]
  def run(name,argv,sources=()):
   before={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in sources}

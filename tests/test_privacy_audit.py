@@ -11,7 +11,7 @@ from script import privacy_audit as audit
 
 class PrivacyAuditTests(unittest.TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory(prefix='arl-publication-', dir='/private/tmp')
+        self.directory = tempfile.TemporaryDirectory(prefix='arl-publication-', dir=tempfile.gettempdir())
         self.root = Path(self.directory.name).resolve()
         self.config = patch.object(audit, 'ROOT', self.root)
         self.config.start()
@@ -75,6 +75,13 @@ class PrivacyAuditTests(unittest.TestCase):
         self.assertEqual(by_name['image.png'], ['binary_review'])
         self.assertEqual(by_name['alias'], ['symlink_review'])
         self.assertFalse(audit.audit_candidate(self.root)['release_ready'])
+
+    def test_private_library_references_are_reported_without_values(self):
+        value = 'libfile_' + 'b' * 32
+        (self.root/'guide.md').write_text(value)
+        report = audit.audit()
+        self.assertTrue(any('private_platform_file_identifier' in hit['types'] for hit in report['findings']))
+        self.assertNotIn(value, json.dumps(report))
 
     def test_reports_are_private_and_refuse_linked_output(self):
         output = self.root / 'build' / 'report.json'

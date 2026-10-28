@@ -169,6 +169,8 @@ struct MusicWriteLedger: Codable, Sendable {
     var schema = 1
     var epochs: [String: UUID] = [:]
     var records: [String: MusicWriteRecord] = [:]
+    // Schema 4 pins archive-index buckets; a missing known bucket fails closed.
+    var archiveBuckets: Set<String>? = nil
 }
 public enum MusicEffectDisposition: String, Codable, Sendable {
     case notDispatched = "not_dispatched", submitted, outcomeUnknown = "outcome_unknown"
@@ -214,6 +216,7 @@ public struct MusicReconciliationResult: Encodable, Sendable {
 }
 protocol MusicWriteJournal: Sendable {
     func inspect() throws -> MusicWriteLedger?
+    func inspect(requestID: UUID) throws -> MusicWriteLedger?
     func transaction<T>(_ body: (inout MusicWriteLedger) throws -> T) throws -> T
     func inspectRecovery(requestID: UUID) throws -> MusicWriteRecoveryRecord?
     func recoveryTransaction<T>(_ body: (MusicWriteLedger, inout MusicWriteRecoveryLedger) throws -> T) throws -> T
@@ -222,6 +225,7 @@ protocol MusicWriteJournal: Sendable {
 extension MusicWriteJournal {
     // Old synthetic journals must opt into the new query; no transaction fallback.
     func inspect() throws -> MusicWriteLedger? { throw CredentialError.deploymentNotApproved }
+    func inspect(requestID: UUID) throws -> MusicWriteLedger? { try inspect() }
     func inspectRecovery(requestID: UUID) throws -> MusicWriteRecoveryRecord? { nil }
     func recoveryTransaction<T>(_ body: (MusicWriteLedger, inout MusicWriteRecoveryLedger) throws -> T) throws -> T { throw CredentialError.deploymentNotApproved }
 }

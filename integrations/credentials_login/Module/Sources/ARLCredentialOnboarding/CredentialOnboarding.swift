@@ -580,7 +580,7 @@ public actor CredentialOnboarding {
                     let value = UUID(); ledger.epochs[reference.id.uuidString] = value; return value
                 }
             }
-            if try writeJournal.inspect()?.records[request.requestID.uuidString] != nil { return .init("request_conflict", request: request) }
+            if try writeJournal.inspect(requestID: request.requestID)?.records[request.requestID.uuidString] != nil { return .init("request_conflict", request: request) }
             if let record = try coverJournal.inspect(request.requestID) {
                 guard record.request == request else { return .init("request_conflict", request: request) }
                 guard record.reference == reference.id, record.epoch == epoch else { return .init("account_changed", request: request) }
@@ -806,7 +806,7 @@ public actor CredentialOnboarding {
             guard let journal = writeJournal, musicReads != nil else { throw CredentialError.deploymentNotApproved }
             try Task.checkCancellation()
             let admission = try repository.lease(reference); admission.secret.clear()
-            guard let ledger = try journal.inspect(), let record = ledger.records[requestID.uuidString] else {
+            guard let ledger = try journal.inspect(requestID: requestID), let record = ledger.records[requestID.uuidString] else {
                 return .init(requestID: requestID)
             }
             guard record.reference == reference.id, ledger.epochs[reference.id.uuidString] == record.epoch else {
@@ -851,7 +851,7 @@ public actor CredentialOnboarding {
             guard let journal = writeJournal, musicReads != nil, musicWrites != nil else { throw CredentialError.deploymentNotApproved }
             try Task.checkCancellation()
             let admission = try repository.lease(reference); admission.secret.clear()
-            guard let ledger = try journal.inspect(), let record = ledger.records[requestID.uuidString] else {
+            guard let ledger = try journal.inspect(requestID: requestID), let record = ledger.records[requestID.uuidString] else {
                 return .init(requestID: requestID)
             }
             guard record.reference == reference.id, ledger.epochs[reference.id.uuidString] == record.epoch else {
@@ -880,7 +880,7 @@ public actor CredentialOnboarding {
         guard !testing.contains(.neteaseMusic) else { throw CredentialError.busy }
         guard let journal = writeJournal, musicReads != nil, musicWrites != nil else { throw CredentialError.deploymentNotApproved }
         let lease = try repository.lease(reference); lease.secret.clear()
-        guard let ledger = try journal.inspect(), let parent = ledger.records[request.supersedesRequestID.uuidString] else {
+        guard let ledger = try journal.inspect(requestID: request.supersedesRequestID), let parent = ledger.records[request.supersedesRequestID.uuidString] else {
             return .init("record_missing", supersedes: request.supersedesRequestID)
         }
         guard parent.reference == reference.id, ledger.epochs[reference.id.uuidString] == parent.epoch else {
@@ -971,7 +971,7 @@ public actor CredentialOnboarding {
         if try coverJournal?.inspect(request.requestID) != nil { return .init(.requestConflict, request: request) }
         testing.insert(.neteaseMusic)
         do {
-            let observed = try journal.inspect()
+            let observed = try journal.inspect(requestID: request.requestID)
             // Existing requests, including recovery, never rewrite the original ledger.
             let epoch: UUID
             if let stored = observed?.epochs[reference.id.uuidString] { epoch = stored }

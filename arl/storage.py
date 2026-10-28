@@ -118,7 +118,7 @@ class Store:
             if count >= policy.max_pending:
                 raise Fault("queue_budget_exceeded")
             calls = self.db.execute("SELECT calls FROM budget WHERE owner=?", (owner,)).fetchone()
-            if calls and calls[0] >= policy.max_calls:
+            if policy.max_calls is not None and calls and calls[0] >= policy.max_calls:
                 raise Fault("call_budget_exceeded")
             priority_plan = None
             now = time.time()

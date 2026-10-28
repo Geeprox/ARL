@@ -1,7 +1,7 @@
 """Unregistered SMB mkdir/move medium using the existing scoped SMB session.
 
 No connection, credential lookup, mount, retry, overwrite, delete or listener.
-Only exact owner-resolved paths below reader.root; move supports files <=1MiB.
+Only exact owner-resolved paths below reader.root; move retains exact source revision and namespace witnesses.
 """
 import uuid
 from smbprotocol import Dialects

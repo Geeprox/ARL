@@ -129,7 +129,7 @@ enum NASCapability {
 /// persistent scope issuer, mutation permit or platform artifact publisher.
 enum NASDownloadCapability {
     static let names:Set<String>=["mio_nas_download","mio_nas_transfer_read"]
-    static let chunkBytes=32768, fileBytes=1048576
+    static let chunkBytes=32768, fileBytes=9_007_199_254_740_991
     static var common:Set<String> {["operation_id","source_ref","config_generation","connection_epoch"]}
     static var descriptors:[[String:Any]] {
         names.sorted().map { tool in
@@ -151,7 +151,7 @@ enum NASDownloadCapability {
                 properties["length"]=["type":"integer","minimum":1,"maximum":chunkBytes]
             }
             return ["name":tool,"description":download
-                ? "Use this to read a complete selected NAS file using the exact source, epoch, object_ref, revision and size from list/search. First-round whole-file budget is 1MiB, read in 32KiB ranges within the existing epoch's cumulative budget. Returns SHA256 and a 120-second ephemeral transfer_ref. Does not reconnect, create a URL, or publish a ChatGPT attachment. No automatic retry."
+                ? "Use this to read a complete selected NAS file using the exact source, epoch, object_ref, revision and size from list/search. Reads 32KiB ranges into a private disk-backed spool; each range rechecks the selected scope and revision. Returns SHA256 and a 120-second ephemeral transfer_ref. Does not reconnect, create a URL, or publish a ChatGPT attachment. No automatic retry."
                 : "Use this to read a verified 32KiB byte chunk from the original NAS download transfer_ref. Preserve operation_id, scope/epoch, size and whole-file SHA256 from the manifest. The native owner rechecks current saved scope and credential identity. Expiry/revocation never reconnects or rebinds the file. Bytes are not a downloadable ChatGPT artifact.",
                 "inputSchema":["type":"object","additionalProperties":false,"properties":properties,"required":properties.keys.sorted()],
                 "annotations":["readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true],

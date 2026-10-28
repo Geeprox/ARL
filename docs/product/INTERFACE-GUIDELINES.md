@@ -20,4 +20,4 @@
 
 随 ARL 提供原生扩展 → 用户在系统设置启用 → 在支持的注册目录内右键项目/空白处 → 访达动作 → 拷贝路径或终端打开。多选路径换行；终端仅单个目录，路径经文件 URL 传递，不拼命令。已挂载 NAS 仅用本机路径。FinderSync 不是通用全局界面 API，真实范围和启用状态必须验收；不注入、不模拟辅助功能、不新增守护服务。
 
-参考：[信息设置](https://support.apple.com/zh-cn/guide/messages/ichte16154fb/mac)、[Finder Sync 适用范围](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Finder.html)。Finder 参考图 Library ID：`libfile_2659dd535d1881918d551616e173dd95`，已在本 Mac 物化查看。
+参考：[信息设置](https://support.apple.com/zh-cn/guide/messages/ichte16154fb/mac)、[Finder Sync 适用范围](https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Finder.html)。Finder 参考图 Library ID：`[private Library reference omitted]`，已在本 Mac 物化查看。

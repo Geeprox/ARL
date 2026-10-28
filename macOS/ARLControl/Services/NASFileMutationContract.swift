@@ -8,7 +8,7 @@ enum NASFileMutationFault: Error { case invalid, expired, unsupported, stale, in
 
 struct NASFileMutationRequest {
     static let maximumBytes = 32 * 1024 // bounded inline/chunk bytes; owner request is 64KiB
-    static let maximumTransferBytes = 1024 * 1024 // existing upload/read-session cap
+    static let maximumTransferBytes = 9_007_199_254_740_991 // Exact JSON integer range; chunks and authority remain bounded.
     let operation: String
     let operationID: String
     let sourceRef: String

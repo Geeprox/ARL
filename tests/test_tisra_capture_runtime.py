@@ -29,7 +29,7 @@ from arl.tisra_capture_runtime import (
     RegisteredCaptureParticipant, CapturePayloadRequest, UploadedCapturePayload,
 )
 
-FIXTURES = Path(__file__).resolve().parents[1] / 'integrations/tisra/capture-inner-v1'
+FIXTURES = Path(__file__).resolve().parents[1] / 'tests/fixtures/capture_transport'
 
 
 def sha(raw): return hashlib.sha256(raw).hexdigest()
@@ -231,12 +231,12 @@ class CaptureRuntimeTests(unittest.TestCase):
         self.assert_fault('capture_payload_mismatch', lambda: self.rpc('capture.submit.v1', params))
         self.assertEqual(self.consumer.writes, 0)
 
-    def test_exact_frozen_fixture_pairs_complete_and_cache_same_bytes(self):
-        manifest = json.loads((FIXTURES.parent/'capture-inner-manifest-v1.json').read_text())
-        for pair in manifest['receipt_cases']:
-            with self.subTest(pair=pair['receipt']):
-                raw = (FIXTURES/pair['request']).read_bytes()
-                result = (FIXTURES/pair['receipt']).read_bytes(); state=pair['outer_state_candidate']
+    def test_exact_synthetic_transport_pairs_complete_and_cache_same_bytes(self):
+        states = ['created','deduplicated','created','deduplicated','created','partial','created','deduplicated']
+        for index,state in enumerate(states):
+            with self.subTest(case=index,state=state):
+                raw = encode({'fixture':'opaque synthetic request','case':index})
+                result = encode({'fixture':'opaque synthetic result','case':index})
                 self.valid_requests.add(raw); self.validation_pairs.add((result, raw, state))
                 self.consumer.raw_result, self.consumer.state = result, state
                 receipt, params = self.submit(raw=raw); self.execute()

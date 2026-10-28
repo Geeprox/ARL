@@ -8,7 +8,7 @@ import threading
 import time
 import uuid
 
-MAX_BYTES = 1_048_576  # existing source MAX_RANGE; MVP is one bounded object
+MAX_BYTES = 2**53 - 1  # Exact integer range shared by JSON, native and SMB metadata.
 CHUNK_BYTES = 65_536
 MAX_WRITES = 128
 FAULTS = frozenset({

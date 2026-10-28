@@ -39,7 +39,7 @@ python3 -B script/bootstrap.py --check --native
 
 脚本不登录账户、不保存凭据、不创建隧道、不安装自启动服务。开发核心使用 Python 3.9+ 标准库，无第三方 Python 依赖；正式 App 的解释器在包内。原生构建要求 Apple Silicon、macOS 14+ 和 Swift 6 工具链。正式包已封装的音乐与 NAS 组件无需用户再次 npm/pip 安装。
 
-**公开发布尚未就绪。** 当前原生构建仍依赖尚未公开的离线资源与维护者签名配置，干净克隆只能完成核心检查；不能把本机成功构建当作公开安装已闭合。公开资源、通用签名配置和发行许可证必须补齐。Mio 是可选边界，账号与隧道由使用者自己的平台交互配置；不会复用作者的组织、域名、隧道或 token。
+**公开源码已发布。** 干净克隆可运行核心检查，并用 `python3 -B script/check_native_source.py` 编译完整原生源码，无需作者的账号、签名或私有资源壳。可安装的正式包仍需准备自己的离线依赖和签名配置；源码编译与安装验收分别记录。Mio 是可选边界，账号与隧道由使用者自己的平台交互配置。
 
 ## 当前能力与限制
 
@@ -94,10 +94,12 @@ python3 -B script/privacy_audit.py --history --output build/privacy-audit.json
 
 ### 开源前源码检查
 
-本轮修复及验证范围见 [OPEN-SOURCE-REVIEW.md](OPEN-SOURCE-REVIEW.md)。macOS 上可直接从源码编译完整 SDK 和 Control，无需作者的签名、账号或离线资源壳：
+本轮修复及验证范围见 [OPEN-SOURCE-REVIEW.md](OPEN-SOURCE-REVIEW.md)；本轮补齐项见 [剩余问题修复记录](docs/REVIEW-COMPLETION-20261028.md)。macOS 上可直接从源码编译完整 SDK 和 Control，无需作者的签名、账号或离线资源壳：
 
 ```sh
 python3 -B script/check_native_source.py
+# 编译并运行真实源码上的合成原生回归：
+python3 -B script/check_review_fixes.py
 ```
 
 该命令只编译，不签名、安装或启动。正式打包仍需自行准备依赖与签名配置；历史部署证据和本地状态不属于公共源码分发。

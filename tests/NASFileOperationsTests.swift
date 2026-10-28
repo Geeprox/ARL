@@ -29,11 +29,11 @@ private enum Check: Error { case failed(String) }
         let request = try NASFileMutationRequest(value: upload, now: now)
         var chunkUpload = args("upload_new")
         chunkUpload["transfer_ref"] = String(repeating: "d", count: 64)
-        chunkUpload["size"] = 1024 * 1024; chunkUpload["sha256"] = sha
+        chunkUpload["size"] = 3 * 1024 * 1024 + 17; chunkUpload["sha256"] = sha
         let chunkRequest = try NASFileMutationRequest(value: chunkUpload, now: now)
         var manifest: [String: Any] = ["schema_version": 1, "operation_id": chunkRequest.operationID,
             "source_ref": chunkRequest.sourceRef, "config_generation": chunkRequest.generation, "connection_epoch": chunkRequest.epoch,
-            "transfer_ref": chunkUpload["transfer_ref"]!, "name": "fixture.txt", "size": 1024 * 1024, "sha256": sha,
+            "transfer_ref": chunkUpload["transfer_ref"]!, "name": "fixture.txt", "size": 3 * 1024 * 1024 + 17, "sha256": sha,
             "expires_in_seconds": 100, "complete": true, "direction": "upload", "downloadable_artifact": false]
         try chunkRequest.admitTransferManifest(manifest)
         manifest["source_ref"] = "other"

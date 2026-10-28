@@ -7,7 +7,7 @@ in tests demonstrates bytes only; it is not exported or a NAS adapter.
 """
 from dataclasses import dataclass
 import hashlib
-from .contracts import CHUNK_BYTES, MAX_BYTES, MAX_WRITES, OwnerBoundary, UploadFault, UploadPlan
+from .contracts import CHUNK_BYTES, MAX_BYTES, OwnerBoundary, UploadFault, UploadPlan
 from .journal import object_identity
 
 
@@ -149,16 +149,13 @@ class UploadNewStorage:
                     self._guard(plan, owner, 'after_stage', source, handle)
                     receipt['state'] = 'writing'
                     self._journal.save(plan.operation_id, receipt)
-                    offset, writes, sent = 0, 0, hashlib.sha256()
+                    offset, sent = 0, hashlib.sha256()
                     while offset < plan.size:
                         self._guard(plan, owner, 'before_source_read', source, handle)
                         data = source.read(offset, min(CHUNK_BYTES, plan.size - offset))
                         if type(data) is not bytes or not 0 < len(data) <= min(CHUNK_BYTES, plan.size - offset):
                             raise UploadFault('invalid_reply')
                         self._guard(plan, owner, 'before_write', source, handle)
-                        if writes >= MAX_WRITES:
-                            raise UploadFault('budget_exceeded')
-                        writes += 1
                         count = handle.write(offset, data,
                             effect_check=lambda: self._guard(plan, owner, 'write_effect', source, handle))
                         self._guard(plan, owner, 'after_write', source, handle)

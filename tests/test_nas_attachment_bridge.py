@@ -115,6 +115,35 @@ class Checks(unittest.TestCase):
             self.fault("integrity_failed",lambda:bridge.import_materialized(self.source(raw),transfer=t,verify=lambda:None))
             self.assertEqual(t.offset,0);self.assertFalse(t.sealed)
 
+    def test_streamed_three_mib_upload_and_download_keep_fd_private(self):
+        raw=bytes(range(256))*12289
+        t=self.transfer(raw)
+        self.assertEqual(bridge.import_materialized(self.source(raw),transfer=t,verify=lambda:None)["sha256"],bridge.digest(raw))
+        value=manifest(raw);peer=SyntheticMio(raw)
+        with bridge.collect_download_file(mcp(value),expected={k:value[k] for k in bridge.DOWNLOAD_KEYS},call=peer,verify=lambda:None) as result:
+            fd=result.fd
+            self.assertEqual(os.fstat(fd).st_mode & 0o777,0o600)
+            self.assertEqual(result.size,len(raw));self.assertEqual(result.sha256,bridge.digest(raw))
+            self.assertEqual(os.pread(fd,len(raw),0),raw)
+        with self.assertRaises(OSError):os.fstat(fd)
+        self.assertEqual(len(peer.calls),97)
+        self.assertEqual(max(p["offset"] for p in peer.calls),96*32768)
+
+    def test_streamed_bad_hash_or_revocation_never_yields_file(self):
+        raw=b"private synthetic"*10000;value=manifest(raw);value["sha256"]="0"*64
+        yielded=[]
+        with self.assertRaises(bridge.BridgeFault):
+            with bridge.collect_download_file(mcp(value),expected={k:value[k] for k in bridge.DOWNLOAD_KEYS},call=SyntheticMio(raw),verify=lambda:None) as result:yielded.append(result)
+        self.assertEqual(yielded,[])
+        calls=[0]
+        def verify():
+            calls[0]+=1
+            if calls[0]>3:raise bridge.BridgeFault("revoked")
+        value=manifest(raw)
+        with self.assertRaises(bridge.BridgeFault):
+            with bridge.collect_download_file(mcp(value),expected={k:value[k] for k in bridge.DOWNLOAD_KEYS},call=SyntheticMio(raw),verify=verify) as result:yielded.append(result)
+        self.assertEqual(yielded,[])
+
     def test_input_change_after_append_breaks_transfer(self):
         raw=b"x"*40000;fd=self.source(raw);t=self.transfer(raw)
         original=t.append
@@ -131,11 +160,11 @@ class Checks(unittest.TestCase):
         bridge.import_materialized(self.source(b"x"),transfer=t,verify=lambda:None)
         self.fault("invalid_transfer",lambda:bridge.import_materialized(self.source(b"x"),transfer=t,verify=lambda:None))
 
-    def test_source_hardlink_and_oversize_are_refused(self):
+    def test_source_hardlink_and_size_mismatch_are_refused(self):
         fd=self.source(b"raw");p=next(p for p in self.home.iterdir() if p.is_file() and not p.name.startswith("file_transfer"))
         os.link(p,self.home/"linked")
         self.fault("invalid_source",lambda:bridge.import_materialized(fd,transfer=self.transfer(b"raw"),verify=lambda:None))
-        self.fault("invalid_source",lambda:bridge.import_materialized(self.source(b"x"*(bridge.MAX_BYTES+1)),transfer=self.transfer(b"x"),verify=lambda:None))
+        self.fault("integrity_failed",lambda:bridge.import_materialized(self.source(b"x"*(bridge.MAX_BYTES+1)),transfer=self.transfer(b"x"),verify=lambda:None))
 
     def test_output_scope_rebinding_boolean_and_extra_key_rejected(self):
         raw=b"data";v=manifest(raw)

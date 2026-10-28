@@ -1,6 +1,7 @@
 import Foundation
 import Darwin
 import OSLog
+import CryptoKit
 
 /// Lazily creates only this identity's receipt directory after the deployment gate.
 /// Files are owner-only, bounded, atomic and fsynced; a nonblocking flock excludes another process.
@@ -54,13 +55,105 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
             return ledger
         } } catch Missing.directory { return nil }
     }
+    private struct Archived: Codable {
+        let record: MusicWriteRecord
+        let recovery: MusicWriteRecoveryRecord?
+    }
+    private func bucket(_ id: UUID) -> String { String(id.uuidString.lowercased().prefix(2)) }
+    private func archiveName(_ id: UUID) -> String { "completed-" + id.uuidString.lowercased() + ".json" }
+    private func hash(_ bytes: Data) -> String { SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() }
+    private func archiveIndex(_ key: String, ledger: MusicWriteLedger) throws -> [String: String] {
+        guard ledger.archiveBuckets?.contains(key) == true else { return [:] }
+        guard let bytes = try loadBytes(filename: "archive-index-" + key + ".json"),
+              let index = try? JSONDecoder().decode([String: String].self, from: bytes),
+              index.allSatisfy({ UUID(uuidString: $0.key)?.uuidString == $0.key &&
+                  String($0.key.lowercased().prefix(2)) == key && $0.value.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil })
+        else { throw CredentialError.uncertainLocalState }
+        return index
+    }
+    private func archived(_ id: UUID, ledger: MusicWriteLedger) throws -> Archived? {
+        guard let expected = try archiveIndex(bucket(id), ledger: ledger)[id.uuidString] else { return nil }
+        guard let bytes = try loadBytes(filename: archiveName(id)), hash(bytes) == expected,
+              let value = try? JSONDecoder().decode(Archived.self, from: bytes), value.record.request.requestID == id,
+              value.record.cloudResource == nil, value.record.result != nil || value.recovery?.reconciled != nil
+        else { throw CredentialError.uncertainLocalState }
+        var single = MusicWriteLedger(); single.schema = 3; single.records[id.uuidString] = value.record
+        try validate(single)
+        if let recovery = value.recovery { try recovery.validate(original: value.record) }
+        return value
+    }
+    func inspect(requestID: UUID) throws -> MusicWriteLedger? {
+        do { return try withLock(create: false) {
+            guard var ledger = try load() else { return nil }
+            try validate(ledger)
+            if let value = try archived(requestID, ledger: ledger) {
+                // A crash may leave both durable copies; they must agree.
+                if let active = ledger.records[requestID.uuidString], active != value.record { throw CredentialError.uncertainLocalState }
+                ledger.records[requestID.uuidString] = value.record
+            }
+            return ledger
+        } } catch Missing.directory { return nil }
+    }
+    private func recoveryOriginals(_ originals: MusicWriteLedger, _ recovery: MusicWriteRecoveryLedger) throws -> MusicWriteLedger {
+        var result = originals
+        for key in recovery.records.keys where result.records[key] == nil {
+            guard let id = UUID(uuidString: key), let archived = try archived(id, ledger: originals) else { throw CredentialError.uncertainLocalState }
+            result.records[key] = archived.record
+        }
+        try recovery.validate(originals: result)
+        return result
+    }
+    private func archiveCompleted(_ ledger: inout MusicWriteLedger) throws {
+        guard ledger.records.count >= 384 else { return }
+        let recoveryBytes = try loadBytes(filename: recoveryFilename)
+        var recovery = try recoveryBytes.map { try JSONDecoder().decode(MusicWriteRecoveryLedger.self, from: $0) } ?? MusicWriteRecoveryLedger()
+        _ = try recoveryOriginals(ledger, recovery)
+        let parents = Set(ledger.records.values.compactMap { $0.cloudResource?.supersedesRequestID })
+        let completed = try ledger.records.values.filter { record in
+            guard record.cloudResource == nil, !parents.contains(record.request.requestID) else { return false }
+            if record.result != nil || recovery.records[record.request.requestID.uuidString]?.reconciled != nil { return true }
+            return try archived(record.request.requestID, ledger: ledger) != nil
+        }
+        for record in completed {
+            let id = record.request.requestID, key = bucket(id)
+            if ledger.archiveBuckets?.contains(key) != true {
+                // Empty index first; schema fence before removing any record.
+                try writeBytes(JSONEncoder().encode([String: String]()), filename: "archive-index-" + key + ".json")
+                ledger.schema = 4; ledger.archiveBuckets = (ledger.archiveBuckets ?? []).union([key]); try write(ledger)
+            }
+            var index = try archiveIndex(key, ledger: ledger)
+            let value = Archived(record: record, recovery: recovery.records[id.uuidString])
+            if index[id.uuidString] != nil {
+                guard let old = try archived(id, ledger: ledger), old.record == record,
+                      value.recovery == nil || old.recovery == value.recovery else { throw CredentialError.uncertainLocalState }
+            } else {
+                let bytes = try JSONEncoder().encode(value)
+                try writeBytes(bytes, filename: archiveName(id))
+                index[id.uuidString] = hash(bytes)
+                try writeBytes(JSONEncoder().encode(index), filename: "archive-index-" + key + ".json")
+            }
+            ledger.records.removeValue(forKey: id.uuidString)
+            recovery.records.removeValue(forKey: id.uuidString)
+        }
+        // Both immutable archive and index are durable before active compaction.
+        if !completed.isEmpty {
+            try write(ledger)
+            if recoveryBytes != nil { try writeBytes(JSONEncoder().encode(recovery), filename: recoveryFilename) }
+        }
+    }
     func transaction<T>(_ body: (inout MusicWriteLedger) throws -> T) throws -> T {
         try withLock {
             var ledger = try load() ?? MusicWriteLedger()
             try validate(ledger)
+            try archiveCompleted(&ledger)
             let previous = ledger
             let result = try body(&ledger)
-            if previous.schema == 3 || ledger.records.values.contains(where: { $0.metadataFieldsOnly == true }) {ledger.schema = 3}
+            guard ledger.archiveBuckets == previous.archiveBuckets else { throw CredentialError.uncertainLocalState }
+            for key in Set(ledger.records.keys).subtracting(previous.records.keys) {
+                guard let id = UUID(uuidString: key), try archived(id, ledger: previous) == nil else { throw CredentialError.uncertainLocalState }
+            }
+            if previous.schema == 4 { ledger.schema = 4 }
+            else if previous.schema == 3 || ledger.records.values.contains(where: { $0.metadataFieldsOnly == true }) {ledger.schema = 3}
             else if previous.schema == 2 || ledger.records.values.contains(where: { $0.cloudResource != nil }) { ledger.schema = 2 }
             for (key, old) in previous.records {
                 guard let current = ledger.records[key], current.request == old.request, current.reference == old.reference,
@@ -77,9 +170,10 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
         do { return try withLock(create: false) {
             guard let originals = try load() else { return nil }
             try validate(originals)
+            if let value = try archived(requestID, ledger: originals) { return value.recovery }
             guard let bytes = try loadBytes(filename: recoveryFilename) else { return nil }
             let recovery = try JSONDecoder().decode(MusicWriteRecoveryLedger.self, from: bytes)
-            try recovery.validate(originals: originals)
+            _ = try recoveryOriginals(originals, recovery)
             return recovery.records[requestID.uuidString]
         } } catch Missing.directory { return nil }
     }
@@ -90,7 +184,7 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
             try validate(originals)
             let bytes = try loadBytes(filename: recoveryFilename)
             var recovery = try bytes.map { try JSONDecoder().decode(MusicWriteRecoveryLedger.self, from: $0) } ?? MusicWriteRecoveryLedger()
-            try recovery.validate(originals: originals)
+            _ = try recoveryOriginals(originals, recovery)
             let previous = recovery
             let value = try body(originals, &recovery)
             // Older binaries must reject the new once-only decision, including
@@ -98,7 +192,7 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
             if previous.schema == 2 || recovery.records.values.contains(where: {
                 $0.appendDecision != nil || $0.reason == .duplicateSafeAppendOnce
             }) { recovery.schema = 2 }
-            try recovery.validate(originals: originals)
+            _ = try recoveryOriginals(originals, recovery)
             for (key, old) in previous.records {
                 guard let current = recovery.records[key], current.preserves(old) else { throw CredentialError.uncertainLocalState }
             }
@@ -107,13 +201,15 @@ final class FileMusicWriteJournal: MusicWriteJournal, @unchecked Sendable {
         }
     }
     private func validate(_ ledger: MusicWriteLedger) throws {
-    guard [1,2,3].contains(ledger.schema), ledger.records.count <= 512, ledger.epochs.count <= 512,
+    guard [1,2,3,4].contains(ledger.schema), ledger.records.count <= 512, ledger.epochs.count <= 512,
+          ledger.schema == 4 || ledger.archiveBuckets == nil,
+          (ledger.archiveBuckets ?? []).allSatisfy({ $0.range(of: "^[a-f0-9]{2}$", options: .regularExpression) != nil }),
           ledger.records.allSatisfy({ $0.key == $0.value.request.requestID.uuidString })
     else { throw CredentialError.uncertainLocalState }
     var parents = Set<UUID>(), files = Set<String>()
     for record in ledger.records.values {
         try record.request.validate()
-        guard record.request.isMetadataUpdate ? (record.metadataFieldsOnly == true ? ledger.schema == 3 && record.contentDigest == nil : record.metadataFieldsOnly == nil && record.contentDigest?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil) : record.contentDigest == nil && record.metadataFieldsOnly == nil
+        guard record.request.isMetadataUpdate ? (record.metadataFieldsOnly == true ? ledger.schema >= 3 && record.contentDigest == nil : record.metadataFieldsOnly == nil && record.contentDigest?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil) : record.contentDigest == nil && record.metadataFieldsOnly == nil
         else { throw CredentialError.uncertainLocalState }
         guard record.request.isSongListUpdate ? record.baselineSongIDs.map({ $0.allSatisfy(MusicReadProtocol.validID) && Set($0).count == $0.count }) == true : record.baselineSongIDs == nil else { throw CredentialError.uncertainLocalState }
         guard record.result?.matchedSongID.map({ record.cloudResource != nil && MusicReadProtocol.validID($0) }) ?? true else { throw CredentialError.uncertainLocalState }

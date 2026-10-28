@@ -63,7 +63,7 @@ private final class FixtureMusic: MusicTransport, MusicReadTransport, MusicWrite
             let songs: [MusicReadSong] = hasSong ? [.init(songID: song, name: "Synthetic song", url: nil, visible: true)] : []
             let payload: MusicReadPayload
             switch request {
-            case .cloudSongs, .userPlaylistsPage, .playlistDetailPage: throw CredentialError.invalidInput // Write fixtures never use partial pages.
+            case .library, .cloudSongs, .userPlaylistsPage, .playlistDetailPage: throw CredentialError.invalidInput // Write fixtures never use partial pages.
             case .userPlaylists:
                 var rows = playlistExists ? [playlist] : []
                 if mode == .ambiguousCreate, writes > 0 { rows.append(.init(playlistID: String(repeating: "3", count: 32), name: playlist.name, url: nil, trackCount: 0)) }

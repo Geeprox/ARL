@@ -2,9 +2,8 @@
 
 Native owner retains at most its approved active transfers and serializes calls.
 Every call revalidates the captured owner/fence/operation, not an MCP `_meta` ID.
-32KiB chunks fit current 64KiB owner requests; whole objects remain <=1MiB to
-match existing UploadNewStorage and NAS read-session budgets. Not a final NAS
-file-size limit. References expire after 120s and never survive owner restart.
+32KiB chunks fit current 64KiB owner requests. Whole objects are disk-backed;
+size uses the shared exact JSON integer range, independent of frame size. References expire after 120s and never survive owner restart.
 """
 from __future__ import annotations
 import base64

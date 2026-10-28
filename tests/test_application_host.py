@@ -28,7 +28,7 @@ OUT = ROOT / 'build/tmp'
 class ApplicationHostTests(unittest.TestCase):
     def setUp(self):
         OUT.mkdir(parents=True, exist_ok=True)
-        self.tmp = tempfile.TemporaryDirectory(prefix='apphost-', dir=OUT)
+        self.tmp = tempfile.TemporaryDirectory(prefix='apphost-', dir=Path('/tmp').resolve())
         self.home = Path(self.tmp.name)
         self.live = True
         self.stack = []
