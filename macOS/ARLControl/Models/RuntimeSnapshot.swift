@@ -38,7 +38,7 @@ struct Capability: Codable, Identifiable, Sendable {
     var isApple: Bool { name.hasPrefix("apple.") }
 }
 struct Budget: Codable, Identifiable, Sendable {
-    let app: String; let max_pending: Int; let max_calls: Int; let max_output_tokens: Int; let max_prompt_utf8_bytes: Int
+    let app: String; let max_pending: Int; let max_calls: Int?; let max_output_tokens: Int; let max_prompt_utf8_bytes: Int
     var id: String { app }
 }
 enum ControlSection: String, CaseIterable, Identifiable {
@@ -115,7 +115,8 @@ extension RuntimeSnapshot {
         for item in try MetadataSchema.array(root["budgets"]) {
             let b = try MetadataSchema.object(item, keys: ["app", "max_pending", "max_calls", "max_output_tokens", "max_prompt_utf8_bytes"])
             _ = try MetadataSchema.string(b["app"])
-            for key in ["max_pending", "max_calls", "max_output_tokens"] { _ = try MetadataSchema.integer(b[key]) }
+            for key in ["max_pending", "max_output_tokens"] { _ = try MetadataSchema.integer(b[key]) }
+            if !(b["max_calls"] is NSNull) { _ = try MetadataSchema.integer(b["max_calls"]) }
             guard try MetadataSchema.integer(b["max_prompt_utf8_bytes"]) == 1024 else { throw ARLError(code: "invalid_response") }
         }
         return try JSONDecoder().decode(Self.self, from: data)

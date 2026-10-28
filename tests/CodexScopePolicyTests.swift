@@ -23,6 +23,18 @@ import Foundation
             _ = try CodexScopeOwner.configuration(previous:OwnerReadWire.encode(legacy,limit:4096),manifest:manifest,requirement:requirement)
             throw Failure.assertion("schema 1 null quota admitted")
         } catch let error as ARLError { try expect(error.code=="codex_scope_review_required","legacy malformed policy rejects") }
+        var overview = try OwnerReadJSON.object(Data(SettingsService.fixture.utf8),limit:65536)
+        var budgets=overview["budgets"] as! [[String:Any]]
+        budgets[0]["max_calls"]=NSNull();overview["budgets"]=budgets
+        let snapshot=try RuntimeSnapshot.decode(JSONSerialization.data(withJSONObject:overview))
+        try expect(snapshot.budgets[0].max_calls==nil && snapshot.budgets.last?.max_calls==0,"overview decodes unlimited and zero finite policy separately")
+        for invalid: Any in [true,-1,"unlimited"] {
+            budgets[0]["max_calls"]=invalid;overview["budgets"]=budgets
+            do {
+                _=try RuntimeSnapshot.decode(JSONSerialization.data(withJSONObject:overview))
+                throw Failure.assertion("malformed overview quota admitted")
+            } catch let error as ARLError { try expect(error.code=="invalid_response","overview finite validation retained") }
+        }
         print("PASS native Codex quota defaults, stable scope and preservation across identity update; no model or installed state access")
     }
 }

@@ -52,3 +52,5 @@ The native release still requires the user's own offline dependencies and signin
 The owner selected the MIT license for original ARL source. Publication uses a fresh non-fork repository with only reviewed source ancestry; the original repository and its historical branches remain private. The source manifest and per-file pattern review describe this source distribution, while the verification limits above still apply.
 
 The public macOS 26 runner also exposed a Swift IRGen crash while converting the service selector's actor-isolated method reference. An explicit Binding setter closure and explicit main-actor view isolation avoid that conversion without changing selection/refresh behavior. Source-check failures now print bounded compiler diagnostics for remote review.
+
+The unlimited-call policy is also decoded by the general settings overview and its management UI, with explicit native regression coverage distinguishing null from zero and rejecting malformed finite budgets.

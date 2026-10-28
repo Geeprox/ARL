@@ -239,8 +239,12 @@
             "minimum": 0
           },
           "max_calls": {
-            "type": "integer",
-            "minimum": 0
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "description": "Null means no local cumulative-call quota. Finite grants retain their explicit integer limit."
           },
           "max_output_tokens": {
             "type": "integer",

@@ -66,6 +66,9 @@ class OptionsTests(RuntimeCase):
   try:
    self.assertIsNone(runtime.policies[service.caller].max_calls)
    runtime.store.db.execute('INSERT INTO budget(owner,calls) VALUES(?,4000)',(service.caller,))
+   from arl.overview import overview
+   snapshot=overview(runtime)
+   self.assertIsNone(next(p for p in snapshot['budgets'] if p['app']==service.caller)['max_calls'])
    status=service.status()
    self.assertTrue(status['route_enabled']);self.assertIsNone(status['max_calls']);self.assertIsNone(status['remaining_calls'])
   finally:runtime.store.close();runtime.control.close();runtime.service_portal.close()

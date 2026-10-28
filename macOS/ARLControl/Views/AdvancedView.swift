@@ -15,7 +15,7 @@ struct AdvancedView: View {
             if let snapshot = store.snapshot {
                 DetailCard(title: "调用限额") {
                     ForEach(snapshot.budgets.filter { budget in AppRegistration.connected(store.control.registry.value ?? [], at: Date()).contains { $0.id == budget.app } }) { budget in
-                        DisclosureGroup(store.control.registry.value?.first { $0.id == budget.app }?.name ?? "应用") { VStack(spacing: 9) { MetadataRow(title: "任务上限", value: String(budget.max_pending)); MetadataRow(title: "调用上限", value: String(budget.max_calls)); MetadataRow(title: "回答上限", value: "回答上限为\(budget.max_output_tokens) token") }.padding(.vertical, 9) }
+                        DisclosureGroup(store.control.registry.value?.first { $0.id == budget.app }?.name ?? "应用") { VStack(spacing: 9) { MetadataRow(title: "任务上限", value: String(budget.max_pending)); MetadataRow(title: "调用上限", value: budget.max_calls.map(String.init) ?? "不设本地次数上限"); MetadataRow(title: "回答上限", value: "回答上限为\(budget.max_output_tokens) token") }.padding(.vertical, 9) }
                     }
                 }
             }
