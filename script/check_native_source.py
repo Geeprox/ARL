@@ -32,7 +32,10 @@ def main():
   records.append({'step':name,'exit_code':process.returncode,'inputs_stable':stable,'source_inputs':before})
   (output/'results.json').write_text(json.dumps({'source_compile_only':True,'installed':False,'launched':False,'steps':records},indent=2)+'\n')
   print(name,process.returncode,'stable',stable,flush=True)
-  if process.returncode or not stable:raise SystemExit(1)
+  if process.returncode or not stable:
+   # CI must expose compiler diagnostics even when its ephemeral workspace is gone.
+   print((process.stdout+process.stderr).decode('utf-8',errors='replace')[-12000:],flush=True)
+   raise SystemExit(1)
  run('compression',['xcrun','clang','-isysroot',sdk,'-target',recipe['product']['target'],'-c',str(ROOT/recipe['compression_c']),'-I',str(header.parent),'-o',str(output/'FlyAICompression.o')],[recipe['compression_c'],recipe['compression_header']])
  for name in ('ARLCredentialOnboarding','ARLCredentialHostCore'):
   sources=recipe['source_groups'][name]

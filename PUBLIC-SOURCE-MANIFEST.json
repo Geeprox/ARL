@@ -697,7 +697,7 @@
     "script/bundled_runtime_entry.py": "987694e9565ed56ffef264983be3f00e59b8f6fd4d7b8d6eca3c520133f223c9",
     "script/calendar_package_smoke.py": "a41d31f5151c936a522d2fc015a4da662c91648b669acb5c373bb708e12bd174",
     "script/check_nas_server_pipe.py": "fe879406a6b25bc416a96db6cc64771556abb80918ac4deb326958d69a7aafcc",
-    "script/check_native_source.py": "d6357e63edf35570e2f88da08342c916292c9c016e18b32d54cf041b2560efa0",
+    "script/check_native_source.py": "655f3ee4ca3d07e8553c4c4ca6eac9ebb9183d69432a87e013afbcbafacca9e4",
     "script/check_review_fixes.py": "627b40e127ed2327b9f6c3666d24c3b388e45b0ca391ca3dfbbe9e7def2ca75d",
     "script/codex_live_cancel.py": "6843a7fb77c037a811d23eaf638a0ffa8b5dea5bb5a450d57a9459a135c08afd",
     "script/codex_live_smoke.py": "c2b4a96ed0e34f969729ac8d5e76495788c3e3e475a62850802d1a5d172b6326",
