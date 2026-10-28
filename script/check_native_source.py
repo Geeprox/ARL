@@ -34,7 +34,9 @@ def main():
   print(name,process.returncode,'stable',stable,flush=True)
   if process.returncode or not stable:
    # CI must expose compiler diagnostics even when its ephemeral workspace is gone.
-   print((process.stdout+process.stderr).decode('utf-8',errors='replace')[-12000:],flush=True)
+   diagnostic=(process.stdout+process.stderr).decode('utf-8',errors='replace')
+   if len(diagnostic)>12000:diagnostic=diagnostic[:6000]+'\n...\n'+diagnostic[-6000:]
+   print(diagnostic,flush=True)
    raise SystemExit(1)
  run('compression',['xcrun','clang','-isysroot',sdk,'-target',recipe['product']['target'],'-c',str(ROOT/recipe['compression_c']),'-I',str(header.parent),'-o',str(output/'FlyAICompression.o')],[recipe['compression_c'],recipe['compression_header']])
  for name in ('ARLCredentialOnboarding','ARLCredentialHostCore'):

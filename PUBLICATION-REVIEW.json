@@ -17,7 +17,7 @@
     },
     {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "e91686ee67bad2c9d3ce2f8db0759cca58e2f3b17241d69bb6a1205f27fcbe9b",
+      "sha256": "8672e3acadaee666cea5a0d92f8ad6be67c4001ca7adf55e6f46bd2f5a3395ae",
       "categories": {
         "private_app_reference": "Intentional integration product or module names."
       }
@@ -389,7 +389,7 @@
     },
     {
       "path": "docs/REVIEW-COMPLETION-20261028.md",
-      "sha256": "378b78873852f23a98b940f899462411a5c1e9f5b9d3a4f3159ef218d47e7423",
+      "sha256": "025981128cc444896ae4f0967fe3c8543c11ee9b07012cef3a6b679ffac269cf",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names."
       }

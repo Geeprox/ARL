@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ServicePortalView: View {
+@MainActor struct ServicePortalView: View {
     let service: SettingsService
     let connectionAvailable: Bool
     @State private var presentation = ServicePortalPresentation()
@@ -13,7 +13,7 @@ struct ServicePortalView: View {
                     DetailCard(title: "服务目录") { Text("暂无已审阅的服务项目").font(.callout).foregroundStyle(.secondary) }
                 } else {
                     HStack {
-                        Picker("服务项目", selection: Binding(get: { selectedServiceID }, set: select)) {
+                        Picker("服务项目", selection: Binding(get: { selectedServiceID }, set: { identity in select(identity) })) {
                             ForEach(catalog.entries) { entry in Text(entry.name).tag(entry.id) }
                         }.frame(maxWidth: 360)
                         Spacer()

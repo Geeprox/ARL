@@ -36,3 +36,7 @@ NAS Python 回归另需 `vendor/nas` 锁定的依赖。源码发行不包含本�
 - 最近一次完整 Python discovery：1017 tests，无断言失败，47 errors、20 skips。其后修复并通过 3 项 checkout 深度导致的 socket 路径错误；余下 44 项前提错误涉及外部 Friday actor 源、冻结的 Capture 验收文件、Tisra 应用/进程夹具、私有签名资源、历史 Calendar/Reminders 包、deployment 模块及 Moments Pillow 缓存。这仍不是全量全绿结果。
 
 公开仓库 CI 的 Linux 组验证独立核心链路，macOS 组只编译原生源。它们不代替真实账户、设备、系统权限、云同步或正式发行包验收。机器日志与失败记录保留在维护者 ignored build 目录，公共报告不包含私有路径、数据正文或凭据。
+
+## 跨工具链构建
+
+公开 macOS 26 CI 在服务选择器的 actor 隔离方法引用转换中触发 Swift IRGen 编译器崩溃；本机 Xcode 27.1 未复现。服务选择器现在明确属于主线程，并使用显式 Binding setter 闭包，选择和刷新行为保持相同。源码检查也会在失败时输出有限编译器诊断，便于干净机器排错。

@@ -50,3 +50,5 @@ The public source snapshot is distinct from the existing private repository's hi
 The native release still requires the user's own offline dependencies and signing configuration. Source compilation is supported separately from signing, packaging, installation and provider acceptance. No ready-to-install public binary is claimed here.
 
 The owner selected the MIT license for original ARL source. Publication uses a fresh non-fork repository with only reviewed source ancestry; the original repository and its historical branches remain private. The source manifest and per-file pattern review describe this source distribution, while the verification limits above still apply.
+
+The public macOS 26 runner also exposed a Swift IRGen crash while converting the service selector's actor-isolated method reference. An explicit Binding setter closure and explicit main-actor view isolation avoid that conversion without changing selection/refresh behavior. Source-check failures now print bounded compiler diagnostics for remote review.
