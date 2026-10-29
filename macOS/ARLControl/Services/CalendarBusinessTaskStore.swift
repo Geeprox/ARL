@@ -62,25 +62,3 @@ final class CalendarBusinessTaskStore {
 }
 
 // Confirmation uses the same backend's revision-bound original occurrence.
-enum CalendarBusinessConfirmation {
-    static func details(_ claim:CalendarBusinessClaim,current:CalendarBusinessEvent?)throws->String {
-        if let target=claim.request.target {
-            guard current?.target==target else{throw CalendarBusinessFault("revision_changed")}
-        } else {guard current==nil else{throw CalendarBusinessFault("target_changed")}}
-        func describe(_ draft:CalendarBusinessDraft)->String {
-            var text=draft.title+"\n"+draft.start+" → "+draft.end+"\n时区："+draft.time_zone+"\n全天："+(draft.all_day ? "是":"否")
-            text+="\n提醒："+(draft.alarm_seconds.isEmpty ? "无":draft.alarm_seconds.map{"提前 "+String($0)+" 秒"}.joined(separator:"、"))
-            if let rule=draft.recurrence {
-                text+="\n重复："+rule.frequency.title+"，间隔 "+String(rule.interval)
-                if let count=rule.count{text+="，共 "+String(count)+" 次"}
-                if let until=rule.until{text+="，截止 "+until}
-            } else {text+="\n重复：无"}
-            return text
-        }
-        var parts=[claim.calendar.source+" / "+claim.calendar.title]
-        if let current {parts.append("原日程：\n"+describe(current.draft))}
-        if let draft=claim.request.draft {parts.append((current==nil ? "新日程：\n":"修改为：\n")+describe(draft))}
-        if claim.request.action == .delete {parts.append("仅删除上述本次实例。")}
-        return parts.joined(separator:"\n\n")
-    }
-}

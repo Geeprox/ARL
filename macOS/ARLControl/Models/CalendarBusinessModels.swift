@@ -50,7 +50,7 @@ struct CalendarBusinessRecurrence: Codable, Equatable, Sendable {
     }
 }
 struct CalendarBusinessDraft: Codable, Equatable, Sendable {
-    // nil means the current default, bound to its exact ID before confirmation.
+    // nil means the current default, bound to its exact ID before the durable claim.
     let calendar_id: String?
     let title: String
     let start: String

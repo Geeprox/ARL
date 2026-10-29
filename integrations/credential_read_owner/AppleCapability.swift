@@ -1,7 +1,7 @@
 import Foundation
 
-/// Transport identity is not a business grant. Every new task still requires
-/// the existing native confirmation for its exact title and default list.
+/// Authenticated requests bind the exact title and current default list.
+/// Per-task validation and durable one-attempt records remain mandatory.
 enum AppleCapability {
     static let reminderCreate = "mio_reminders_create"
     static let reminderStatus = "mio_reminders_operation_status"
@@ -26,12 +26,12 @@ enum AppleCapability {
             if create { properties["title"] = ["type":"string", "minLength":1, "maxLength":300] }
             return ["name":name,
                 "description":create
-                    ? "Create one reminder through ARL's existing native task consumer. Local confirmation must approve this exact title and existing default list once; this tool never requests OS permission. Repeated task_id only inspects the durable record, including drafts, and never resumes or repeats a save. saved_local does not verify cloud sync. Due date, alarms, recurrence, new lists, edits and deletes are not supported here."
+                    ? "Create one reminder through ARL's existing native task consumer. The exact title and current default list are bound without an additional confirmation dialog; this tool never requests OS permission. Repeated task_id only inspects the durable record, including drafts, and never resumes or repeats a save. saved_local does not verify cloud sync. Due date, alarms, recurrence, new lists, edits and deletes are not supported here."
                     : "Read the durable record of the original task_id. Does not fetch reminder bodies from EventKit, start the helper, request permission, create a task, resume a draft or retry an effect.",
                 "inputSchema":["type":"object", "additionalProperties":false,
                     "required":create ? ["task_id","title"] : ["task_id"], "properties":properties],
                 "annotations":["readOnlyHint":!create, "destructiveHint":false, "idempotentHint":true, "openWorldHint":false],
-                "_meta":["arl/capability":"apple.reminders.task", "arl/version":1, "arl/requiresConfirmation":create, "arl/automaticReplay":false]]
+                "_meta":["arl/capability":"apple.reminders.task", "arl/version":1, "arl/requiresConfirmation":false, "arl/automaticReplay":false]]
         }
         return [descriptor(reminderCreate, create:true), descriptor(reminderStatus, create:false)]
     }

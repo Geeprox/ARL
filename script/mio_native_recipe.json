@@ -89,15 +89,15 @@
     },
     {
       "path": "integrations/credential_read_owner/AppleCapability.swift",
-      "sha256": "0432657698d8b2851aef75e6bb86665bb248625a5791cbc9900bc6e5ceb79f8e"
+      "sha256": "7f0dd547de8e746d4dcc07a670666b15493525e1934c39d42716bc658623f634"
     },
     {
       "path": "integrations/credential_read_owner/NASCapability.swift",
-      "sha256": "8da33919893b109893e5adbca1b3401a83b10ac5dd73a7179e9e45103837eacd"
+      "sha256": "0358096372ff24090decf178d4cbe6e32213709720f7544b44ec7fbd959669e6"
     },
     {
       "path": "integrations/credential_read_owner/AppleProductCapability.swift",
-      "sha256": "f4a5cbbe05a3d1e19f97d5258c59bac567a3774a26fa5c564d23e132e4836c93"
+      "sha256": "4aabd4a9aa4c767683234f064abe9ebd677d27526caeb9ccb97212efaeadf05b"
     },
     {
       "path": "integrations/credential_read_owner/MusicPlaylistCoverCapability.swift",

@@ -20,6 +20,9 @@ import Foundation
     var changedIntent = false, badRevision = false, badList = false, recurring = false
     var failFirstStatus = false, failEnsure = false, statusCode = "operation_missing"
     var verificationFault: AppleDirectFault?
+    var sessionFault: AppleDirectFault?
+    var sessionChecks = 0, verifications = 0, stopAfterVerification: Int?
+    var notesFolder: NotesDirectFolder?
     var args: [String: Any] {
         ["task_id": id, "list_id": "synthetic-list", "reminder_id": changedIntent ? "different-item":"synthetic-item", "expected_revision": revision]
     }
@@ -59,7 +62,16 @@ import Foundation
             reply.catalog = .init(sources:[target.source], lists:[target.list!])
         } else if frame.action == .submit {
             submissions += 1
-            preconditionFailure("test must never submit a deletion")
+            precondition(frame.task_id == id)
+            let raw = frame.request_json!
+            let op = RemindersProductContract.operationID(id)
+            let receipt: [String:Any] = ["schema_version":3, "status":"ok", "operation_id":op, "persistence":"deleted_local",
+                "cloud_sync":"not_checked", "deletion":["id":"synthetic-item", "list_id":"synthetic-list", "expected_revision":revision]]
+            priorState = "saved_local"
+            reply.task = .init(task_id:id, operation_id:op, request_sha256:RemindersNativeIO.hash(Data(raw.utf8)),
+                request_json:raw, target:target, state:"saved_local", code:"deleted_local", result_json:nil)
+            reply.result_json = String(decoding:try json(receipt), as:UTF8.self)
+            reply.code = "deleted_local"
         }
         return reply
     }
@@ -68,12 +80,18 @@ import Foundation
             ensureService:{self.ensures += 1;if self.failEnsure { throw RemindersTransportFault("needs_permission") }},
             send:{try self.reply($0)}, record:{_,_,_,_ in self.records += 1}))
         let calendar = CalendarBusinessHandler(backend:OwnerDeleteUnusedCalendar(), port:.init(verify:{},
-            lookup:{_ in nil}, approve:{_ in preconditionFailure("no calendar confirmation")},
+            lookup:{_ in nil},
             claim:{_ in preconditionFailure("no calendar claim")}, finish:{_ in preconditionFailure("no calendar finish")},
             record:{_,_ in preconditionFailure("no calendar record")}))
         return .init(home:home, events:AppleDirectExecutor(), reminders:controller, calendar:calendar,
-            port:.init(begin:{_ in true},end:{_ in},verify:{if let fault=self.verificationFault {throw fault}},
-                       notesFolder:{nil}, messagesAccount:{nil}),
+            port:.init(begin:{_ in true},end:{_ in},verify:{
+                self.verifications += 1
+                if let fault=self.verificationFault {throw fault}
+                if self.verifications == self.stopAfterVerification {throw AppleDirectFault("synthetic_stop")}
+            },notesFolder:{self.notesFolder}, messagesAccount:{nil}, requireUserSession:{
+                self.sessionChecks += 1
+                if let fault=self.sessionFault {throw fault}
+            }),
             confirmation:{_,_ in self.confirmations += 1;return false})
     }
 }
@@ -87,6 +105,15 @@ import Foundation
         func call(_ f: OwnerDeleteFlowFixture, tool: String = "mio_reminders_delete_item", args: [String:Any]? = nil) async throws -> [String:Any] {
             let bytes = try await f.owner(home:home).execute(tool:tool, argumentsJSON:f.json(args ?? f.args), callID:UUID())
             return try OwnerReadJSON.object(bytes, limit:262144)
+        }
+        for descriptor in AppleProductCapability.descriptors {
+            let tool = descriptor["name"] as! String
+            if AppleProductCapability.calendar.contains(tool) || AppleProductCapability.notes.contains(tool) || AppleProductCapability.reminders.contains(tool) {
+                expect((descriptor["_meta"] as? [String:Any])?["arl/requiresConfirmation"] as? Bool == false, "published Apple operation does not require another confirmation")
+            }
+        }
+        for descriptor in AppleCapability.descriptors {
+            expect((descriptor["_meta"] as? [String:Any])?["arl/requiresConfirmation"] as? Bool == false, "legacy reminder metadata also permits direct execution")
         }
         var malformed:[[String:Any]]=[]
         let valid=OwnerDeleteFlowFixture().args
@@ -135,14 +162,19 @@ import Foundation
             expect(f.confirmations == 0 && f.submissions == 0, "bad preflight stops before confirmation and effect")
         }
         let fresh = OwnerDeleteFlowFixture()
-        let stopped = try await call(fresh)
-        expect(["user_session_unavailable","user_cancelled"].contains(stopped["code"] as? String ?? ""), "fresh synthetic delete stops at actual session or injected decline")
-        expect(fresh.calls == [.status,.read] && fresh.submissions == 0, "fresh request reads one exact item and never submits")
-        expect(stopped["state"] as? String == "unavailable" && stopped["task_id"] as? String == fresh.id, "no attempted effect is reported unknown")
+        let saved = try await call(fresh)
+        expect(saved["code"] as? String == "deleted_local" && saved["state"] as? String == "saved_local", "fresh delete submits directly")
+        expect(fresh.calls == [.status,.read,.submit] && fresh.submissions == 1 && fresh.confirmations == 0, "exact-item preflight and one submission without confirmation")
+        expect(fresh.sessionChecks == 1, "direct execution retains active-session admission")
+        _ = try await call(fresh)
+        expect(fresh.calls == [.status,.read,.submit,.status] && fresh.submissions == 1 && fresh.confirmations == 0, "repeat only observes original deletion")
         let cold = OwnerDeleteFlowFixture();cold.failFirstStatus = true
         let coldResult = try await call(cold)
-        expect(cold.calls == [.status,.catalog,.status,.read], "cold helper restores through ordinary catalog before original task inspect")
-        expect(cold.submissions == 0 && ["user_session_unavailable","user_cancelled"].contains(coldResult["code"] as? String ?? ""), "cold start never skips session or confirmation")
+        expect(cold.calls == [.status,.catalog,.status,.read,.submit], "cold helper restores before original-task inspect and direct submit")
+        expect(cold.submissions == 1 && cold.confirmations == 0 && coldResult["code"] as? String == "deleted_local", "cold start directly executes exact synthetic deletion")
+        let locked = OwnerDeleteFlowFixture();locked.sessionFault = AppleDirectFault("user_session_unavailable", sessionIssue:.screenLocked)
+        let blocked = try await call(locked)
+        expect(blocked["code"] as? String == "user_session_unavailable" && locked.submissions == 0 && locked.confirmations == 0, "locked session cannot delete")
         let denied = OwnerDeleteFlowFixture();denied.failFirstStatus = true;denied.failEnsure = true
         let deniedResult = try await call(denied)
         expect(deniedResult["code"] as? String == "needs_permission", "cold read reports permission owner instead of requesting consent")
@@ -154,6 +186,20 @@ import Foundation
         expect(noteResult["code"] as? String == "user_session_unavailable" && noteResult["state"] as? String == "unavailable", "Notes blocked before native backend")
         expect((noteResult["recovery"] as? [String:Any])?["reason"] as? String == "screen_locked", "Owner preserves exact Notes blocked reason")
         expect(notes.calls.isEmpty && notes.confirmations == 0 && notes.submissions == 0, "Notes blocked path has no reminder or confirmation effects")
-        print("PASS \(checks) actual Apple Owner delete-flow checks; real_Apple_events=0 permission_requests=0 business_submissions=0")
+        for tool in ["mio_notes_create", "mio_notes_update", "mio_notes_delete"] {
+            let f = OwnerDeleteFlowFixture()
+            f.notesFolder = .init(accountID:"x-coredata://ABCD/ICAccount/p1", accountName:"Synthetic account", id:"x-coredata://ABCD/ICFolder/p2", name:"Synthetic folder")
+            f.stopAfterVerification = 2
+            var args: [String:Any] = ["task_id":f.id]
+            if tool != "mio_notes_create" {
+                args["row"] = ["id":"x-coredata://ABCD/ICNote/p3", "title":"Synthetic", "modified":0]
+                args["source_body_digest"] = f.revision
+            }
+            if tool != "mio_notes_delete" {args["title"]="Synthetic";args["plaintext"]="Synthetic body"}
+            let result = try await call(f,tool:tool,args:args)
+            expect(result["code"] as? String == "synthetic_stop", "Notes request reaches target revalidation directly")
+            expect(f.verifications == 2 && f.confirmations == 0 && f.sessionChecks == 1, "Notes mutation retains admission without a dialog")
+        }
+        print("PASS \(checks) actual Apple Owner delete-flow checks; real_Apple_events=0 permission_requests=0 synthetic_reminder_submissions=2")
     }
 }

@@ -6,7 +6,7 @@ import Foundation
     let home: URL
     let store: CalendarBusinessTaskStore
     var access: CalendarBusinessAccess { mode == "permission" ? .denied : .full_access }
-    var preparations = 0, approvals = 0, claims = 0, effects = 0, finishes = 0
+    var preparations = 0, claims = 0, effects = 0, finishes = 0
     var changed = false
     let calendar = CalendarBusinessCalendar(id: "fixture-calendar", title: "Synthetic", source: "Fixture", writable: true, is_default: true)
     let id = UUID().uuidString.lowercased()
@@ -22,9 +22,11 @@ import Foundation
     func get(_ target: CalendarBusinessTarget) throws -> CalendarBusinessEvent { preconditionFailure("no provider read") }
     func prepare(_ request: CalendarBusinessRequest) throws -> CalendarBusinessClaim {
         preparations += 1
+        if preparations == 1, mode == "cancel" { withUnsafeCurrentTask { $0?.cancel() } }
         if mode == "revision" { throw CalendarBusinessFault("revision_changed") }
         if !access.canCreate { throw CalendarBusinessFault("needs_permission") }
         let selected = changed ? CalendarBusinessCalendar(id: "changed-calendar", title: "Changed", source: "Fixture", writable: true, is_default: true) : calendar
+        if preparations == 1, mode == "changed" { changed = true }
         return .init(request: request, calendar: selected)
     }
     func commit(_ claim: CalendarBusinessClaim) throws -> CalendarBusinessOperation {
@@ -40,11 +42,6 @@ import Foundation
         .init(backend: self, port: .init(verify: {}, lookup: { id in
         if self.mode == "lookup" { throw CalendarBusinessFault("needs_permission") }
         return try self.store.lookup(id)
-    }, approve: { _ in
-        self.approvals += 1
-        if self.mode == "changed" { self.changed = true }
-        if self.mode == "cancel" { withUnsafeCurrentTask { $0?.cancel() } }
-        return self.mode != "decline"
     }, claim: { claim in
         self.claims += 1
         try self.store.claim(claim)
@@ -87,7 +84,7 @@ import Foundation
         func expect(_ value: Bool, _ label: String) {
             guard value else { fatalError(label) }; checks += 1
         }
-        for (mode, code) in [("decline", "user_cancelled"), ("revision", "revision_changed"), ("permission", "needs_permission"), ("changed", "target_changed"), ("cancel", "cancelled")] {
+        for (mode, code) in [("revision", "revision_changed"), ("permission", "needs_permission"), ("changed", "target_changed"), ("cancel", "cancelled")] {
             let fixture = try CalendarRecoveryFixture(mode: mode, root: root)
             let reply = try await fixture.call()
             trace("PRECLAIM mode=\(mode) state=\(reply["state"] ?? "missing") code=\(reply["code"] ?? "missing") claims=\(fixture.claims) effects=\(fixture.effects)")
@@ -105,7 +102,7 @@ import Foundation
             }
         }
         if expectBug {
-            trace("REPRODUCED \(checks) checks: five zero-claim rejections incorrectly marked outcome_unknown; real_Apple=0 UI=0 permissions=0")
+            trace("REPRODUCED \(checks) checks: four zero-claim rejections incorrectly marked outcome_unknown; real_Apple=0 UI=0 permissions=0")
             return
         }
         let malformed = try CalendarRecoveryFixture(mode: "success", root: root)
@@ -129,20 +126,20 @@ import Foundation
             expect(status["task_id"] as? String == fixture.id, "status uses original operation ID")
             expect(status["state"] as? String == (mode == "effect" ? "outcome_unknown" : "attempting"), "status reports original unresolved record")
             expect(fixture.claims == 1 && fixture.effects == (mode == "claim" ? 0 : 1), "\(mode) repeated submission never claims/effects twice")
-            expect(fixture.approvals == 1 && fixture.preparations == 2, "original unresolved operation never reconfirms/prepares")
+            expect(fixture.preparations == 2, "original unresolved operation never prepares again")
             trace("UNCERTAIN mode=\(mode) claims=\(fixture.claims) effects=\(fixture.effects) status=\(status["state"] ?? "missing")")
         }
         let lookup = try CalendarRecoveryFixture(mode: "lookup", root: root)
         let blocked = try await lookup.call()
         expect(blocked["state"] as? String == "outcome_unknown" && blocked["code"] as? String == "needs_permission", "failed original lookup cannot prove absence, even for familiar error code")
-        expect(blocked["recovery"] == nil && lookup.claims == 0 && lookup.effects == 0 && lookup.approvals == 0, "uncertain original lookup has no resubmit guidance or effect")
+        expect(blocked["recovery"] == nil && lookup.claims == 0 && lookup.effects == 0, "uncertain original lookup has no resubmit guidance or effect")
         let saved = try CalendarRecoveryFixture(mode: "success", root: root)
         let receipt = try await saved.call()
         let args = try JSONSerialization.jsonObject(with: saved.request().argumentsJSON()) as! [String: Any]
         expect(try AppleProductCapability.admit(receipt, tool: "mio_calendar_create", arguments: args), "successful real owner receipt remains publicly admissible")
         _ = try await saved.call()
         let status = try await saved.call(.operation_status)
-        expect(status["state"] as? String == "saved_local" && saved.claims == 1 && saved.effects == 1 && saved.approvals == 1, "saved task and status never re-execute")
+        expect(status["state"] as? String == "saved_local" && saved.claims == 1 && saved.effects == 1, "saved task and status never re-execute")
         let missing = try await saved.call(.operation_status, taskID: UUID().uuidString.lowercased())
         expect(missing["code"] as? String == "task_not_found", "new status ID does not inspect original task")
         trace("PASS \(checks) Calendar public owner/durable recovery checks; real_Apple=0 UI=0 permissions=0 business_writes=0")

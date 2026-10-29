@@ -509,11 +509,7 @@ final class RuntimeStore {
         let backend=CalendarEventKitBackend()
         let handler=CalendarBusinessHandler(backend:backend,port:.init(verify:{[weak self] in
             guard let self else{throw OwnerReadFault.held};try self.verifyAppleProductAdmission()
-        },lookup:{try store.lookup($0)},approve:{claim in
-            let current=try claim.request.target.map{try backend.get($0)}
-            let details=try CalendarBusinessConfirmation.details(claim,current:current)
-            return await AppleProductOwnerExecutor.confirm(claim.request.action == .delete ? "删除本次日程":"保存日程",details)
-        },claim:{try store.claim($0)},finish:{try store.finish($0)},record:{request,reply in
+        },lookup:{try store.lookup($0)},claim:{try store.claim($0)},finish:{try store.finish($0)},record:{request,reply in
             try journal.recordProduct(tool:request.action.tool,callID:UUID(uuidString:request.task_id)!,argumentsJSON:request.argumentsJSON(),responseJSON:try reply.map{try CalendarBusinessContract.encode($0)})
         }))
         calendarBusinessHandler=handler

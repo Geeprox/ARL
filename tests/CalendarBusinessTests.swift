@@ -2,11 +2,11 @@ import Foundation
 
 @MainActor final class CalendarBusinessFixture: CalendarBusinessBackend {
     var access: CalendarBusinessAccess = .full_access
-    var reads=0, preparations=0, effects=0, approvals=0, claims=0, finishes=0, logs=0
-    var failEffect=false, failFinish=false, failClaim=false, approve=true, permitted=true
+    var reads=0, preparations=0, effects=0, claims=0, finishes=0, logs=0
+    var failEffect=false, failFinish=false, failClaim=false, permitted=true
     var changed=false, failRead=false
     var rows: [String:CalendarBusinessOperation] = [:]
-    var approvalHook: (() -> Void)?
+    var preparationHook: (() -> Void)?
     let calendar = CalendarBusinessCalendar(id:"calendar-a",title:"测试",source:"本机",writable:true,is_default:true)
     func calendars() throws -> [CalendarBusinessCalendar] {
         if failRead { throw CalendarBusinessFault("synthetic_read_error") }
@@ -20,7 +20,9 @@ import Foundation
         preparations += 1
         guard access.canCreate else { throw CalendarBusinessFault("needs_permission") }
         if access == .write_only, request.action != .create || request.draft?.calendar_id != nil { throw CalendarBusinessFault("needs_full_access") }
-        return .init(request:request,calendar:changed ? .init(id:"other",title:"其他",source:"本机",writable:true,is_default:true):calendar)
+        let selected = changed ? CalendarBusinessCalendar(id:"other",title:"其他",source:"本机",writable:true,is_default:true):calendar
+        if preparations == 1 { preparationHook?() }
+        return .init(request:request,calendar:selected)
     }
     func commit(_ claim:CalendarBusinessClaim) throws -> CalendarBusinessOperation {
         effects += 1
@@ -31,9 +33,7 @@ import Foundation
     func handler() -> CalendarBusinessHandler {
         .init(backend:self,port:.init(verify:{
             if !self.permitted { throw CalendarBusinessFault("owner_unavailable") }
-        },lookup:{self.rows[$0]},approve:{ _ in
-            self.approvals += 1;self.approvalHook?();return self.approve
-        },claim:{ claim in
+        },lookup:{self.rows[$0]},claim:{ claim in
             self.claims += 1
             guard self.rows[claim.request.task_id] == nil else { throw CalendarBusinessFault("operation_consumed") }
             self.rows[claim.request.task_id] = .init(task_id:claim.request.task_id,digest:claim.request.digest,action:claim.request.action,state:.attempting,code:"attempting",event:nil)
@@ -73,10 +73,10 @@ import Foundation
         try CalendarBusinessDraft(calendar_id:nil,title:"全天",start:"2026-03-08T00:00:00-08:00",end:"2026-03-09T00:00:00-07:00",time_zone:"America/Los_Angeles",all_day:true,alarm_seconds:[],recurrence:nil).validate()
         let f=CalendarBusinessFixture(), h=f.handler()
         let first=try await h.execute(request)
-        precondition(first.operation?.state == .saved_local && f.effects == 1 && f.claims == 1 && f.approvals == 1 && f.logs == 2)
+        precondition(first.operation?.state == .saved_local && f.effects == 1 && f.claims == 1 && f.logs == 2)
         _ = try await h.execute(request)
         _ = try await h.execute(.init(taskID:id,action:.operation_status))
-        precondition(f.effects == 1 && f.approvals == 1 && f.preparations == 2)
+        precondition(f.effects == 1 && f.preparations == 2)
         do { _ = try await h.execute(.init(taskID:id,action:.create,draft:draft(title:"不同")));preconditionFailure() } catch { }
         precondition(f.effects == 1)
         let unknown=CalendarBusinessFixture();unknown.failEffect=true;let uh=unknown.handler()
@@ -91,13 +91,13 @@ import Foundation
         let claim=CalendarBusinessFixture();claim.failClaim=true;let ch=claim.handler()
         do { _ = try await ch.execute(request);preconditionFailure() } catch { }
         _ = try await ch.execute(request);precondition(claim.effects == 0 && claim.rows[id]?.state == .attempting)
-        let denied=CalendarBusinessFixture();denied.approve=false
+        let denied=CalendarBusinessFixture();denied.permitted=false
         do { _ = try await denied.handler().execute(request);preconditionFailure() } catch { }
         precondition(denied.claims == 0 && denied.effects == 0)
-        let changed=CalendarBusinessFixture();changed.approvalHook={changed.changed=true}
+        let changed=CalendarBusinessFixture();changed.preparationHook={changed.changed=true}
         do { _ = try await changed.handler().execute(request);preconditionFailure() } catch { }
         precondition(changed.claims == 0 && changed.effects == 0)
-        let cancel=CalendarBusinessFixture();cancel.approvalHook={withUnsafeCurrentTask{$0?.cancel()}}
+        let cancel=CalendarBusinessFixture();cancel.preparationHook={withUnsafeCurrentTask{$0?.cancel()}}
         let work=Task { @MainActor in try await cancel.handler().execute(request) }
         do { _ = try await work.value;preconditionFailure() } catch { }
         precondition(cancel.claims == 0 && cancel.effects == 0)
@@ -108,7 +108,7 @@ import Foundation
         precondition(write.reads == 0)
         let read=CalendarBusinessFixture(), rh=read.handler()
         _ = try await rh.execute(.init(taskID:id,action:.calendars))
-        precondition(read.effects == 0 && read.claims == 0 && read.approvals == 0 && read.reads == 1)
+        precondition(read.effects == 0 && read.claims == 0 && read.reads == 1)
         // Native controller keeps prior trusted metadata and the exact unresolved
         // task across subsequent actions, with no replacement submission.
         let suite="arl-calendar-controller-test-"+UUID().uuidString

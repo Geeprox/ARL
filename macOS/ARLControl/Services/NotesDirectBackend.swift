@@ -167,7 +167,7 @@ final class NotesDirectBackend {
         let current = try read(proposal.scope, row: proposal.row)
         // Exact deletion does not reconstruct content in the plain-text editor.
         // noteRef still rejects shared/locked targets; revision/body and the
-        // separate deletion confirmation bind the precise object being removed.
+        // selected folder bind the precise object being removed.
         guard current.bodyDigest == proposal.sourceBodyDigest else { throw AppleDirectFault("revision_changed") }
     }
     func delete(_ proposal: NotesDirectDeleteProposal, beforeEffect: () throws -> Void) throws -> String {

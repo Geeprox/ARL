@@ -1671,7 +1671,7 @@ async function collectPlaylistMetadata(invoke) {
   check(JSON.stringify(witness(before))===JSON.stringify(witness(after)),'playlist_metadata_changed');
   return after;
 }
-async function collectMusicPages(fetchPage,{kind,pageSize,maxPages=Infinity,maxItems=Infinity,maxBytes=98304,expectedTotal=null,withinBudget=()=>true,startOffset=0}) {
+async function collectMusicPages(fetchPage,{kind,pageSize,maxPages=Infinity,maxItems=Infinity,maxBytes=24*1024*1024,expectedTotal=null,withinBudget=()=>true,startOffset=0}) {
   async function sweep() {
     const items=[],seen=new Set(),observations=[];let total=expectedTotal,pages=0,itemBytes=2;
     const done=(state,complete=false)=>({items,total,complete,pagination:{state,pages,items:items.length,total,
@@ -1687,9 +1687,10 @@ async function collectMusicPages(fetchPage,{kind,pageSize,maxPages=Infinity,maxI
       if(total!==null&&startOffset+items.length+page.items.length>total)return done('drift');
       if(page.items.some(row=>seen.has(row[kind+'_id'])))return done('drift');
       if(new Set(page.items.map(row=>row[kind+'_id'])).size!==page.items.length)return done('drift');
-      // Retain the existing result budget. Admit whole items up to it, then
-      // return an explicit offset for the unreturned suffix of this same page.
-      // A page which exceeds the budget must never erase its fitting prefix.
+      // The owner reassembles up to 32 MiB through digest-bound private parts.
+      // Reserve room for playlist/envelope fields instead of imposing the old
+      // 96 KiB single-frame display cap on the complete two-sweep snapshot.
+      // A genuine aggregate limit still returns whole items and a continuation.
       for(const row of page.items) {
         const bytes=Buffer.byteLength(JSON.stringify(row))+(items.length?1:0);
         if(items.length>=maxItems||itemBytes+bytes>maxBytes)return done('budget_exhausted');

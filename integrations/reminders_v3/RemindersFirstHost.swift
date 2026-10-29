@@ -263,7 +263,8 @@ final class RemindersEventKitSourceAccess: RemindersSourceAccess {
                     let candidate=try taskStore.mutable(frame.task_id!,expected:frame.expected_digest!)
                     guard status()=="full_access",!stopped() else{throw RemindersTransportFault(stopped() ? "cancelled":"needs_permission")}
                     let target=try sourceAccess.defaultSource();try RemindersTaskContract.target(target)
-                    guard await confirmTaskScope(candidate,target:target,cancelled:stopped),!stopped() else{throw RemindersTransportFault("cancelled")}
+                    // The authenticated task request supplies intent. Freeze the
+                    // current default list without a second per-reminder dialog.
                     try ownCurrent();try sourceAccess.verifyTaskTarget(target)
                     guard !stopped() else{throw RemindersTransportFault("cancelled")}
                     _=try taskStore.grant(id:candidate.task_id,expected:frame.expected_digest!,source:target,nowMS:Int64(Date().timeIntervalSince1970*1000),uptime:ProcessInfo.processInfo.systemUptime)
@@ -326,26 +327,6 @@ final class RemindersEventKitSourceAccess: RemindersSourceAccess {
             }
             return try encoder.encode(reply)
         } catch {return failure((error as? RemindersTransportFault)?.code ?? (error as? AdapterFault)?.code ?? "outcome_unknown")}
-    }
-    private func confirmTaskScope(_ task:RemindersTaskRecord,target:RemindersSelectedSource,cancelled:@escaping @Sendable ()->Bool) async->Bool {
-        #if REMINDERS_FIRST_SLICE_FIXTURE
-        return true // Explicit isolated synthetic action; fixture never uses EventKit.
-        #else
-        let window=NSWindow(contentRect:NSRect(x:0,y:0,width:520,height:220),styleMask:[.titled],backing:.buffered,defer:false)
-        window.title="ARL 提醒范围";window.center();window.makeKeyAndOrderFront(nil);selectionWindow=window
-        defer{window.orderOut(nil);selectionWindow=nil};NSApp.activate(ignoringOtherApps:true)
-        let alert=NSAlert();alert.messageText="仅允许本次提醒"
-        alert.informativeText="内容：\(task.title)\n来源：\(RemindersTaskContract.display(target.title))\n列表：\(RemindersTaskContract.display(target.default_list_title))\n\n确认后五分钟内只可创建这条提醒一次，可能按已有设置同步。本次只确认范围，尚不保存；旧未知操作和测试预算保持原样。"
-        alert.addButton(withTitle:"确认范围");alert.addButton(withTitle:"取消")
-        let timer=Timer(timeInterval:0.1,repeats:true) { _ in
-            MainActor.assumeIsolated {
-                if cancelled(),let sheet=window.attachedSheet { window.endSheet(sheet,returnCode:.alertSecondButtonReturn) }
-            }
-        }
-        RunLoop.main.add(timer,forMode:.common)
-        defer { timer.invalidate() }
-        return await withCheckedContinuation{continuation in alert.beginSheetModal(for:window){response in continuation.resume(returning:response == .alertFirstButtonReturn)}}
-        #endif
     }
     private func confirmUpgrade(_ assessment:RemindersUpgradeAssessment) async->Bool {
         #if REMINDERS_FIRST_SLICE_FIXTURE

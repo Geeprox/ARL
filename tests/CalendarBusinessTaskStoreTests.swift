@@ -57,15 +57,6 @@ import Darwin
         try fm.moveItem(at:terminalFile,to:savedTerminal)
         try fm.createSymbolicLink(at:terminalFile,withDestinationURL:savedTerminal)
         expect(rejects{_ = try store.lookup(id)},"terminal symlink rejected")
-        let target=CalendarBusinessTarget(calendar_id:calendar.id,event_id:"fixture-event",occurrence_start:draft.start,revision:String(repeating:"b",count:64))
-        let originalEvent=CalendarBusinessEvent(target:target,draft:draft,editable:true,recurrence_supported:true,alarms_supported:true,repeating:false)
-        let delete=CalendarBusinessClaim(request:.init(taskID:UUID().uuidString.lowercased(),action:.delete,target:target),calendar:calendar)
-        let details=try CalendarBusinessConfirmation.details(delete,current:originalEvent)
-        expect(details.contains(draft.title) && details.contains(draft.start) && details.contains(draft.end) && details.contains("全天：否"),"delete confirmation binds original title and full interval")
-        expect(rejects{_ = try CalendarBusinessConfirmation.details(delete,current:nil)},"missing original cannot be confirmed")
-        let update=CalendarBusinessClaim(request:.init(taskID:UUID().uuidString.lowercased(),action:.update,target:target,draft:changed.draft),calendar:calendar)
-        let editedDetails=try CalendarBusinessConfirmation.details(update,current:originalEvent)
-        expect(editedDetails.contains("Synthetic journal") && editedDetails.contains("Changed"),"edit confirmation shows original and replacement")
         print("PASS "+String(count)+" Calendar durable-claim checks; EventKit=0 permissions=0 business_writes=0")
     }
 }

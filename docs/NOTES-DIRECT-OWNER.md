@@ -1,6 +1,6 @@
 # Notes Direct owner
 
-当前源码（2026-10-28）由同一 ARL 原生 owner 使用固定公开 Apple Events；不读 Notes 私有数据库，不新增授权身份或后台授权路径。
+当前源码（2026-10-29）由同一 ARL 原生 owner 使用固定公开 Apple Events；不读 Notes 私有数据库，不新增授权身份或后台授权路径。
 
 用户先授权并选择账号及非共享文件夹。每次请求重查范围、身份、权限与期限。共享、锁定或加密笔记不参与正文搜索和读取；切换范围后旧结果不能继续操作。
 
@@ -8,8 +8,10 @@
 
 读取使用精确结果行及其修订，按 UTF-8 字节分页；每页最多 64 KiB，字符不会被截断。分页内容可用于消费方自己的迁移读取，但不构成全账号历史导入、附件导出或云同步保证。部分正文不能成为可编辑前缀。
 
-普通纯文本新建/改写沿用精确内容摘要、持久消费记录及本地回读。富文本和附件笔记的普通编辑继续拒绝。单条删除通过原有独立精确对象确认，检查修订和正文摘要；删除支持不以普通编辑能力为前提。取消和超时不承诺撤销已发生的效果，未知状态不能自动重放。
+普通纯文本新建/改写沿用精确内容摘要、持久消费记录及本地回读。富文本和附件笔记的普通编辑继续拒绝。新建、修改、单条删除由界面动作或受信工具请求直接执行，不另弹确认框。删除检查精确对象、修订和正文摘要；删除支持不以普通编辑能力为前提。取消和超时不承诺撤销已发生的效果，未知状态不能自动重放。
 
 Mio 的 `mio_notes_list` / `mio_notes_search` / `mio_notes_read` 复用同一 owner、选定范围和分页实现。调用方不能通过请求参数自报账号或文件夹来扩大授权。
 
 `tests/NotesDirectTests.swift` 和 `tests/NotesDeleteTests.swift` 注入合成 Apple Event transport，覆盖范围、修订、锁定/共享排除、长正文、续页与写入消费。使用 `python3 -B script/check_review_fixes.py` 编译并运行。它们不会请求 TCC 或访问真实笔记；安装、实际权限、真实写入与云同步仍须独立验收。
+
+无二次业务确认的执行链回归：先运行 `python3 -B script/check_native_source.py --output build/apple-direct-native`，再运行 `python3 -B script/check_apple_direct_execution.py --native-build build/apple-direct-native`。该入口编译实际主应用模块和生产提醒事项 helper，并运行合成 Calendar / Notes / Reminders 测试；不安装应用或访问真实记录。

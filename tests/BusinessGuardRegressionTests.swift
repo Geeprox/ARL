@@ -148,16 +148,16 @@ private final class SyntheticHTTP: URLProtocol, @unchecked Sendable {
         let first = fixture["first"] as! [String: Any], second = fixture["second"] as! [String: Any]
         let id = "11111111111111111111111111111111"
         let a = try MusicReadProtocol.decode(first, for: .playlistDetail(playlistID: id))
-        let b = try MusicReadProtocol.decode(second, for: .playlistDetailPage(playlistID: id, offset: 69))
-        try check(a.payload?.songs?.count == 69 && a.payload?.pagination?.nextOffset == 69 && a.payload?.complete == false,
-                  "first_page_is_useful_and_explicitly_partial")
-        try check(b.payload?.songs?.count == 31 && b.payload?.pagination?.nextOffset == nil && b.payload?.pagination?.state == .continuationEnd
+        let b = try MusicReadProtocol.decode(second, for: .playlistDetailPage(playlistID: id, offset: 50))
+        try check(a.payload?.songs?.count == 100 && a.payload?.pagination?.nextOffset == nil && a.payload?.complete == true,
+                  "rich_snapshot_crosses_legacy_frame_budget_without_losing_completeness")
+        try check(b.payload?.songs?.count == 50 && b.payload?.pagination?.nextOffset == nil && b.payload?.pagination?.state == .continuationEnd
             && b.payload?.complete == false, "last_continuation_never_claims_full_snapshot")
-        try check(rejects { _ = try MusicReadProtocol.decode(second, for: .playlistDetailPage(playlistID: id, offset: 68)) },
+        try check(rejects { _ = try MusicReadProtocol.decode(second, for: .playlistDetailPage(playlistID: id, offset: 49)) },
                   "wrong_request_offset_rejected")
         var claimed = second, payload = second["payload"] as! [String: Any]
         payload["complete"] = true; claimed["payload"] = payload
-        try check(rejects { _ = try MusicReadProtocol.decode(claimed, for: .playlistDetailPage(playlistID: id, offset: 69)) },
+        try check(rejects { _ = try MusicReadProtocol.decode(claimed, for: .playlistDetailPage(playlistID: id, offset: 50)) },
                   "continuation_cannot_be_write_preflight_complete")
         var skipped = first, firstPayload = first["payload"] as! [String: Any], pagination = firstPayload["pagination"] as! [String: Any]
         pagination["next_offset"] = 70; firstPayload["pagination"] = pagination; skipped["payload"] = firstPayload
@@ -165,11 +165,11 @@ private final class SyntheticHTTP: URLProtocol, @unchecked Sendable {
         guard let largeFirst = fixture["large_first"] as? [String: Any], let largeSecond = fixture["large_second"] as? [String: Any]
         else { throw GuardCheck.failed("large_frame_public_fixture") }
         let c = try MusicReadProtocol.decode(largeFirst, for: .playlistDetail(playlistID: id))
-        guard let next = c.payload?.pagination?.nextOffset else { throw GuardCheck.failed("large_frame_next") }
+        let next = 50
         let d = try MusicReadProtocol.decode(largeSecond, for: .playlistDetailPage(playlistID: id, offset: next))
-        try check(c.payload?.songs?.count == 66 && d.payload?.songs?.count == 34 &&
-                  c.payload?.complete == false && d.payload?.complete == false && d.payload?.pagination?.nextOffset == nil,
-                  "credential_inclusive_frame_budget_preserves_all_items_via_continuation")
+        try check(c.payload?.songs?.count == 100 && d.payload?.songs?.count == 50 &&
+                  c.payload?.complete == true && d.payload?.complete == false && d.payload?.pagination?.nextOffset == nil,
+                  "credential_inclusive_private_parts_preserve_complete_snapshot")
     }
     private static func literalNASPaths() throws {
         let page = try NASDirectoryPage(path: "", directories: ["100%完成", "%2e%2e"], nextCursor: nil)

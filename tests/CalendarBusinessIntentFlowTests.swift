@@ -18,7 +18,6 @@ final class CalendarIntentPreferences: UserDefaults, @unchecked Sendable {
     var logFailuresRemaining = 0
     var failAllLogs = false
     var failRead = false
-    var approvals = 0
     var effects: [String: Int] = [:]
     var operations: [String: CalendarBusinessOperation] = [:]
     var committed: [CalendarBusinessClaim] = []
@@ -44,7 +43,7 @@ final class CalendarIntentPreferences: UserDefaults, @unchecked Sendable {
                      state: access.canRead ? .saved_local : .saved_unreadable, code: "fixture_only", event: nil)
     }
     func handler() -> CalendarBusinessHandler {
-        .init(backend: self, port: .init(verify: {}, lookup: { self.operations[$0] }, approve: { _ in self.approvals += 1; return true }, claim: { claim in
+        .init(backend: self, port: .init(verify: {}, lookup: { self.operations[$0] }, claim: { claim in
             guard self.operations[claim.request.task_id] == nil else { throw CalendarBusinessFault("operation_consumed") }
             self.operations[claim.request.task_id] = .init(task_id: claim.request.task_id, digest: claim.request.digest,
                 action: claim.request.action, state: .attempting, code: "attempting", event: nil)
@@ -121,7 +120,7 @@ final class CalendarIntentPreferences: UserDefaults, @unchecked Sendable {
         precondition(submitted.calendar.id == "calendar-a" && restored.operation?.state == .saved_unreadable)
         precondition(f.effects[oldID] == 1 && f.operations[oldID] == original)
         // Coordinator duplicate-key delta: raw and escaped-equivalent keys are
-        // rejected before approval, durable claim or effect.
+        // rejected before durable claim or effect.
         let strict = CalendarIntentFlowFixture(), strictHandler = strict.handler()
         let valid = CalendarBusinessRequest(taskID: UUID().uuidString.lowercased(), action: .create, draft: draft("校验", calendar: nil))
         let json = String(decoding: try valid.argumentsJSON(), as: UTF8.self)
@@ -134,7 +133,7 @@ final class CalendarIntentPreferences: UserDefaults, @unchecked Sendable {
             do { _ = try await strictHandler.execute(tool: valid.action.tool, argumentsJSON: Data(duplicate.utf8)); preconditionFailure("duplicate accepted") }
             catch let fault as CalendarBusinessFault { precondition(fault.code == "duplicate_product_key") }
         }
-        precondition(strict.approvals == 0 && strict.operations.isEmpty && strict.effects.isEmpty)
+        precondition(strict.operations.isEmpty && strict.effects.isEmpty)
 
         // Best-effort logs cannot block a valid operation/status, mask a backend
         // fault, or lose their warning when a missing-status reply is rebuilt.

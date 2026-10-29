@@ -187,7 +187,7 @@ import Observation
         }
     }
     func commit(_ claim: CalendarBusinessClaim) throws -> CalendarBusinessOperation {
-        // Revalidate permission, default calendar and revision after approval and
+        // Revalidate permission, default calendar and revision after the
         // durable claim. A changed target never falls back to another calendar.
         guard try prepare(claim.request) == claim else { throw CalendarBusinessFault("target_changed") }
         let request = claim.request
@@ -235,12 +235,11 @@ import Observation
 }
 
 /// Shared owner supplies its existing identity, durable tasks and business log.
-/// There is deliberately no in-memory/default journal or implicit consent port.
+/// A UI action or authenticated tool request supplies intent without another dialog.
 @MainActor final class CalendarBusinessHandler {
     struct Port {
         let verify: () throws -> Void
         let lookup: (String) async throws -> CalendarBusinessOperation?
-        let approve: (CalendarBusinessClaim) async throws -> Bool
         // Atomic O_EXCL/locked + fsynced claim. Same task ID never overwrites a
         // previous request. An unresolved attempt must not be silently retried.
         let claim: (CalendarBusinessClaim) async throws -> Void
@@ -293,7 +292,6 @@ import Observation
                 case .get: reply.events = [try backend.get(request.target!)]
                 case .create, .update, .delete:
                     let claim = try backend.prepare(request)
-                    guard try await port.approve(claim) else { throw CalendarBusinessFault("user_cancelled") }
                     try Task.checkCancellation(); try port.verify()
                     guard !held, try backend.prepare(request) == claim else { throw CalendarBusinessFault("target_changed") }
                     // A status call/repeated task can only observe; it never resumes

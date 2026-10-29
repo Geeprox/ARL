@@ -13,8 +13,15 @@ async function collect(items,extra={}) {
 (async()=>{
  api.context({isWrite:false,verification:false});
  const display=records.map(r=>api.projectItem(r,'song'));
- const first=await collect(display);
+ const first=await collect(display,{maxBytes:98304});
  assert.equal(first.complete,false);assert.equal(first.pagination.state,'budget_exhausted');assert(first.items.length<32);
+ const richComplete=await collect(display);
+ assert.equal(richComplete.complete,true);assert.equal(richComplete.items.length,32);
+ assert(Buffer.byteLength(JSON.stringify(richComplete.items))>98304);
+ assert(richComplete.items.every(r=>r.provider_record.fields.extraBusinessField==='x'.repeat(4000)));
+ const course=Array.from({length:252},(_,i)=>({...display[i%display.length],song_id:id(i+10000)}));
+ const courseComplete=await collect(course);assert.equal(courseComplete.complete,true);assert.equal(courseComplete.items.length,252);
+ assert.equal(courseComplete.pagination.pages,6);assert.equal(courseComplete.pagination.state,'stable_observed');
  api.context({isWrite:false,verification:false,arguments:{}});
  assert.equal(api.projectCloudSongs({code:200,data:{songs:[records[0]],hasMore:true,cursor:'next',total:200001}}).cloud_page.total,200001);
  api.context({isWrite:false,verification:true});
@@ -53,5 +60,5 @@ async function collect(items,extra={}) {
  assert.equal(drift.complete,false);assert.equal(drift.pagination.state,'drift');
  const duplicate=await collect([compact[0],compact[0]],{maxBytes:Infinity});
  assert.equal(duplicate.complete,false);
- console.log(JSON.stringify({status:'PASS',rich_records:32,large_membership:1101,ordered_sweeps:true,real_network:0}));
+ console.log(JSON.stringify({status:'PASS',rich_records:32,large_membership:1101,rich_course_records:252,ordered_sweeps:true,real_network:0}));
 })().catch(e=>{console.error(e);process.exitCode=1;});

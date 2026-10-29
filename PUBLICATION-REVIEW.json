@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1082,
+  "source_files": 1084,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -17,9 +17,16 @@
     },
     {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "c75d726ddaf422b3a56b0882fab9bb4bb6c95c1c2e48539a0d4245ac53f38a48",
+      "sha256": "f80a8e3042ffe47e5c7540c8415978f07ec1c03f413a5cd913b19583fc036075",
       "categories": {
-        "private_app_reference": "Intentional integration product or module names."
+        "private_app_reference": "Intentional integration module names in the source review or source-file inventory; no credentials or operational state."
+      }
+    },
+    {
+      "path": "PUBLIC-SOURCE-MANIFEST.json",
+      "sha256": "24d1548dfc0f5dbc0ad0f9c8a776d0b2936e96df613c2e85bbc1f43a468d6a6b",
+      "categories": {
+        "private_app_reference": "Intentional integration module names in the source review or source-file inventory; no credentials or operational state."
       }
     },
     {
@@ -1579,7 +1586,7 @@
   ],
   "private_upstream_history_excluded": true,
   "publication_method": "Fast-forward update of the reviewed public source repository; private upstream ancestry remains excluded.",
-  "review_date": "2026-10-28",
+  "review_date": "2026-10-30",
   "historical_reference_review": {
     "current_source_references": 0,
     "historical_files": 2,

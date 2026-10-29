@@ -21,7 +21,7 @@ import Foundation
         }
     }
     /// Explicit local UI continuation only. It is never a published Mio action:
-    /// scope confirms without saving; submit uses only the exact displayed digest.
+    /// scope binds the default target without saving; submit uses only the exact displayed digest.
     func executeLocal(_ frame: RemindersFirstFrame, callID: UUID) async throws -> Data {
         guard [.task_prepare,.task_scope,.task_submit,.task_cancel].contains(frame.action),
               let taskID=frame.task_id else { throw RemindersTransportFault("invalid_arguments") }
@@ -84,7 +84,7 @@ import Foundation
             let selected = try await call(.task_scope,request,expected:draft.digest)
             guard selected.code == "task_scope_selected", let scoped = selected.task else { return .reply(selected,request:request) }
             guard scoped.state == .scoped, scoped.scope != nil else { throw RemindersTransportFault("task_changed") }
-            try Task.checkCancellation() // Late native approval cannot start a cancelled save.
+            try Task.checkCancellation() // A late scope response cannot start a cancelled save.
             submitStarted=true
             return .reply(try await call(.task_submit,request,expected:scoped.digest),request:request)
         } catch {

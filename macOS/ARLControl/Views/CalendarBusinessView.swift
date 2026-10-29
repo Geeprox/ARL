@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A business page: normal calendar names, date range, event list and editor.
-/// The shared handler supplies the same native confirmation for UI and Mio.
+/// UI and Mio share the same validation and direct execution without another dialog.
 struct CalendarBusinessView: View {
     @Bindable var controller: CalendarBusinessController
     @State private var rangeStart = Calendar.current.startOfDay(for: Date())

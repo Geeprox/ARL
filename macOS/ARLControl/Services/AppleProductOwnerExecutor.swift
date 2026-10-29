@@ -8,6 +8,7 @@ import AppKit
         let verify:()throws->Void
         let notesFolder:()->NotesDirectFolder?
         let messagesAccount:()->MessagesDirectAccount?
+        var requireUserSession:()throws->Void = {try AppleDirectAuthority.requireUserSession()}
     }
     let home:URL
     let events:AppleDirectExecutor
@@ -53,7 +54,7 @@ import AppKit
             }
             if tool == "mio_reminders_delete_item" {
                 // Treat the connector schema as documentation, never as input authority.
-                // Validate before status/read/confirmation and keep only typed values below.
+                // Validate before status/read and keep only typed values below.
                 try keys(args,["task_id","list_id","reminder_id","expected_revision"])
                 guard let taskID=args["task_id"] as? String,RemindersTaskContract.uuid(taskID),
                       let listID=args["list_id"] as? String,let reminderID=args["reminder_id"] as? String,
@@ -62,7 +63,7 @@ import AppKit
                       expectedRevision.utf8.count == 64,
                       expectedRevision.utf8.allSatisfy({(48...57).contains($0) || (97...102).contains($0)}),
                       let requestJSON=frame.request_json else{throw OwnerReadFault.invalid}
-                // Inspect the original task before any current-target read or confirmation.
+                // Inspect the original task before any current-target read.
                 // An existing consumed task is never submitted again, even after permission loss.
                 let statusFrame=RemindersProductFrame(.status,taskID:taskID)
                 let status:RemindersProductReply
@@ -87,9 +88,7 @@ import AppKit
                       list.id == item.list_id,list.writable,item.revision == expectedRevision
                 else{throw RemindersTransportFault(snapshot.code == "ok" ? "revision_conflict":snapshot.code)}
                 guard item.recurrence.descriptors.isEmpty else{throw RemindersTransportFault("recurring_delete_unsupported")}
-                try AppleDirectAuthority.requireUserSession()
-                guard await confirmation("删除提醒事项",list.title+"\n"+item.title+"\n仅删除这一条提醒，可能同步到其他设备。") else{throw AppleDirectFault("user_cancelled")}
-                try port.verify();try Task.checkCancellation();try AppleDirectAuthority.requireUserSession()
+                try port.verify();try Task.checkCancellation();try port.requireUserSession()
             }
             mutationEntered=frame.action == .submit
             let reply=try await reminders.execute(frame,tool:tool,argumentsJSON:argumentsJSON)
@@ -104,9 +103,10 @@ import AppKit
             return try envelope(tool:tool,taskID:reply.task_id,state:reply.operation?.state.rawValue ?? (reply.code=="ok" ? "read":"unavailable"),code:reply.operation?.code ?? reply.code,result:reply,businessLogAvailable:reply.businessLogAvailable)
         }
         if AppleProductCapability.notes.contains(tool) {
-            // Check the existing session before any write confirmation can appear.
+            // The authenticated request supplies the operation intent; no second
+            // confirmation is needed. Check the existing session before dispatch.
             // AppleDirectSession repeats this check before every native event.
-            try AppleDirectAuthority.requireUserSession()
+            try port.requireUserSession()
             let folder=port.notesFolder()
             let scope=folder.map{NotesDirectScope(folder:$0,expires:Date().addingTimeInterval(600))}
             let request:NotesDirectRequest
@@ -126,7 +126,6 @@ import AppKit
                 try keys(args,["task_id","title","plaintext"])
                 guard let scope else{throw AppleDirectFault("target_required")}
                 guard let title=args["title"] as? String,let text=args["plaintext"] as? String else{throw OwnerReadFault.invalid}
-                guard await confirmation("创建备忘录",scope.folder.label+"\n"+title+"\n\n"+text) else{throw AppleDirectFault("user_cancelled")}
                 try port.verify();guard port.notesFolder()==folder else{throw AppleDirectFault("target_changed")}
                 let proposal=NotesDirectProposal(id:UUID(uuidString:args["task_id"] as! String)!,scope:scope,title:title,plaintext:text,expires:Date().addingTimeInterval(120))
                 request = .create(proposal:proposal,expectedDigest:proposal.digest)
@@ -135,7 +134,6 @@ import AppKit
                 guard let scope else{throw AppleDirectFault("target_required")}
                 guard let title=args["title"] as? String,let text=args["plaintext"] as? String,let hash=args["source_body_digest"] as? String else{throw OwnerReadFault.invalid}
                 let row=try decode(NotesDirectRow.self,args["row"])
-                guard await confirmation("修改备忘录",scope.folder.label+"\n"+row.title+" → "+title+"\n\n"+text) else{throw AppleDirectFault("user_cancelled")}
                 try port.verify();guard port.notesFolder()==folder else{throw AppleDirectFault("target_changed")}
                 let proposal=NotesDirectEditProposal(id:UUID(uuidString:args["task_id"] as! String)!,scope:scope,row:row,sourceBodyDigest:hash,title:title,plaintext:text,expires:Date().addingTimeInterval(120))
                 request = .update(proposal:proposal,expectedDigest:proposal.digest)
@@ -146,8 +144,7 @@ import AppKit
                 let row=try decode(NotesDirectRow.self,args["row"])
                 let proposal=NotesDirectDeleteProposal(id:UUID(uuidString:args["task_id"] as! String)!,scope:scope,row:row,sourceBodyDigest:hash,expires:Date().addingTimeInterval(120))
                 try proposal.validate()
-                guard await confirmation("删除备忘录",scope.folder.label+"\n"+row.title+"\n仅删除这一条备忘录，可能同步到其他设备。") else{throw AppleDirectFault("user_cancelled")}
-                try port.verify();try Task.checkCancellation();try AppleDirectAuthority.requireUserSession()
+                try port.verify();try Task.checkCancellation();try port.requireUserSession()
                 guard port.notesFolder()==folder else{throw AppleDirectFault("target_changed")}
                 request = .delete(proposal:proposal,expectedDigest:proposal.digest)
             default:throw OwnerReadFault.unsupported

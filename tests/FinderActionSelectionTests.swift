@@ -21,7 +21,7 @@ import Foundation
         try expect(blank.terminalDirectory(isDirectory: { _ in false }) == nil, "file or missing directory rejected")
         try expect(FinderActionSelection(context: .items, selected: [], targeted: directory, roots: roots) == nil, "items do not fallback to parent")
         try expect(FinderActionSelection(context: .container, selected: [directory], targeted: nil, roots: roots) == nil, "blank space needs exact target")
-        for path in ["/fixture-home/project", "/etc", "/fixture-home/../../etc"] {
+        for path in ["/fixture-home-other/project", "/etc", "/fixture-home/../../etc"] {
             try expect(FinderActionSelection(context: .items, selected: [URL(fileURLWithPath: path)], targeted: nil, roots: roots) == nil, "scope component boundary")
         }
         for raw in ["smb://fixture/share", "file://remote/Volumes/share", "https://example.test", "file:///fixture-home/file?query=1", "file:///fixture-home/file#fragment"] {
