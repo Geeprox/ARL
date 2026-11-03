@@ -9,6 +9,13 @@
   "upstream_history_cleanup_required_before_public": false,
   "reviewed_pattern_matches": [
     {
+      "path": ".github/workflows/source-checks.yml",
+      "sha256": "eada355ee38991934a2c255547e94f1bdb9b14dd72e742f011da232e0fa99064",
+      "categories": {
+        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+      }
+    },
+    {
       "path": "OPEN-SOURCE-REVIEW.md",
       "sha256": "f80a8e3042ffe47e5c7540c8415978f07ec1c03f413a5cd913b19583fc036075",
       "categories": {
@@ -17,7 +24,7 @@
     },
     {
       "path": "PUBLIC-SOURCE-MANIFEST.json",
-      "sha256": "e8c388312c7f9bd1495e7bc0dd4995f7113f243f0768eab9951f4a77da464025",
+      "sha256": "0ca5d48744e5d846d6181e1b6a91ecd80fe37e7aede70b08b6023c6d89340fcf",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -424,7 +431,7 @@
     },
     {
       "path": "docs/TESTING-PROFILES.md",
-      "sha256": "a9349edaf57d27a7684360f3143f7a7216061ca1dcc6227d34e8937bfd65cf16",
+      "sha256": "ee5b022b718e529064c86e52919ed2f5d53d4ced0dd84c1f61d5ad0a255b8f92",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -978,7 +985,7 @@
     },
     {
       "path": "script/test_profiles.json",
-      "sha256": "483aab9ec6654fb025c9e56f07893b9df7b8e2b01f7372f6f2156e719572e142",
+      "sha256": "4e939ce38eb1885037b69abe41ee6b5ce1068666fc9811f8c8d531e191cb438d",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }

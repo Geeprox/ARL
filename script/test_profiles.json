@@ -553,6 +553,15 @@
     },
     "tests.test_install_child_drain": {
       "kind": "unittest",
+      "overrides": {
+        "ChildDrainTests.test_real_owned_child_is_observed_until_exit": {
+          "profile": "native",
+          "reason": "Real macOS libproc process identity",
+          "requires": [
+            "macos"
+          ]
+        }
+      },
       "profile": "portable",
       "reason": "Self-contained checked-in source and synthetic temporary fixtures",
       "requires": []
@@ -1281,6 +1290,15 @@
     },
     "tests.test_tisra_capture_process": {
       "kind": "unittest",
+      "overrides": {
+        "ProcessTests": {
+          "profile": "native",
+          "reason": "Real macOS libproc process identity",
+          "requires": [
+            "macos"
+          ]
+        }
+      },
       "profile": "portable",
       "reason": "Self-contained checked-in source and synthetic temporary fixtures",
       "requires": []

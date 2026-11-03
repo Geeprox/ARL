@@ -59,3 +59,5 @@ python3 -B script/check.py --profile portable --output build/check-portable
 `--all --list` 当前记录 211 项前提阻断，涉及外部 Capture/Friday 工程、冻结执行夹具及锁定 NAS 依赖；它是计划检查，不是全量通过。真实 NAS 连接、文档、大文件和写入验收保持独立。普通 NAS 读取可配置共享根目录或任意有效子目录；既有保存范围不由源码同步自动扩展，固定样例创建/清理仍限定其验收目录。
 
 首次 GitHub 复验随后暴露了平台差异：两项依赖 macOS libproc 的进程身份检查应归入 native；另一项适配器不兼容性检查改用从不执行的临时文件，移除对作者已安装 Codex 的依赖。该轮 876 项 portable 收据来自 macOS；重新分类后的 portable 计划为 874 项，原生身份检查仍由 macOS CI 实际执行，不改为 skip。Notes 焦点等待的取消回调先取得独立的强引用再切换 MainActor，修复 CI 工具链报告的弱捕获并发错误；相关 36 项本地回归全部通过。两平台失败时会上传对应的合成测试收据，便于定位真实错误。
+
+Linux 的后续收据确认没有断言失败或错误，但另有 18 项已有 macOS 专属检查被旧分类放入 portable，因意外 skip 按规则阻断。已将真实子进程回收检查和 Capture ProcessTests 归回 native，并让 macOS CI 实际执行；最终 portable 计划为 856 项。这些检查保留原有内核身份断言，不使用测试替身替代。
