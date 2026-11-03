@@ -249,7 +249,7 @@ struct EditorialMenu<Items: View, Label: View>: View {
     var body: some View {
         Menu(content: content) {
             label().modifier(EditorialMenuLabel())
-        }.menuStyle(.borderlessButton).menuIndicator(.hidden).tint(EditorialStyle.graphite)
+        }.menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).tint(EditorialStyle.graphite)
     }
 }
 

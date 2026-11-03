@@ -1630,7 +1630,7 @@
     },
     {
       "path": "PUBLIC-SOURCE-MANIFEST.json",
-      "sha256": "b9b9a6a1213fbdd02fd9a9651bd3bab23e3315560eed54cd8343d1c15fd5612c",
+      "sha256": "4d3d0579d2a1baa37a2ebf45bc7463a9888c03f18ff7e903647c11d74dd69f9e",
       "categories": {
         "private_app_reference": "Intentional source inventory names."
       }

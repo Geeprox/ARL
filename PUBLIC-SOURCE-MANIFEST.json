@@ -694,7 +694,7 @@
     "macOS/ARLControl/Views/CodexExecutionSelector.swift": "4a2ce4d0671dcf49c5cda194338356c307c938ce4970c65235df0e298c13ff18",
     "macOS/ARLControl/Views/CodexPackagesSettingsView.swift": "42d0b3874caf3b231231e88e01761a3ccad480b39d9be90444f6733e68ea80d1",
     "macOS/ARLControl/Views/CodexTaskPanel.swift": "df7f6d0abfdc3e191878e16b0e882ecbb3a2c5bc89980ebdb708a1c9f920ed33",
-    "macOS/ARLControl/Views/Components.swift": "5da93ba1a63921ab153a573622a38616c08df18ffc483e736da2a422169012b4",
+    "macOS/ARLControl/Views/Components.swift": "70ba9d1936e00b15a2d22f5367357869705201320b825f211eda7423944a5c22",
     "macOS/ARLControl/Views/ConsolidatedMessagesView.swift": "121c9481f3b78f1b4385376035f35689cdf1a7de4b7bf858210c0329e71d81c3",
     "macOS/ARLControl/Views/ContentView.swift": "394c38bcb06ade482d9b44e8d9fdd18a815b270b569d4522537718ae096731bc",
     "macOS/ARLControl/Views/CredentialsView.swift": "146b661786c7bc769b573021e022e297e0a05932c22c2fd71f13fcf8dad04869",
