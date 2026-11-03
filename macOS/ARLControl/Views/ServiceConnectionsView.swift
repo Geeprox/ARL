@@ -5,9 +5,6 @@ import ARLCredentialHostCore
 struct ServiceConnectionsView: View {
     let store: RuntimeStore
     let navigate: (ControlSection) -> Void
-    @State private var destination: String
-    @SceneStorage("serviceConnections.destination") private var savedDestination = "日历"
-    @SceneStorage("serviceConnections.category") private var legacyCategory = ""
     let initialDestination: String?
     let nasSetup: ARLNASSetupModel?
     init(store: RuntimeStore, navigate: @escaping (ControlSection) -> Void, initialDestination: String? = nil, nasSetup: ARLNASSetupModel? = nil) {
@@ -15,52 +12,63 @@ struct ServiceConnectionsView: View {
         self.navigate = navigate
         self.initialDestination = initialDestination
         self.nasSetup = nasSetup
-        _destination = State(initialValue: initialDestination ?? "日历")
     }
-    private let destinations = ["日历", "提醒事项", "备忘录", "网络硬盘", "信息", "其他服务"]
     private var bootstrap: CredentialHostBootstrap { store.credentialBootstrap }
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
+        ScrollViewReader {proxy in ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
                 EditorialHeading(title: "服务连接", subtitle: "")
-                ScrollView(.horizontal) {
-                    HStack(spacing: 4) {
-                        ForEach(destinations, id: \.self) { name in
-                            Button { destination = name } label: {
-                                Text(name).font(.system(size: 13, weight: destination == name ? .semibold : .regular))
-                                    .padding(.horizontal, 13).frame(height: 34).contentShape(Rectangle())
-                            }.buttonStyle(ConnectionDestinationStyle(selected: destination == name))
-                                .accessibilityAddTraits(destination == name ? .isSelected : [])
-                        }
-                    }.padding(3)
-                }.scrollIndicators(.hidden).fixedSize(horizontal: false, vertical: true)
-                Divider()
-                connectionDetails.frame(maxWidth: 700, alignment: .leading)
-            }.padding(28).frame(maxWidth: 1100, alignment: .leading).frame(maxWidth: .infinity)
+                    .padding(.bottom,8)
+                connectionCard("日历",icon:"calendar",symbol:"calendar") {
+                    ConnectionIndicator(ready:calendarReady,pending:store.calendarPermission.busy,title:"日历",text:calendarReady ? "已连接":nil)
+                } content: {
+                    if !calendarReady {calendar}
+                }
+                connectionCard("提醒事项",icon:"reminders",symbol:"checklist") {
+                    ConnectionIndicator(ready:store.remindersFirst.value?.fresh == true && store.remindersFirst.value?.permission_state == "authorized_full",pending:store.remindersRestoring,title:"提醒事项")
+                } content: { reminders }
+                connectionCard("备忘录",icon:"notes",symbol:"note.text") {
+                    appleStatus("备忘录",permission:store.notesDirect.permission,observation:store.notesDirect.connection.state)
+                } content: { TaskNotesConnectionView(controller:store.notesDirect) }
+                connectionCard("信息",icon:"messages",symbol:"message") {
+                    appleStatus("信息",permission:store.messagesDirect.permission,observation:store.messagesDirect.connection.state)
+                } content: { messages }
+                DetailCard(title:"") {
+                    HStack(spacing:12) {
+                        Image(systemName:"externaldrive.connected.to.line.below").font(.title2).frame(width:32,height:32).foregroundStyle(.secondary)
+                        Text("网络硬盘").font(.headline);Spacer()
+                        ConnectionIndicator(ready:(nasSetup ?? store.nasSettings).snapshot.connected == .verified,pending:(nasSetup ?? store.nasSettings).isPerforming,title:"网络硬盘")
+                    }
+                    TaskNASConnectionView(model:nasSetup ?? store.nasSettings,preview:store.demo)
+                }.id("网络硬盘")
+                DisclosureGroup("其他服务") { otherServices.padding(.top,12) }.padding(.horizontal,4)
+            }.padding(24).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
                 .buttonStyle(EditorialActionButtonStyle()).textFieldStyle(EditorialFieldStyle())
                 .groupBoxStyle(EditorialGroupBoxStyle()).tint(EditorialStyle.accent)
         }
-        .onAppear {
-            if initialDestination == nil, destinations.contains(savedDestination) { destination = savedDestination }
-            if legacyCategory == "硬盘" { destination = "网络硬盘"; legacyCategory = "" }
-            if !destinations.contains(destination) { destination = "日历" }
+        .onAppear {if let initialDestination {proxy.scrollTo(initialDestination,anchor:.top)}}
         }
-        .onChange(of: destination) { savedDestination = destination }
     }
-    @ViewBuilder private var connectionDetails: some View {
-        switch destination {
-        case "网络硬盘": TaskNASConnectionView(model: nasSetup ?? store.nasSettings, preview: store.demo)
-        case "备忘录": TaskNotesConnectionView(controller: store.notesDirect)
-        case "提醒事项": reminders
-        case "信息": messages
-        case "其他服务": otherServices
-        default: calendar
-        }
+    private var calendarReady:Bool {store.calendarPermission.state == .fullAccess && !store.calendarPermission.lastProbeFailed}
+    private func connectionCard<Status:View,Content:View>(_ title:String,icon:String,symbol:String,@ViewBuilder status:@escaping ()->Status,@ViewBuilder content:@escaping ()->Content)->some View {
+        DetailCard(title:"") {
+            HStack(spacing:12) {
+                AppIcon(id:icon,symbol:symbol,size:32)
+                Text(title).font(.headline);Spacer();status()
+            }
+            content()
+        }.id(title)
+    }
+    private func appleStatus(_ title:String,permission:AppleDirectPermission,observation:AppleConnectionState<AppleDirectPermission>)->some View {
+        let inactive=observation.lastFailure?.issue == .targetNotRunning
+        let ready=permission == .authorized && observation.lastFailure == nil && !observation.restored
+        return ConnectionIndicator(ready:ready,pending:observation.refreshing,title:title,inactive:inactive,
+            text:inactive ? "未运行":permission == .denied ? "待授权":nil)
     }
     private var calendar: some View {
         let permission = store.calendarPermission
         return VStack(alignment: .leading, spacing: 20) {
-            Text(calendarTitle).font(.system(size: 17, weight: .semibold))
+            if permission.state != .fullAccess { Text(calendarTitle).font(.callout.weight(.medium)) }
             Group {
                 if permission.busy { ProgressView("等待系统授权").controlSize(.small) }
                 else if permission.lastProbeFailed {
@@ -76,15 +84,6 @@ struct ServiceConnectionsView: View {
                 }
                 if let message = permission.message { Text(message).font(.caption).foregroundStyle(.secondary) }
             }
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if permission.lastProbeFailed { Text("权限更新失败") }
-                    if let at = permission.observedAt { Text(at, format: .dateTime.month().day().hour().minute()) }
-                    Button("刷新权限") { permission.refresh() }.disabled(!permission.canAct)
-                    if let diagnostic = permission.requestDiagnostic { Text(diagnostic).textSelection(.enabled) }
-
-                }.font(.caption).foregroundStyle(.secondary).padding(.top, 10)
-            }.font(.caption)
         }
     }
     private var calendarTitle: String {
@@ -104,7 +103,7 @@ struct ServiceConnectionsView: View {
         let value = store.remindersFirst.value
         let authorized = value?.fresh == true && value?.permission_state == "authorized_full"
         return VStack(alignment: .leading, spacing: 20) {
-            Text(authorized ? "已授权" : "提醒事项访问").font(.system(size: 17, weight: .semibold))
+            if !authorized {Text("提醒事项访问").font(.callout.weight(.medium))}
             Group {
                 if store.remindersRestoring || store.permissionBusy { ProgressView("正在处理").controlSize(.small) }
                 else if !authorized, value?.fresh == true && value?.permission_state == "not_determined" {
@@ -159,30 +158,20 @@ struct ServiceConnectionsView: View {
 
 }
 
-private struct ConnectionDestinationStyle: ButtonStyle {
-    let selected: Bool
-    @Environment(\.isFocused) private var focused
-    @State private var hovered = false
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.foregroundStyle(EditorialStyle.graphite)
-            .background(selected ? EditorialStyle.panel : hovered || configuration.isPressed ? Color.primary.opacity(0.035) : .clear, in: RoundedRectangle(cornerRadius: 7))
-            .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2).allowsHitTesting(false) }
-            .onHover { hovered = $0 }
-    }
-}
-
 private struct TaskNotesConnectionView: View {
     let controller: NotesDirectController
     @State private var appearance:UUID?
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 14) {
+            if controller.permission != .authorized || controller.connection.state.lastFailure != nil || controller.busy {
             AppleConnectionActionsView(target: .notes, permission: controller.permission, enabled: controller.enabled,
                 busy: controller.busy, observation: controller.connection.state,
                 check: { Task { await controller.prepareForDisplay() } }, request: request)
+            }
             if controller.permission == .authorized {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("默认文件夹").font(.callout.weight(.medium))
-                    if !controller.folders.isEmpty {
+                    Text("默认写入文件夹").font(.callout.weight(.medium))
+                    if !controller.folders.isEmpty || controller.scope != nil {
                         EditorialMenu {
                             ForEach(controller.folders) { folder in
                                 Button(folder.label) {
@@ -191,20 +180,30 @@ private struct TaskNotesConnectionView: View {
                             }
                         } label: { Text(controller.scope?.folder.label ?? "选择文件夹") }
                             .frame(maxWidth: 360, alignment: .leading)
-                            .disabled(controller.busy)
+                            .disabled(controller.busy || controller.folders.isEmpty)
                     } else {
                         if let folder = controller.scope?.folder { Text(folder.label).font(.callout).foregroundStyle(.secondary) }
                     }
-                    Button(controller.folders.isEmpty ? "选择文件夹" : "刷新文件夹") {
+                    if controller.folders.isEmpty && controller.scope == nil { Button("选择默认写入文件夹") {
                         controller.performUserActionAfterClick { ticket in await controller.loadFolders(ticket: ticket) }
-                    }.disabled(controller.busy)
+                    }.disabled(controller.busy) }
+                    Text("读取和搜索覆盖所有已授权文件夹。").font(.caption).foregroundStyle(.secondary)
                     if let message=controller.message {Text(message).font(.callout).foregroundStyle(.secondary)}
                     if let detail = controller.detail {
                         DisclosureGroup("连接详情") {Text(detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)}
                     }
                 }
             }
-        }.task { appearance=controller.appear(); await controller.prepareForDisplay() }
+        }.task {
+            appearance=controller.appear()
+            while !Task.isCancelled {
+                await controller.prepareForDisplay()
+                do{try await Task.sleep(for:.seconds(5))}catch{return}
+            }
+        }
+            .onReceive(NotificationCenter.default.publisher(for:NSApplication.didBecomeActiveNotification)) {_ in
+                Task{await controller.prepareForDisplay()}
+            }
             .onDisappear { if let appearance {controller.disappear(appearance:appearance)};appearance=nil }
     }
     private func request() {

@@ -63,8 +63,8 @@ class FormalResearchHostTests(unittest.TestCase):
             self.assertEqual(set(runtime.research_engines), {NAME})
             self.assertEqual(len(runtime.priority_producer.domains), 1)
             self.assertEqual(runtime.priority_producer.domains[0].codec, 'codex.appserver.sourced.v2')
-            self.assertEqual(runtime.policies['mio'].tools, frozenset())
-            self.assertEqual(runtime.policies['friday'].tools, frozenset())
+            self.assertNotIn('mio',runtime.policies)
+            self.assertNotIn('friday',runtime.policies)
             self.assertEqual(runtime.policies['tisra'].tools, frozenset({NAME}))
 
     def test_review_revision_fences_native_and_publication(self):

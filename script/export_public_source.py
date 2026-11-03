@@ -53,9 +53,17 @@ def selected(name):
  if p.suffix in {'.json','.md'} and HISTORICAL.search(p.name) and name not in PUBLIC_SOURCE_RECORDS|{'OPEN-SOURCE-REVIEW.md'}:return False
  return p.suffix in SOURCE or p.name in {'.gitignore','LICENSE','LICENSE.proposed','NOTICE','build.sh','Build.command'} or name.startswith('macOS/ARLControl/Resources/AppIcon/') and p.suffix in {'.png','.icns'}
 
-def export(output):
+def scoped_output(output):
+ output=Path(output).absolute()
+ if any(p.is_symlink() for p in (output,*output.parents)):raise ValueError('export_output_symlink')
  output=output.resolve()
- if (ROOT/'build').resolve() not in output.parents or output.exists():raise ValueError('new_build_output_required')
+ project=ROOT.resolve()
+ cache=Path.home()/'Library/Caches/CodexBuilds.noindex'/(project.name+'-'+hashlib.sha256(str(project).encode()).hexdigest()[:12])
+ if not ((ROOT/'build').resolve() in output.parents or cache in output.parents) or output.exists():raise ValueError('new_build_output_required')
+ return output
+
+def export(output):
+ output=scoped_output(output)
  names=sorted(set(n for n in subprocess.check_output(['git','ls-files','-z','--cached','--others','--exclude-standard'],cwd=ROOT).decode().split('\0') if n))
  output.mkdir(parents=True)
  omitted=[];inventory={};pending=[]

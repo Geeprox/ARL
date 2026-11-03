@@ -29,14 +29,14 @@ struct LogsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
-                EditorialHeading(title: "运行记录", subtitle: "运行记录")
+                EditorialHeading(title: "运行记录", subtitle: "")
                 Spacer()
                 if let label = store.previewLabel { StatusBadge(title: label) }
                 Menu {
                     Button("导出结果") {
                         do { let export = try ControlLogExport.filtered(filtered); exportData = export.content; exporting = true; exportNotice = "已载入的筛选结果 · \(export.count) 条" } catch { exportError = true }
                     }.help("只导出已载入的筛选结果").disabled(filtered.isEmpty)
-                    Button("导出近况") { exportRecent() }.help("导出最近15分钟的运行记录")
+                    Button("导出近况") { exportRecent() }.help("导出最近24小时的运行记录")
                 } label: { Label("导出", systemImage: "square.and.arrow.up") }.disabled(feature.value == nil || preparing)
                 if preparing { ProgressView().controlSize(.small) }
             }
@@ -131,7 +131,7 @@ struct LogsView: View {
     private func exportRecent() {
         preparing = true
         Task {
-            do { let export = try await store.service.exportLogs(); exportData = export.content; exportNotice = ("最近 15 分钟 · \(export.count) 条\(export.more || export.truncated ? " · 部分记录" : "")"); exporting = true }
+            do { let export = try await store.service.exportLogs(); exportData = export.content; exportNotice = ("最近 24 小时 · \(export.count) 条\(export.more || export.truncated ? " · 部分记录" : "")"); exporting = true }
             catch { exportError = true }
             preparing = false
         }

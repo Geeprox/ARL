@@ -7,6 +7,7 @@ struct NASServerSetupSnapshot {
     var port = 445
     var timeoutSeconds = 8
     var saved = false
+    var account: String?
     var state = NASServerState()
     var directory: NASDirectoryPage?
     var share: String?
@@ -39,10 +40,13 @@ enum NASServerSetupAction: Equatable {
 }
 
 @MainActor protocol NASServerSetupOwner: AnyObject {
+    func maintainServerConnection() async
     func serverSetupSnapshot() -> NASServerSetupSnapshot
     func beginServerAction(_ action:NASServerSetupAction) -> NASServerSetupIntent?
     func performServerAction(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?) async
 }
+
+extension NASServerSetupOwner { func maintainServerConnection() async {} }
 
 @MainActor protocol NASArchivePickerOwner: NASServerSetupOwner {
     func archiveDestination() async throws -> NASArchiveDestination
@@ -54,6 +58,7 @@ enum NASServerSetupAction: Equatable {
     @Published var snapshot: NASServerSetupSnapshot
     init(owner:any NASServerSetupOwner) {self.owner=owner;snapshot=owner.serverSetupSnapshot()}
     func refresh(){snapshot=owner.serverSetupSnapshot()}
+    func maintain() async {await owner.maintainServerConnection();refresh()}
     func begin(_ action:NASServerSetupAction) -> NASServerSetupIntent? {
         let intent=owner.beginServerAction(action);refresh();return intent
     }
@@ -69,6 +74,7 @@ enum NASServerSetupAction: Equatable {
     @State private var username=""
     @State private var password=""
     @State private var wholeShare=false
+    @State private var editingLogin=false
     @State private var task:Task<Void,Never>?
     @State private var taskIsPreview=false
     init(owner:any NASServerSetupOwner,setup:ARLNASSetupModel) {
@@ -86,29 +92,38 @@ enum NASServerSetupAction: Equatable {
 
         }.disabled(model.snapshot.busy)
         Section("账号登录") {
-            TextField("账号",text:$username)
-            SecureField("密码",text:$password)
+            if !model.snapshot.saved || !sameEndpoint || editingLogin {
+                TextField("账号",text:$username)
+                SecureField("密码",text:$password)
+            } else {
+                HStack {
+                    Label(model.snapshot.account ?? "账号已保存",systemImage:"person.crop.circle")
+                    Text("••••••••").foregroundStyle(.secondary).accessibilityLabel("密码已保存")
+                    Spacer()
+                    Button("更换登录",systemImage:"pencil") {username=model.snapshot.account ?? "";editingLogin=true}
+                }
+            }
 
             HStack {
-                Button("保存登录") {
+                if !model.snapshot.saved || !sameEndpoint || editingLogin { Button("保存并连接") {
                     guard let intent=model.begin(.save(address:setup.draft.address,port:setup.draft.port,timeout:setup.draft.connectionTimeoutSeconds)) else{return}
                     let input=ARLNASCredentialInput(username:username,password:password)
                     username="";password="";taskIsPreview=false
-                    task=Task{await model.run(intent,input:input);setup.refreshCachedStatus()}
-                }.disabled(model.snapshot.busy || username.isEmpty || password.isEmpty || (try? NASAddressInput(setup.draft.address,port:setup.draft.port)) == nil)
-                Button("验证登录") {launch(.login)}
-                    .disabled(model.snapshot.busy || !model.snapshot.saved || !sameEndpoint)
-                Button("断开连接") {task?.cancel();launch(.stop)}
-                    .disabled(!model.snapshot.busy && !model.snapshot.state.authenticated && setup.snapshot.connected != .verified)
+                    task=Task{await model.run(intent,input:input);await model.maintain();setup.refreshCachedStatus();editingLogin=false}
+                }.disabled(model.snapshot.busy || username.isEmpty || password.isEmpty || (try? NASAddressInput(setup.draft.address,port:setup.draft.port)) == nil) }
+                if model.snapshot.fault != nil { Button("重新连接") {launch(.login)}
+                    .disabled(model.snapshot.busy || !model.snapshot.saved || !sameEndpoint) }
+                if model.snapshot.state.authenticated || setup.snapshot.connected == .verified { Button("断开连接") {task?.cancel();launch(.stop)}
+                    .disabled(!model.snapshot.busy && !model.snapshot.state.authenticated && setup.snapshot.connected != .verified) }
             }
-            Text(model.snapshot.state.authenticated ? "服务器已验证" : model.snapshot.saved && sameEndpoint ? "登录已保存，尚未验证" : "尚未保存登录").foregroundStyle(.secondary)
-            if model.snapshot.saved && sameEndpoint && model.snapshot.authorizedScope == nil {
+            Text(setup.snapshot.connected == .verified ? "已连接" : model.snapshot.state.authenticated ? "服务器已连接" : model.snapshot.saved && sameEndpoint ? "正在自动连接…" : "尚未保存登录").foregroundStyle(.secondary)
+            if model.snapshot.state.authenticated && model.snapshot.authorizedScope == nil {
                 Text(model.snapshot.state.authenticated ? "请选择共享和目录。" : "验证已保存的登录后，选择共享和目录。").foregroundStyle(.secondary)
             }
             if let fault=model.snapshot.fault {Text(recovery(fault)).foregroundStyle(.secondary)}
+            if model.snapshot.saved && setup.snapshot.connected == .verified { Button("更换读取目录") {launch(.login)} }
         }
-        Section("选择共享") {
-            Button("查看共享") {launch(.shares(cursor:nil))}.disabled(!canBrowse)
+        if model.snapshot.state.authenticated && (model.snapshot.authorizedScope == nil || !model.snapshot.state.shares.isEmpty) { Section("选择共享") {
 
             ForEach(model.snapshot.state.shares) {share in
                 Button(share.name) {wholeShare=false;launch(.directory(share:share.name,path:"",cursor:nil))}
@@ -117,6 +132,7 @@ enum NASServerSetupAction: Equatable {
             if let cursor=model.snapshot.state.nextCursor {
                 Button("下一页") {launch(.shares(cursor:cursor))}.disabled(!canBrowse)
             }
+        }
         }
         if let page=model.snapshot.directory,let share=model.snapshot.share {
             Section("选择目录") {
@@ -138,13 +154,13 @@ enum NASServerSetupAction: Equatable {
             Section("已授权") {
                 Text(scope).textSelection(.enabled)
 
-                Button("连接目录") {
+                if setup.snapshot.connected != .verified { Button("重试目录连接") {
                     setup.refreshCachedStatus()
                     if let configuration=setup.snapshot.configuration {setup.draft=ARLNASConfigurationDraft(configuration:configuration)}
                     guard let intent=setup.beginManualActionAfterClick(.testConnection) else{return}
                     taskIsPreview=false
                     task=Task{await setup.performAfterClick(intent);model.refresh()}
-                }.disabled(model.snapshot.busy || setup.isPerforming)
+                }.disabled(model.snapshot.busy || setup.isPerforming) }
                 Text(setup.snapshot.connected == .verified ? "目录已连接" : "目录尚未连接").foregroundStyle(.secondary)
             }
         }
@@ -160,7 +176,7 @@ enum NASServerSetupAction: Equatable {
         .onAppear {
             if !model.snapshot.address.isEmpty {setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds}
         }
-        .task {while !Task.isCancelled {model.refresh();try? await Task.sleep(for:.seconds(2))}}
+        .task {while !Task.isCancelled {await model.maintain();do{try await Task.sleep(for:.seconds(5))}catch{return}}}
         .onChange(of:setup.draft.address) {_ in username="";password="";wholeShare=false}
         .onChange(of:setup.draft.port) {_ in username="";password="";wholeShare=false}
         .onDisappear {username="";password="";if taskIsPreview {task?.cancel()}}

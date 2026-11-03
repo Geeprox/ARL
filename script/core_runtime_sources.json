@@ -6,6 +6,8 @@
     "arl/app_connections.py",
     "arl/apple.py",
     "arl/application_models.py",
+    "arl/application_platform.py",
+    "arl/application_session.py",
     "arl/attachment_inspection.py",
     "arl/calendar_review.py",
     "arl/calendar_write.py",

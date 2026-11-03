@@ -17,6 +17,7 @@ import Observation
     private(set) var searchResult: NotesDirectSearch?
     private(set) var readResult: NotesDirectRead?
     private(set) var lastOperationID: String?
+    private var lastFolderRead: TimeInterval?
     private var operationBusy = false
     private(set) var focusing = false
     var busy: Bool { operationBusy || focusing }
@@ -179,7 +180,7 @@ import Observation
     func prepareForDisplay() async {
         guard focusIntentID == nil else { return }
         await connection.refresh()
-        guard focusIntentID == nil, permission == .authorized, scope == nil, folders.isEmpty,
+        guard focusIntentID == nil, permission == .authorized, !busy, (lastFolderRead == nil || ProcessInfo.processInfo.systemUptime - lastFolderRead! > 30),
               !NSRunningApplication.runningApplications(withBundleIdentifier: AppleDirectTarget.notes.identifier).isEmpty,
               let ticket = ticket() else { return }
         // Visible-page metadata only. A race with app termination must not launch it.
@@ -214,8 +215,8 @@ import Observation
             guard epoch == generation else { return }
             guard case let .folders(values) = reply.result else { throw AppleDirectFault("invalid_response") }
             businessLogAvailable = reply.businessLogAvailable
-            folders = values
-            message = values.isEmpty ? "没有可用目录，请到备忘录查看。" : "请选择目录，尚未读取笔记。"
+            folders = values;lastFolderRead=ProcessInfo.processInfo.systemUptime
+            message = values.isEmpty ? "没有可写入的文件夹。" : nil
         } catch { failure(error) }
     }
     func select(_ folder: NotesDirectFolder, ticket: NotesDirectActionTicket) async {
@@ -236,37 +237,39 @@ import Observation
     }
     func search(query: String, offset: Int = 0, ticket: NotesDirectActionTicket) async {
         do {
-            let value = try actionScope(ticket)
-            try value.validate(); if !query.isEmpty { try NotesDirectContract.text(query, maximum: 1024) }
+            try page.validate(ticket,currentFolder:scope?.folder)
+            let expires=Date().addingTimeInterval(600)
+            if !query.isEmpty { try NotesDirectContract.text(query, maximum: 1024) }
             let (stop, epoch) = try begin(ticket); defer { end() }
             try await prepareTarget(stop)
             searchResult = nil; readResult = nil
             let journalHome = home
             let reply = try await executor.run {
-                let session = try AppleDirectSession(target: .notes, stop: stop, expires: value.expires)
-                return try NotesDirectHandler(home: journalHome, backend: NotesDirectBackend(session: session), selectedFolder: value.folder)
-                    .handle(.page(scope: value, query: query, offset: offset, limit: 50))
+                let session = try AppleDirectSession(target: .notes, stop: stop, expires: expires)
+                return try NotesDirectHandler(home: journalHome, backend: NotesDirectBackend(session: session))
+                    .handle(.allPage(query: query, offset: offset, limit: 50))
             }
             guard epoch == generation else { return }
             guard case let .search(result) = reply.result else { throw AppleDirectFault("invalid_response") }
             businessLogAvailable = reply.businessLogAvailable
             searchQuery = query
             searchResult = result
-            message = "已检查 \(result.scanned) / \(result.total) 条，找到 \(result.notes.count) 条；只搜索标题，跳过共享或加密笔记。" +
+            message = "已检查 \(result.scanned) / \(result.total) 条，找到 \(result.notes.count) 条；搜索所有已授权笔记的标题与正文，跳过加密笔记。" +
                 (result.next_offset != nil ? "可继续下一页。" : "")
         } catch { failure(error) }
     }
     func read(_ row: NotesDirectRow, offset: Int = 0, ticket: NotesDirectActionTicket) async {
         do {
             guard searchResult?.notes.contains(row) == true else { throw AppleDirectFault("target_changed") }
-            let value = try actionScope(ticket)
+            try page.validate(ticket,currentFolder:scope?.folder)
+            let expires=Date().addingTimeInterval(600)
             let (stop, epoch) = try begin(ticket); defer { end() }
             try await prepareTarget(stop)
             readResult = nil
             let journalHome = home
             let reply = try await executor.run {
-                let session = try AppleDirectSession(target: .notes, stop: stop, expires: value.expires)
-                return try NotesDirectHandler(home: journalHome, backend: NotesDirectBackend(session: session), selectedFolder: value.folder).handle(.readPage(scope: value, row: row, offset: offset, maxBytes: 65536))
+                let session = try AppleDirectSession(target: .notes, stop: stop, expires: expires)
+                return try NotesDirectHandler(home: journalHome, backend: NotesDirectBackend(session: session)).handle(.allRead(row: row, offset: offset, maxBytes: 65536))
             }
             guard epoch == generation else { return }
             guard case let .read(result) = reply.result else { throw AppleDirectFault("invalid_response") }

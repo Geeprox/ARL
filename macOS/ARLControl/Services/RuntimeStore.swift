@@ -14,6 +14,7 @@ final class RuntimeStore {
     private(set) var lastUpdated: Date?
     private(set) var control = ControlPlaneState.unavailable
     private(set) var controlError: String?
+    private(set) var scheduler: ModelSchedulerStatus?
     private(set) var modules: MetadataFeature<ModulesSnapshot> = .unsupported
     private(set) var mioCalendarPermission: MetadataFeature<MioCalendarPermissionStatus> = .unsupported
     private(set) var permissions: MetadataFeature<ApplePermissionSnapshot> = .unsupported
@@ -66,6 +67,7 @@ final class RuntimeStore {
     let codex: CodexNativeController
     let credentialBootstrap: CredentialHostBootstrap
     @ObservationIgnored private var bundledRuntimeOwner: BundledRuntimeOwner?
+    @ObservationIgnored private var nasMaintenance: Task<Void,Never>?
     @ObservationIgnored private var messagesReceiveRelay: MessagesReceiveRelayServer?
     @ObservationIgnored private var messagesReceiveRelayStopping=false
     @ObservationIgnored private var credentialReadOwner: CredentialReadOwnerServer?
@@ -146,6 +148,23 @@ final class RuntimeStore {
         if !demo && !isolated && !requiresIsolatedHome { Self.active = self }
         moments.attachNAS(nasSettings.archivePickerOwner)
         restoreRemindersConnection()
+        startNASMaintenance()
+    }
+    private func startNASMaintenance() {
+        guard nasMaintenance == nil,!demo,!isolated,!requiresIsolatedHome,!nativeActionsHeld else{return}
+        nasMaintenance=Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.maintainNASConnection()
+                do{try await Task.sleep(for:.seconds(5))}catch{return}
+            }
+        }
+    }
+    private func maintainNASConnection() async {
+        guard !Task.isCancelled,!exitRequested,exitOperation == nil,lifecycleOperation == nil,
+              !nativeActionsHeld,let owner=nasSettings.serverSetupOwner else{return}
+        await owner.maintainServerConnection()
+        guard !Task.isCancelled,!exitRequested else{return}
+        nasSettings.refreshCachedStatus()
     }
     func stopBackground() async -> Bool {
         guard exitOperation == nil else { return false }
@@ -157,6 +176,7 @@ final class RuntimeStore {
                 exitOperation = nil
                 if !completed {
                     exitRequested = false; bundledRuntimeOwner?.cancelExit(); moments.cancelExit()
+                    startNASMaintenance()
                     nasFileExecutor?.resumeAfterCancelledExit()
                     observeCredentialOwner()
                     notesDirect.resumeAfterCancelledExit(); messagesDirect.resumeAfterCancelledExit(); calendarPermission.resumeAfterCancelledExit(); calendarBusiness?.resumeAfterCancelledExit(); codex.resumeAfterCancelledExit()
@@ -165,6 +185,7 @@ final class RuntimeStore {
             }
         }
         exitRequested = true; bundledRuntimeOwner?.requestExit()
+        nasMaintenance?.cancel();nasMaintenance=nil
         messagesDirect.receiver.setAgentTransportState(available:false,code:"receive_stopping")
         if let relay=messagesReceiveRelay {
             messagesReceiveRelayStopping=true
@@ -329,6 +350,7 @@ final class RuntimeStore {
                 }
             }
             modules = await service.readModules()
+            scheduler = await service.readScheduler()
         }
         catch {
             let code = (error as? ARLError)?.code ?? "invalid_response"
@@ -731,7 +753,7 @@ final class RuntimeStore {
             } while more && rows.count < 500
             guard !Task.isCancelled, generation == legacyLogGeneration else { return }
             let page = RedactedLogPage(entries: rows, hasMore: more, nextCursor: cursor,
-                truncated: truncated || more, sourceDescription: "当前进程 · 最近 15 分钟 · 服务端脱敏")
+                truncated: truncated || more, sourceDescription: "重启保留 · 最近 24 小时 · 服务端脱敏")
             lastSuccessfulLogPage = page; lastLogSuccess = Date()
             control.logs = .available(page); logReadError = nil
         } catch {

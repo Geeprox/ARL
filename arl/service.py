@@ -12,6 +12,7 @@ from .capabilities import AppleAdapter, build_tools
 from .contracts import AppPolicy, Cancelled, Fault, encode, object_schema, string, validate
 from .control import ControlPlane
 from .app_connections import AppConnections, METHODS as CONNECTION_METHODS
+from .application_platform import TASK_METHODS
 from .application_models import ApplicationModels, METHODS as APPLICATION_METHODS
 from .messages_receive import MessagesReceive, METHODS as MESSAGES_RECEIVE_METHODS
 from .diagnostics import CODES, log_schema, log_v3_schema
@@ -33,7 +34,7 @@ MAX_FRAME = 16384
 METHODS = {
     "runtime.describe": object_schema(), "health": object_schema(), "ready": object_schema(), "capabilities": object_schema(),
     "providers": object_schema(), "overview": object_schema(), "codex.service.status.v1": object_schema(),
-    "settings.modules_snapshot": object_schema(), "settings.snapshot": object_schema(),
+    "settings.modules_snapshot": object_schema(), "settings.scheduler.v1": object_schema(), "settings.snapshot": object_schema(),
     "settings.app_icon.v1": object_schema({"app_id":string(64), "sha256":string(64)}, ["app_id","sha256"]), "settings.logs": log_schema(),
     "settings.logs_export": log_schema(export=True), "settings.logs.v3": log_v3_schema(), "heartbeat": object_schema(),
     "submit": object_schema({"tool": string(100), "args": {"type": "object", "properties": {}},
@@ -46,7 +47,7 @@ METHODS = {
     "poll_wakes": object_schema(), "stop": object_schema(),
 }
 METHODS.update(SERVICE_PORTAL_METHODS)
-METHODS.update({m:object_schema() for m in CONNECTION_METHODS | APPLICATION_METHODS | MESSAGES_RECEIVE_METHODS})
+METHODS.update({m:object_schema() for m in CONNECTION_METHODS | APPLICATION_METHODS | MESSAGES_RECEIVE_METHODS | TASK_METHODS})
 
 
 
@@ -87,6 +88,9 @@ class JobContext:
 class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = False
     block_on_close = True
+    # The socket backlog must absorb simultaneous SDK startup bursts. Handler
+    # admission remains bounded independently to 32 active requests.
+    request_queue_size = 64
 
     def __init__(self, *args, **kwargs):
         self.admission = threading.BoundedSemaphore(32)
@@ -118,7 +122,7 @@ class Handler(socketserver.StreamRequestHandler):
         # as discovery; this does not add methods to any default policy.
         application_methods = APPLICATION_METHODS | frozenset(
             getattr(runtime, 'application_execution_methods', ()))
-        session_methods = application_methods | MESSAGES_RECEIVE_METHODS
+        session_methods = application_methods | MESSAGES_RECEIVE_METHODS | TASK_METHODS
         try:
             if peer_uid(self.request) != os.geteuid():
                 raise Fault("peer_not_authorized")
@@ -154,6 +158,9 @@ class Handler(socketserver.StreamRequestHandler):
                 binder = getattr(runtime.identity_verifier, 'session_binding', None)
                 if binder is None: raise Fault('app_identity_unverified')
                 binding = binder(self.request, verified)
+            platform = getattr(runtime, 'application_platform', None)
+            if verified is None and platform is not None and type(request) is dict:
+                verified, binding = platform.prepare(self.request, request)
             result = runtime.dispatch(request, verified_app=verified, peer_binding=binding)
             response = {"protocol": PROTOCOL, "ok": True, "result": result}
         except Fault as exc:
@@ -294,7 +301,7 @@ class Runtime:
         # Explicit public metadata exception, never an identity grant. Even a host
         # policy cannot use this flag to exempt arbitrary tools or task methods.
         public_read = (owner == "settings" and policy.public_metadata and
-                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot", "codex.service.status.v1", "settings.app_icon.v1", *SERVICE_PORTAL_METHODS} and verified_app is None)
+                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", *SERVICE_PORTAL_METHODS} and verified_app is None)
         if self.identity_verifier is not None and verified_app != owner and not public_read:
             raise Fault("app_identity_unverified")
         priority_allowed=(method in {'priority.negotiate.v1','priority.negotiate.v2'} or method=='priority.submit.v1' and 'submit' in policy.methods)
@@ -302,6 +309,11 @@ class Runtime:
         describe_allowed = method == 'runtime.describe' and 'health' in policy.methods
         if method not in policy.methods and not connection_allowed and not describe_allowed and not (self.priority_authority is not None and priority_allowed):
             raise Fault("method_not_authorized")
+        if method in TASK_METHODS:
+            platform = getattr(self, 'application_platform', None)
+            if platform is None or verified_app != owner or peer_binding is None:
+                raise Fault('app_identity_unverified')
+            return platform.dispatch(request, peer_binding)
         if method in CONNECTION_METHODS:
             if verified_app != owner or self.identity_verifier is None:
                 raise Fault('app_identity_unverified')
@@ -367,6 +379,10 @@ class Runtime:
             if owner != 'settings':
                 raise Fault('method_not_authorized')
             return self.service_portal.dispatch(method, params)
+        if method == 'settings.scheduler.v1':
+            platform=getattr(self,'application_platform',None)
+            if platform is None or self.store is None:raise Fault('scheduler_unavailable')
+            return platform.snapshot()
         if method == 'settings.modules_snapshot':
             return self.modules.snapshot()
         if method == 'settings.snapshot':
@@ -381,7 +397,7 @@ class Runtime:
             return self.control.diagnostics.query_v3(params)
         if method == "runtime.describe":
             return self.description.snapshot(self.ready.is_set() and not self.stopping.is_set(),
-                application_models=self.application_models is not None)
+                application_models=self.application_models is not None, application_platform=getattr(self,"application_platform",None) is not None)
         if method == "health":
             return {"live": not self.stopping.is_set(), "ready": self.ready.is_set(),
                     "version": VERSION, "pid": os.getpid(), "ui_required": False}
@@ -496,7 +512,14 @@ class Runtime:
 
     def work(self):
         while not self.stopping.is_set():
-            row = self.store.claim(scope=self.work_scope) if self.work_scope is not None else self.store.claim()
+            platform = getattr(self, 'application_platform', None)
+            if platform is not None and self.codex_service is not None:
+                if time.monotonic()-platform.last_settings >= 5: platform.refresh_settings()
+                with self.store.lock:
+                    active = self.store.db.execute("SELECT COUNT(*) FROM jobs WHERE state='running' AND tool=?", (self.codex_service.name,)).fetchone()[0]
+                    row = self.store.claim(scope=self.work_scope) if active < platform.concurrency else None
+            else:
+                row = self.store.claim(scope=self.work_scope) if self.work_scope is not None else self.store.claim()
             if not row:
                 self.job_signal.wait(0.1)
                 self.job_signal.clear()
@@ -537,6 +560,7 @@ class Runtime:
                         effect_observed_at=effect_observed_at)
                     if self.codex_service is not None and row["tool"] == self.codex_service.name:
                         self.codex_service.note_publication(self.store.get(row["owner"], row["id"]))
+                        self.control.diagnostics.emit("model_task_succeeded",app=row["owner"])
                     continue
                 if tool.idempotent:
                     context.check_cancelled()
@@ -556,6 +580,7 @@ class Runtime:
             except Fault as exc:
                 if self.codex_service is not None and row["tool"] == self.codex_service.name:
                     self.codex_service.finish_failure(self.store, row, exc.code)
+                    self.control.diagnostics.emit("model_task_failed",app=row["owner"],level="error")
                     continue
                 if research_engine is not None:
                     research_engine.complete(row, error=exc.code)
@@ -621,7 +646,7 @@ class Runtime:
                         if hasattr(engine, 'recover'): engine.recover()
                     if self.capture is not None:
                         self.capture.recover()
-                    count=self.priority_authority.worker_count if self.priority_authority is not None else 1
+                    count=self.priority_authority.worker_count if self.priority_authority is not None else 8 if getattr(self,"application_platform",None) is not None else 1
                     self.workers=[threading.Thread(target=self.work,daemon=True) for _ in range(count)]
                     self.worker=self.workers[0]
                     for worker in self.workers:worker.start()

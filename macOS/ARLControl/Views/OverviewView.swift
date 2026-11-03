@@ -29,8 +29,10 @@ struct OverviewView: View {
                 TimelineView(.periodic(from: .now, by: 5)) { timeline in
                     fact("Mio 本机连接", value: Self.mioTitle(store.modules.value?.mioStatus(at: timeline.date)), symbol: "link")
                 }
-                Divider()
-                fact("Agent 执行", value: store.control.runtime.value.map { $0.task_execution_enabled ? "已启用" : "已停用" } ?? "未检查", symbol: "terminal")
+                if let queue=store.scheduler {
+                    Divider()
+                    fact("模型任务",value:queue.running > 0 ? "\(queue.running) 项执行中 · \(queue.queued) 项排队":"空闲",symbol:"cpu")
+                }
             }
             TimelineView(.periodic(from: .now, by: 5)) { timeline in
                 VStack(alignment: .leading, spacing: 14) {
@@ -43,7 +45,7 @@ struct OverviewView: View {
                                 AppIcon(id: app.id, symbol: app.symbol, registeredIcon: app.applicationIcon, iconHome: app.applicationIconHome, protocolIcon: true)
                                 Text(app.name).font(.callout)
                                 Spacer()
-                                Text(app.connection).font(.callout).foregroundStyle(.secondary)
+                                ConnectionIndicator(ready:true,title:app.name)
                             }
                         }
                     } else { Text("尚未检查应用连接").font(.callout).foregroundStyle(.secondary) }
@@ -79,7 +81,9 @@ struct OverviewView: View {
             Image(systemName: symbol).frame(width: 20).foregroundStyle(.secondary).accessibilityHidden(true)
             Text(title)
             Spacer()
-            Text(value).foregroundStyle(.secondary)
+            if ["运行中","已连接"].contains(value) {ConnectionIndicator(ready:true,title:title)}
+            else if ["未检查","正在启动","需要重新检查"].contains(value) {ConnectionIndicator(ready:false,pending:true,title:title)}
+            else {Text(value).foregroundStyle(.secondary)}
         }.font(.system(size: 13)).padding(.vertical, 17)
     }
 }

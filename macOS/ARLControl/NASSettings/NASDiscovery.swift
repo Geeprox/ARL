@@ -72,10 +72,18 @@ enum NASDiscoveryEvent: Sendable {
         }
     }
     private func accept(_ device:NASDiscoveredDevice) {
-        func host(_ value:String?) -> String? { value?.lowercased().trimmingCharacters(in:CharacterSet(charactersIn:".")) }
+        func host(_ value:String) -> String {
+            let value=value.lowercased().trimmingCharacters(in:CharacterSet(charactersIn:"."))
+            return value.hasSuffix(".local") ? String(value.dropLast(6)):value
+        }
+        func endpoints(_ value:NASDiscoveredDevice) -> Set<String> {
+            Set((value.addresses + [value.host].compactMap{$0}).map(host))
+        }
+        let incoming=endpoints(device)
         let known=identifiers[device.id] ?? device.id
         let matches=devices.filter { old in
-            old.id==known || old.id==device.id || (device.host != nil && host(old.host)==host(device.host) && old.port==device.port)
+            old.id==known || old.id==device.id ||
+                (old.port==device.port && !incoming.isDisjoint(with:endpoints(old)))
         }
         if matches.isEmpty,devices.count>=64 {
             guard let stale=devices.indices.filter({!devices[$0].seenInCurrentScan}).min(by:{
@@ -85,10 +93,11 @@ enum NASDiscoveryEvent: Sendable {
             identifiers=identifiers.filter{$0.value != removed}
         }
         var merged=matches.first(where:{$0.host != nil}) ?? matches.first ?? device
-        merged.name=device.name;merged.host=device.host ?? merged.host;merged.port=device.port
+        if !device.mounted || merged.host == nil {merged.name=device.name}
+        merged.host=merged.host ?? device.host;merged.port=device.port
         for value in matches + [device] {
             merged.shares=Array(Set(merged.shares+value.shares)).sorted()
-            merged.addresses=Array(Set(merged.addresses+value.addresses)).sorted()
+            merged.addresses=Array(Set(merged.addresses+value.addresses+[value.host].compactMap{$0})).sorted()
             merged.mounted=merged.mounted || value.mounted
         }
         merged.lastSeenAt=now();merged.seenInCurrentScan=true
@@ -108,10 +117,21 @@ enum NASDiscoveryEvent: Sendable {
     private var services: [String: NetService] = [:]
     private var receive: (@MainActor (NASDiscoveryEvent) -> Void)?
     private var deadline: Task<Void, Never>?
+    private var generation=UUID()
 
     func start(_ receive: @escaping @MainActor (NASDiscoveryEvent) -> Void) {
         stop(); self.receive = receive
-        for device in Self.mountHints() { receive(.device(device)) }
+        let captured=generation
+        for device in Self.mountHints() {
+            receive(.device(device))
+            guard let host=device.host else {continue}
+            Task { [weak self] in
+                let addresses=await Task.detached(priority:.utility) {NASMountAddresses.shared.resolve(host)}.value
+                guard let self,self.generation==captured,!addresses.isEmpty else {return}
+                var resolved=device;resolved.addresses=addresses
+                self.receive?(.device(resolved))
+            }
+        }
         let browser = NetServiceBrowser(); self.browser = browser
         browser.delegate = self; browser.searchForServices(ofType: "_smb._tcp.", inDomain: "local.")
         deadline = Task { [weak self] in
@@ -121,6 +141,7 @@ enum NASDiscoveryEvent: Sendable {
         }
     }
     func stop() {
+        generation=UUID()
         deadline?.cancel(); deadline = nil
         browser?.delegate = nil; browser?.stop(); browser = nil
         for service in services.values { service.delegate = nil; service.stop() }
@@ -201,5 +222,31 @@ enum NASDiscoveryEvent: Sendable {
             if result.count == 64 { break }
         }
         return result
+    }
+}
+
+/// Resolve only endpoints already present in the kernel mount table. DNS may
+/// block, so bound outstanding lookups across scans and discard stale results.
+private final class NASMountAddresses: @unchecked Sendable {
+    static let shared=NASMountAddresses()
+    private let lock=NSLock()
+    private var active=Set<String>()
+    private var cache:[String:(TimeInterval,[String])]=[:]
+    func resolve(_ host:String) -> [String] {
+        let key=host.lowercased(),now=ProcessInfo.processInfo.systemUptime
+        lock.lock()
+        if let cached=cache[key],now-cached.0<60 {lock.unlock();return cached.1}
+        guard active.count<4,!active.contains(key) else {lock.unlock();return []}
+        active.insert(key);lock.unlock()
+        let values=Array(Set((Host(name:host).addresses ?? []).filter {value in
+            let parts=value.split(separator:".",omittingEmptySubsequences:false)
+            return parts.count==4 && parts.allSatisfy {part in
+                !part.isEmpty && part.allSatisfy(\.isNumber) && Int(part).map{(0...255).contains($0)} == true
+            }
+        })).sorted()
+        lock.lock();active.remove(key)
+        if cache.count>=64 {cache.removeAll()}
+        cache[key]=(ProcessInfo.processInfo.systemUptime,Array(values.prefix(8)))
+        lock.unlock();return Array(values.prefix(8))
     }
 }

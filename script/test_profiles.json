@@ -189,6 +189,12 @@
       "reason": "Actual Apple source compilation or kernel process identity",
       "requires": []
     },
+    "tests.test_application_platform": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Real local SDK registration and queue with synthetic model subprocesses and isolated private state; no accounts or data sources",
+      "requires": []
+    },
     "tests.test_attachment_inspection": {
       "kind": "unittest",
       "profile": "portable",
@@ -1356,6 +1362,15 @@
       "profile": "portable",
       "reason": "Public core packaging and source-contained migration tests",
       "requires": []
+    },
+    "tests.test_application_native": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Compile actual native discovery and Notes boundaries with synthetic events; no live services",
+      "requires": [
+        "macos",
+        "swift"
+      ]
     }
   },
   "profiles": {

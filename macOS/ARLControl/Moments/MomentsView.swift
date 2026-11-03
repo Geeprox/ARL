@@ -22,13 +22,21 @@ struct MomentsView: View {
                         HStack(spacing: 28) {
                             LabeledContent("朋友圈", value: "\(controller.postCount) 条")
                             LabeledContent("图片待补齐", value: "\(controller.remainingImages) 张")
-                            LabeledContent("下载失败", value: "\(controller.failedImages) 张")
+                            LabeledContent("待恢复", value: "\(controller.failedImages) 张")
                         }
                         if let date = controller.captureDate { Text("最近读取本机数据 \(date.formatted())").font(.caption).foregroundStyle(.secondary) }
                         if let latest = controller.latestPost { Text("归档最新帖子 \(latest)").font(.caption).foregroundStyle(.secondary) }
                         HStack {
                             Button("打开朋友圈") { NSWorkspace.shared.open(controller.viewerURL) }.buttonStyle(.borderedProminent)
                             Button(controller.collecting ? "暂停采集" : "启动采集") { Task { await controller.toggle() } }.disabled(controller.busy)
+                            if controller.failedImages>0 || controller.remainingImages>0 {
+                                Button(controller.recoveryPending ? "正在检查…":"检查并补齐图片",systemImage:"arrow.triangle.2.circlepath") {controller.recoverImages()}
+                                    .disabled(!controller.collecting || controller.recoveryPending || controller.imageStopPreserved)
+                            }
+                        }
+                        if controller.failedImages>0 {
+                            Text(controller.imageStopPreserved ? "图片下载已停止，停止记录保留。" : "临时网络失败会自动重试；服务器拒绝的图片会等待本地缓存提供新地址。")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     } else {
                         Button("导入现有归档…") { controller.importArchive() }.buttonStyle(.borderedProminent).disabled(!controller.available)
@@ -75,7 +83,7 @@ struct MomentsView: View {
         case "full_disk_access_required": "ARL 尚未获得微信数据目录的读取权限。"
         case "download_stop_preserved": "图片队列已暂停，停止记录持续保留；这本身不代表已确认风控。"
         case "risk_stop_preserved": "采集已因停止记录暂停，请先检查微信和下载状态。"
-        case "worker_stopped": "后台任务已退出。请检查日志后重新启动采集；不会自动重试失败图片。"
+        case "worker_stopped","worker_launch_failed": "后台任务正在自动恢复。"
         case "source_changed", "capture_busy": "正在等待本地数据写入稳定。"
         case "archive_configuration_missing": "这个文件夹中没有可用的归档配置。"
         default: "操作尚未完成（\(code)）。原有归档已保留。"

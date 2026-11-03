@@ -3,21 +3,27 @@ import AppKit
 
 @MainActor struct CodexPackagesSettingsView: View {
     @State private var settings: CodexPackageSettingsStore
-    @State private var explicit: CodexExecutionSelection?
-    @State private var copied = false
-    init(home: URL, enabled: Bool) { _settings = State(initialValue:CodexPackageSettingsStore(home:home,enabled:enabled)) }
+    let controller: CodexNativeController?
+    init(home: URL, enabled: Bool, controller: CodexNativeController? = nil) { self.controller=controller; _settings = State(initialValue:CodexPackageSettingsStore(home:home,enabled:enabled)) }
     var body: some View {
         DetailCard(title:"模型套餐") {
-            Text("每档可独立选择模型、思考强度和加速。应用按套餐发起的新任务使用此配置，已有任务保持原参数。")
-                .font(.caption).foregroundStyle(.secondary)
+            HStack {
+                Text("应用按场景使用套餐，新任务采用保存后的配置。").font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                if let controller {
+                    ConnectionIndicator(ready:controller.status?.state == "ready" && controller.errorCode == nil,
+                        pending:controller.status?.state == "preflight_pending",title:"Codex",
+                        text:controller.status?.state == "ready" && controller.errorCode == nil ? "Codex 已连接":controller.errorCode == nil ? "Codex 连接中":"Codex 连接异常")
+                }
+            }
             if !settings.enabled {
                 Text("请在正式连接中配置模型套餐。").foregroundStyle(.secondary)
-            } else if let catalog = settings.catalog, let saved = settings.saved {
+            } else if let catalog = settings.catalog, settings.saved != nil {
                 HStack(spacing:12) {
                     Text("套餐").frame(width:80,alignment:.leading)
                     Text("模型").frame(maxWidth:.infinity,alignment:.leading)
                     Text("思考强度").frame(width:100,alignment:.leading)
-                    Text("加速").frame(width:66,alignment:.leading)
+                    Image(systemName:"bolt").frame(width:40).accessibilityLabel("加速")
                 }.font(.caption).foregroundStyle(.secondary)
                 ForEach(CodexPackageSettingsStore.ids,id:\.self) { id in
                     if let row = settings.draft[id] {
@@ -42,43 +48,28 @@ import AppKit
                                 }
                             } label: { Text(CodexEffortOption.title(row.reasoning_effort)) }
                                 .frame(width:100).accessibilityLabel("\(id) 套餐思考强度")
-                            Toggle("加速",isOn:Binding(get:{ settings.draft[id]?.tier == "fast" },set:{ settings.draft[id]?.service_tier = $0 ? "fast" : "default" }))
-                                .toggleStyle(.checkbox).frame(width:66,alignment:.leading)
+                            Button {
+                                settings.draft[id]?.service_tier = row.tier == "fast" ? "default" : "fast"
+                            } label: {
+                                Image(systemName:row.tier == "fast" ? "bolt.fill" : "bolt")
+                                    .frame(width:16,height:32)
+                            }.buttonStyle(EditorialActionButtonStyle(emphasis:row.tier == "fast" ? .primary:.quiet))
                                 .disabled(row.tier != "fast" && catalog.models.first(where:{ $0.model == row.model })?.fast_available != true)
-                                .accessibilityLabel("\(id) 套餐加速")
+                                .accessibilityLabel("\(row.display_name)套餐加速").accessibilityValue(row.tier == "fast" ? "开启":"关闭")
+                                .help("Fast 加速，可能更快消耗额度")
                         }
                     }
                 }
                 HStack {
-                    Button("保存套餐") { settings.save() }.disabled(!settings.valid || !settings.changed)
-                    Button("重新读取") { settings.reload() }.help("读取当前已保存配置，放弃未保存修改。")
+                    Stepper("同时执行 \(settings.maxParallel) 项模型任务",value:Binding(get:{settings.maxParallel},set:{settings.setParallel($0)}),in:1...8)
+                        .fixedSize()
                     Spacer()
-                    if settings.changed { Text("未保存").font(.caption).foregroundStyle(.secondary) }
-                    Text("版本 \(saved.revision)").font(.caption).foregroundStyle(.secondary)
-                }
-                if !catalog.isFresh() { Text("模型目录已过期，等待 Codex 自动更新。").font(.caption).foregroundStyle(.orange) }
-                else if !settings.valid { Text("请检查各档模型、思考强度和加速是否仍受当前目录支持。").font(.caption).foregroundStyle(.orange) }
-                DisclosureGroup("应用接入选项") {
-                    CodexExecutionSelector(catalog:catalog.execution, selection:explicit ?? catalog.current, disabled:false, choose:{ explicit = $0; copied = false })
-                    HStack {
-                        Button("复制模型与强度选项") {
-                            let selected = explicit ?? catalog.current
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString("arl/option/" + selected.model + "/" + selected.reasoning_effort + (selected.fast ? "/fast" : ""),forType:.string)
-                            copied = true
-                        }
-                        if copied { Text("已复制").font(.caption).foregroundStyle(.secondary) }
-                    }
-                    Text("套餐调用名：arl/package/medium；medium 可换为 low、high、very_high 或 highest。")
-                        .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                }
-                if let stamp = catalog.refreshed_at_ms {
-                    Text("来源：本机 Codex · 目录更新于 \(Date(timeIntervalSince1970:Double(stamp)/1000).formatted(date:.omitted,time:.standard))")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                    if settings.changed { Button("保存套餐") { settings.save() }.disabled(!settings.valid) }
+                }.padding(.top,8)
+                if !catalog.isFresh() { Text("正在更新模型目录…").font(.caption).foregroundStyle(.secondary) }
+                else if !settings.valid { Text("部分套餐的模型选项已变化，请重新选择。").font(.caption).foregroundStyle(.orange) }
             } else {
                 Text("等待 Codex 提供模型目录。").foregroundStyle(.secondary)
-                Button("重新读取") { settings.reload() }
             }
             if let message = settings.message { Text(message).font(.caption).foregroundStyle(.secondary) }
         }.task {

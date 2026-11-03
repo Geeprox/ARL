@@ -29,6 +29,7 @@ struct ControlApp: Codable, Sendable {
     var handshake_session: String? = nil
     var session_remaining_ms: Int? = nil
     var application_icon: RegisteredApplicationIcon? = nil
+    var scenarios: [RegisteredModelScenario]? = nil
     var presentation: AppRegistration { presented(atUptime: ProcessInfo.processInfo.systemUptime) }
     func presented(atUptime: TimeInterval, iconHome: URL? = nil) -> AppRegistration {
         let symbol = icon_ref.hasPrefix("sf:") ? String(icon_ref.dropFirst(3)) : "app"
@@ -42,7 +43,7 @@ struct ControlApp: Codable, Sendable {
             hasVerifiedRegistration: registration == "registered" && authentication == "verified",
             verifiedAt: last_verified_at_ms.map { Date(timeIntervalSince1970: Double($0) / 1000) },
             lease: session_remaining_ms.map { AppConnectionLease(remainingMilliseconds: $0, uptime: atUptime) },
-            applicationIcon: application_icon, applicationIconHome: iconHome)
+            applicationIcon: application_icon, applicationIconHome: iconHome, scenarios:scenarios ?? [])
     }
     private static func connectionTitle(_ state: String) -> String {
         switch state { case "connected": "已连接"; case "stale": "状态过期";
@@ -131,7 +132,7 @@ struct ControlPlaneSnapshot: Codable, Sendable {
         let apps = try WireSchema.array(r["apps"])
         for value in apps {
             let base: Set<String> = ["id","name","icon_ref","version","registration","connection","authentication","authorization","last_verified_at_ms","last_seen_at_ms","stale_after_ms","advertised_capabilities","authorized_tools"]
-            let optional: Set<String> = ["handshake_session", "session_remaining_ms", "application_icon"]
+            let optional: Set<String> = ["handshake_session", "session_remaining_ms", "application_icon", "scenarios"]
             let keys = base.union(Set((value as? [String:Any])?.keys.map { $0 } ?? []).intersection(optional))
             let a = try WireSchema.object(value, keys)
             if let session = a["handshake_session"], !(session is NSNull) {
@@ -145,6 +146,18 @@ struct ControlPlaneSnapshot: Codable, Sendable {
             if let icon = a["application_icon"], !(icon is NSNull) {
                 guard let appID = a["id"] as? String, a["handshake_session"] is String else { throw ARLError(code:"invalid_response") }
                 try RegisteredApplicationIcon.validate(icon, appID:appID)
+            }
+            if let values=a["scenarios"] {
+                let rows=try WireSchema.array(values);guard rows.count <= 32 else{throw ARLError(code:"invalid_response")}
+                try WireSchema.uniqueIDs(rows)
+                for value in rows {
+                    let row=try WireSchema.object(value,["id","name","task_kind","priority","package_id","deadline_ms","max_output_bytes"])
+                    try WireSchema.identifier(row["id"]);_ = try WireSchema.string(row["name"],maximum:400)
+                    _ = try WireSchema.string(row["task_kind"],maximum:100)
+                    try WireSchema.choice(row["priority"],["interactive","explicit","background"])
+                    try WireSchema.choice(row["package_id"],["low","medium","high","very_high","highest"])
+                    guard (1000...180000).contains(try WireSchema.integer(row["deadline_ms"])),(128...32768).contains(try WireSchema.integer(row["max_output_bytes"])) else{throw ARLError(code:"invalid_response")}
+                }
             }
             try WireSchema.identifier(a["id"]); _ = try WireSchema.string(a["name"])
             try WireSchema.icon(a["icon_ref"]); try WireSchema.nullableString(a["version"],maximum:80)
@@ -255,11 +268,11 @@ struct ControlLogResponse: Codable, Sendable {
         _ = try WireSchema.boolean(raw["more"]); _ = try WireSchema.boolean(raw["truncated"])
         return try JSONDecoder().decode(Self.self, from:data)
     }
-    var presentation: RedactedLogPage { .init(entries: records, hasMore: more, nextCursor: next_cursor, truncated: truncated, sourceDescription: "当前进程 · 最近 15 分钟 · 服务端脱敏") }
+    var presentation: RedactedLogPage { .init(entries: records, hasMore: more, nextCursor: next_cursor, truncated: truncated, sourceDescription: "重启保留 · 最近 24 小时 · 服务端脱敏") }
 }
 
 enum WireSchema {
-    static let events: Set<String> = ["runtime_starting","runtime_ready","runtime_stopping","app_verified","app_revoked","provider_check","rpc_rejected"]
+    static let events: Set<String> = ["runtime_starting","runtime_ready","runtime_stopping","app_verified","app_revoked","provider_check","rpc_rejected","model_task_queued","model_task_succeeded","model_task_failed","diagnostic_history_reset"]
     static let codes: Set<String> = ["identity_unverified","method_not_authorized","unknown_app","unknown_method","invalid_request","invalid_arguments","not_ready","internal_error","provider_unavailable","probe_failed"]
     static func object(_ value: Any?, _ keys: Set<String>) throws -> [String:Any] {
         guard let v=value as? [String:Any], Set(v.keys)==keys else { throw ARLError(code:"invalid_response") }; return v

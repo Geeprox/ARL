@@ -35,8 +35,10 @@ class AppConnections:
             mono = r.monotonic()
             session = r.live_session(entry)
             if method == 'connection.open':
-                if set(params) != {'client_nonce','name','icon_ref','version','capabilities'} or not token(params['client_nonce']):
+                if set(params) not in ({'client_nonce','name','icon_ref','version','capabilities'}, {'client_nonce','name','icon_ref','version','capabilities','scenarios'}) or not token(params['client_nonce']):
                     raise Fault('invalid_arguments')
+                from .application_platform import scenarios
+                declared = scenarios(params.get("scenarios", []))
                 caps = params['capabilities']
                 if type(caps) is not list:
                     raise Fault('invalid_arguments')
@@ -52,7 +54,7 @@ class AppConnections:
                     raise Fault('app_instance_conflict')
                 pending = {'id':secrets.token_hex(32),'challenge':secrets.token_hex(32),
                     'binding':binding[0],'guard':binding[1],'at_mono':mono,'descriptor':descriptor,
-                    'tools':sorted(policy.tools.intersection(caps))}
+                    'tools':sorted(policy.tools.intersection(caps)), 'scenarios':declared}
                 entry['pending'] = pending
                 return {'schema_version':1,'protocol':'arl/1','client_nonce':params['client_nonce'],
                     'session_id':pending['id'],'challenge':pending['challenge'],
@@ -70,7 +72,7 @@ class AppConnections:
                     raise Fault('app_session_changed')
                 # Re-register/revoke replaces the entry and its pending challenge.
                 pending.update(renewed_mono=mono,expires_mono=mono+TTL_MS)
-                entry.update(descriptor=pending['descriptor'],session=pending,pending=None,seen=now,verified=now,verified_mono=mono,expired=False,closed=False,capability_checks={})
+                entry.update(descriptor=pending['descriptor'],session=pending,pending=None,seen=now,verified=now,verified_mono=mono,expired=False,closed=False,capability_checks={},scenarios=pending.get('scenarios',[]))
                 r.diagnostics.emit('app_verified',app=app)
                 return self._reply(pending['id'], now)
             if set(params) != {'session_id'} or not token(params['session_id']):

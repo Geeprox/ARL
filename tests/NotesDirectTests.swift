@@ -191,6 +191,28 @@ import Darwin
         let backend = NotesDirectBackend(send: { _,_ in nativeRequests += 1; throw Failure.assertion("unexpected native request") }, check: {})
         try rejected("expired backend before event") { try backend.verify(.init(folder: folder, expires: Date().addingTimeInterval(-1))) }
         try expect(nativeRequests == 0, "no live or synthetic dispatch on invalid scope")
+        let libraryID="x-coredata://ABCD/ICNote/p55",revision=Date(timeIntervalSince1970:1000)
+        var libraryEvents=0
+        let library=NotesDirectBackend(send:{event,params in
+            libraryEvents += 1
+            if event == 0x636e7465 {return .init(int32:1)}
+            guard event == 0x67657464,let direct=params[UInt32(keyDirectObject)],let code=direct.forKeyword(0x73656c64)?.typeCodeValue else{throw Failure.assertion("read-only global Notes event")}
+            switch code {
+            case 0x49442020:return .init(string:libraryID)
+            case 0x706e616d:return .init(string:"Outside default folder")
+            case 0x61736d6f:return .init(date:revision)
+            case 0x70777072:return .init(boolean:false)
+            case 0x74657874:return .init(string:"Synthetic library text 😀")
+            default:throw Failure.assertion("global read does not require shared-folder write checks or mutation")
+            }
+        },check:{})
+        let libraryRows=try library.searchAll(query:"library",offset:0,limit:50)
+        try expect(libraryRows.notes.count==1 && libraryRows.notes[0].id==libraryID,"search reaches a note outside the default write folder")
+        let libraryRead=try library.readAll(row:libraryRows.notes[0],offset:0,maxBytes:65536)
+        try expect(libraryRead.plaintext=="Synthetic library text 😀" && libraryRead.editableText==nil && libraryRead.bodyDigest==nil,"library reading does not create an edit authority")
+        let globalReply=try NotesDirectHandler(home:root,backend:library).handle(.allPage(query:"",offset:0,limit:1))
+        if case .search(let value)=globalReply.result {try expect(value.notes.count==1,"library search requires no selected write folder")} else {throw Failure.assertion("global reply")}
+        try expect(libraryEvents>0,"actual production global backend exercised with synthetic Apple events")
         print("{\"status\":\"PASS\",\"checks\":\(checks),\"actual_os_or_notes_calls\":false}")
     }
 }

@@ -195,6 +195,18 @@ public actor NASCredentialService {
         guard enabled else { throw CredentialError.deploymentNotApproved }
         return try repository.metadata(.nasSMB).map(NASCredentialIdentity.init)
     }
+    /// Account label only. The password and credential envelope stay in this actor.
+    public func savedServerAccount(endpoint: NASServerEndpoint, identity: NASCredentialIdentity) throws -> String {
+        guard enabled,!busy else{throw CredentialError.busy}
+        try current(identity)
+        let lease=try repository.lease(identity.reference);defer{lease.secret.clear()}
+        guard NASCredentialIdentity(lease.metadata)==identity else{throw CredentialError.staleReference}
+        var bytes=try lease.secret.copyBytes(for:.nasSMB);defer{bytes.resetBytes(in:0..<bytes.count)}
+        let envelope=try NASEnvelope.fields(bytes)
+        guard (envelope["schema"] as? NSNumber)?.intValue == 2,envelope["endpoint_fingerprint"] as? String == endpoint.fingerprint,
+              let username=envelope["username"] as? String else{throw CredentialError.wrongPurpose}
+        return username
+    }
     /// Uses the existing server credential, only for the explicitly selected
     /// Moments destination. No secret return value or consumer callback exists.
     public func connectArchive(_ destination: NASArchiveDestination) async throws -> NASArchiveMount {

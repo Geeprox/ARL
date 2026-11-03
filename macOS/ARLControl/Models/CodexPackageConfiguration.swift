@@ -29,3 +29,9 @@ struct CodexPackagesCatalog: Codable {
         .init(schema_version:1, source:"app_server_model_list", models:models, selection_enabled:true, current:current)
     }
 }
+
+struct ModelSchedulerConfiguration: Codable { let schema_version: Int; let max_parallel: Int }
+struct ModelSchedulerStatus: Codable, Sendable {
+    let schema_version: Int; let max_parallel: Int; let running: Int; let queued: Int
+    let queues: [String:Int]
+}

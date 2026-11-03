@@ -226,6 +226,10 @@ class Service:
                     overdue=t-self.last_refresh>=self.config.get('max_defer_seconds',120)
                     if t-self.last_refresh>=self.config.get('refresh_min_seconds',30) and (quiet or overdue):self.refresh(fingerprint)
         if self.stopping.is_set():return
+        if self.config.get('safe_image_recovery') is True and execute_images:
+            if self.clock()-getattr(self,'last_recovery_check',-float('inf'))>=60:
+                self.last_recovery_check=self.clock()
+                self.queue.recover_failed(user_authorized=True)
         if self.blocked():
             self.checkpoint('watching_downloads_paused',error_code=self.blocked())
             if self.bridge:self.bridge.publish()

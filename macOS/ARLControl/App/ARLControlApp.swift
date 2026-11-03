@@ -7,6 +7,7 @@ final class ControlDelegate: NSObject, NSApplicationDelegate {
             return true
         }
         window.deminiaturize(nil)
+        sender.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         sender.activate(ignoringOtherApps: true)
         return false

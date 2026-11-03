@@ -10,6 +10,20 @@ from script import privacy_audit as audit
 
 
 class PrivacyAuditTests(unittest.TestCase):
+    def test_source_export_accepts_only_project_build_or_its_own_cache_area(self):
+        import hashlib
+        from script import export_public_source as source
+        with tempfile.TemporaryDirectory() as raw:
+            root=Path(raw).resolve();project=root/'Project';project.mkdir();home=root/'home';home.mkdir()
+            prefix=home/'Library/Caches/CodexBuilds.noindex'/('Project-'+hashlib.sha256(str(project).encode()).hexdigest()[:12])
+            with patch.object(source,'ROOT',project),patch.object(source.Path,'home',return_value=home):
+                self.assertEqual(source.scoped_output(prefix/'python/verification/task/export'),prefix/'python/verification/task/export')
+                self.assertEqual(source.scoped_output(project/'build/export'),project/'build/export')
+                with self.assertRaises(ValueError):source.scoped_output(home/'other-project/export')
+                prefix.mkdir(parents=True);existing=prefix/'existing';existing.mkdir()
+                with self.assertRaises(ValueError):source.scoped_output(existing)
+                link=prefix/'link';link.symlink_to(project,target_is_directory=True)
+                with self.assertRaises(ValueError):source.scoped_output(link/'export')
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix='arl-publication-', dir=tempfile.gettempdir())
         self.root = Path(self.directory.name).resolve()

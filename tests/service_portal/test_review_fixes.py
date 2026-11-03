@@ -101,11 +101,11 @@ class ReviewFixes(unittest.TestCase):
         self.assertEqual(extended["settings"].methods - base["settings"].methods, {CATALOG_METHOD, REVIEW_METHOD})
         for identity in ("service.hub", "service.indexer"):
             self.assertEqual(extended[identity].tools | extended[identity].providers | extended[identity].methods, frozenset())
-        collision = dict(base); collision["service.hub"] = base["mio"]
+        collision = dict(base); collision["service.hub"] = AppPolicy(frozenset(), frozenset(), 0, 0, 0, methods=frozenset())
         with self.assertRaises(Fault):
             portal.policies(collision)
         overflow = dict(base)
-        overflow.update({f"legacy{index}": base["mio"] for index in range(100)})
+        overflow.update({f"legacy{index}": AppPolicy(frozenset(), frozenset(), 0, 0, 0, methods=frozenset()) for index in range(100)})
         with self.assertRaises(Fault):
             portal.policies(overflow)
 

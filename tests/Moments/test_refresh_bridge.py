@@ -48,6 +48,52 @@ class ResumeTests(unittest.TestCase):
    self.assertEqual(inode,(output/'.video-batch.stop').stat().st_ino);self.assertEqual(grant['min_interval_seconds'],30)
    self.assertTrue(all(x['status']=='failed' for x in q._edit()['assets'].values()));self.assertFalse(grant['failed_asset_retries_permitted'])
 
+class SafeRecoveryTests(unittest.TestCase):
+ def setUp(self):
+  from async_media import Queue
+  self.tmp=tempfile.TemporaryDirectory();self.output=Path(self.tmp.name)/'data';self.output.mkdir()
+  self.q=Queue(self.output);(self.output/'.video-batch.stop').touch()
+  atomic_json(self.output.parent/'risk-stop.json',{'image_downloads_permitted':True})
+  atomic_json(self.output/'private/image-resume.json',{'scope':['ordinary_images'],'stop_fingerprint':self.q._stop_fingerprint(),'account_operations_permitted':False,'failed_asset_retries_permitted':False})
+  self.locator={'kind':'2','url':'https://fixture.qpic.cn/synthetic-old'}
+  atomic_json(self.output/'private/locators.json',{'assets':{'fixture':self.locator}})
+  atomic_json(self.output/'moments.json',{'posts':[{'media':[{'asset_id':'fixture','type':'2'}]}]})
+  atomic_json(self.output/'media-state.json',{'assets':{'fixture':{'status':'failed','error_code':'http_400'}}})
+  self.q._edit(lambda value:value['assets'].update(fixture={'status':'failed','error_code':'http_400'}))
+ def tearDown(self):self.q.close();self.tmp.cleanup()
+ def test_old_400_baseline_is_offline_and_only_changed_locator_qualifies(self):
+  with patch('async_media.fetch_once',side_effect=AssertionError('unexpected network')):
+   self.assertTrue(self.q.recover_failed()['blocked'])
+   self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+   self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+   self.locator['url']='https://fixture.qpic.cn/synthetic-new'
+   atomic_json(self.output/'private/locators.json',{'assets':{'fixture':self.locator}})
+   self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],1)
+  import base64
+  png=base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jYt0AAAAASUVORK5CYII=')
+  with patch('async_media.fetch_once',return_value=(png,'png')) as fetch:self.q._process_locked();self.assertEqual(fetch.call_count,1)
+  self.assertEqual(self.q._edit()['assets']['fixture']['status'],'downloaded')
+  self.assertTrue((self.output/'.video-batch.stop').exists())
+  self.assertFalse(self.q._image_resume_grant()['account_operations_permitted'])
+ def test_backoff_budget_and_risk_stop_are_preserved(self):
+  import time
+  self.q._edit(lambda value:value['assets']['fixture'].update(error_code='network_error_TimeoutError',recovery_not_before=time.time()+3600))
+  self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+  self.q._edit(lambda value:value['assets']['fixture'].update(recovery_not_before=0,recovery_attempts=3))
+  self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+  self.q._edit(lambda value:value.update(halted=True,risk_control_suspected=True,error_code='http_429'))
+  before=self.q.path.read_bytes();grant=(self.output/'private/image-resume.json').read_bytes()
+  self.assertTrue(self.q.recover_failed(user_authorized=True)['blocked'])
+  self.assertEqual(self.q.path.read_bytes(),before);self.assertEqual((self.output/'private/image-resume.json').read_bytes(),grant)
+ def test_new_transient_failure_waits_and_does_not_clear_image_grant(self):
+  import urllib.error
+  self.q._edit(lambda value:value['assets']['fixture'].update(error_code='network_error_TimeoutError'))
+  self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],1)
+  with patch('async_media.fetch_once',side_effect=urllib.error.URLError(TimeoutError())):self.q._process_locked()
+  row=self.q._edit();self.assertFalse(row['halted']);self.assertIsNotNone(self.q._image_resume_grant())
+  self.assertEqual(row['assets']['fixture']['status'],'failed')
+  self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+
 class ProjectionTests(unittest.TestCase):
  def test_offloaded_metadata_refresh_does_not_read_nas_payloads(self):
   from moments_backup import merge_media_state

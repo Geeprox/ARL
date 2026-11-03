@@ -1,5 +1,12 @@
 import Foundation
 
+struct RegisteredModelScenario: Codable, Identifiable, Sendable {
+    let id: String; let name: String; let task_kind: String; let priority: String; let package_id: String
+    let deadline_ms: Int; let max_output_bytes: Int
+    var priorityTitle: String { priority == "interactive" ? "交互":priority == "background" ? "后台":"用户任务" }
+    var packageTitle: String { ["low":"低","medium":"中","high":"高","very_high":"很高","highest":"最高"][package_id] ?? package_id }
+}
+
 /// Presentation contracts. Wire decoding is added only for a confirmed service schema.
 enum MetadataFeature<Value: Sendable>: Sendable {
     case available(Value)
@@ -52,6 +59,7 @@ struct AppRegistration: Identifiable, Sendable {
     var lease: AppConnectionLease? = nil
     var applicationIcon: RegisteredApplicationIcon? = nil
     var applicationIconHome: URL? = nil
+    var scenarios: [RegisteredModelScenario] = []
     func isStale(at now: Date) -> Bool { hasConnectedEvidence && observedAt.map { now.timeIntervalSince($0) * 1000 > Double(staleAfterMilliseconds) } == true }
     func isConnected(at now: Date, uptime: TimeInterval = ProcessInfo.processInfo.systemUptime) -> Bool {
         guard handshakeSession != nil, hasConnectedEvidence, hasVerifiedRegistration, staleAfterMilliseconds > 0,
@@ -106,6 +114,10 @@ struct RedactedLogEntry: Identifiable, Codable, Sendable {
         case "app_revoked": "应用身份已撤销"
         case "provider_check": "服务检查"
         case "rpc_rejected": "调用已拒绝"
+        case "model_task_queued": "模型任务已排队"
+        case "diagnostic_history_reset": "历史记录损坏，已重新开始记录"
+        case "model_task_succeeded": "模型任务已完成"
+        case "model_task_failed": "模型任务未完成"
         default: "未知事件"
         }
     }

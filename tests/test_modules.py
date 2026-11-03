@@ -16,7 +16,7 @@ class ModulesTests(RuntimeCase):
         d=rpc();self.assertEqual(d['schema_version'],1);self.assertEqual(d['modules'][0]['readiness'],'ready')
         self.assertIsNone(d['modules'][0]['tool_count']);self.assertEqual(d['modules'][0]['tool_publication'],'not_checked')
         for params in ({'url':'http://evil'},{'owner':'mio'},{'pid':1}):self.assert_fault('invalid_arguments',lambda:rpc(params=params))
-        self.assert_fault('app_identity_unverified',lambda:rpc('mio'))
+        self.assert_fault('unknown_app',lambda:rpc('mio'))
         self.assert_fault('app_identity_unverified',lambda:rpc(verified='mio'))
         self.assertEqual(r.policies['settings'].tools,frozenset());self.assertFalse(r.execute_jobs);r.control.close()
     def test_cache_preserves_check_time_and_runs_only_fixed_worker(self):

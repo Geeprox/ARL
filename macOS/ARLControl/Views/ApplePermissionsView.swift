@@ -52,7 +52,6 @@ struct ApplePermissionsView: View {
                                         Button("重新检查") { perform(record.id, "retest") }.disabled(!canAct)
                                     }.controlSize(.small)
                                 }
-                                Text("权限与操作范围分别确认").font(.caption).foregroundStyle(.secondary)
                                 DisclosureGroup("权限详情") {
                                     VStack(alignment: .leading, spacing: 7) {
                                         ForEach(group.records) { record in
@@ -83,7 +82,7 @@ struct ApplePermissionsView: View {
         let records: [ApplePermissionRecord]
     }
     private var groups: [Group] {
-        let records = (feature.value?.records ?? []).filter { PermissionRouteRegistry.section(for: $0.id) == nil && !(calendarManagedByMain && $0.id.contains("calendar")) && !(notesManagedByMain && $0.id.hasPrefix("notes.")) }
+        let records = (feature.value?.records ?? []).filter { $0.implementation_state == "installed" && PermissionRouteRegistry.section(for: $0.id) == nil && !(calendarManagedByMain && $0.id.contains("calendar")) && !(notesManagedByMain && $0.id.hasPrefix("notes.")) }
         let grouped = Dictionary(grouping: records) { record -> String in
             if record.id.contains("reminders") { return "reminders" }
             if record.id.contains("calendar") { return "calendar" }

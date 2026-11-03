@@ -96,7 +96,7 @@ class ProductResearchEntryTests(unittest.TestCase):
                  patch('arl.compat_host.run', return_value=7) as run:
                 self.assertEqual(main(), 7)
             self.assertIs(run.call_args.kwargs['research_activation'], activation)
-            self.assertIsNone(run.call_args.kwargs['formal_tisra_peer'])
+            self.assertIsNone(run.call_args.kwargs.get('formal_tisra_peer'))
 
     def test_product_approval_composes_real_runtime_without_model_or_process(self):
         with tempfile.TemporaryDirectory() as root:
@@ -116,7 +116,7 @@ class ProductResearchEntryTests(unittest.TestCase):
                 runtime = make_runtime(home / 'runtime', research_activation=activation)
             self.assertTrue(runtime.execute_jobs)
             self.assertEqual(runtime.policies['tisra'].tools, frozenset({'tisra.codex.research.v2'}))
-            self.assertEqual(runtime.policies['friday'].tools, frozenset())
+            self.assertNotIn('friday',runtime.policies)
             self.assertEqual(runtime.priority_producer.config.tasks[0].task_kind, 'model.inference')
             self.assertFalse(activation.registered_peer.registry)
             self.assertFalse(runtime.ready.is_set())

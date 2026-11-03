@@ -1,7 +1,7 @@
 import hashlib,time,sys
 from pathlib import Path
 from unittest.mock import Mock, patch
-from arl.codex_server import CodexTextAdapter,NAME,Session
+from arl.codex_server import CodexTextAdapter,NAME,Session,instruction_isolation_profile,provider_command
 from arl.contracts import AppPolicy,Fault,Cancelled
 from tests.test_runtime import RuntimeCase,running
 ARGS={'model':'synthetic-model','input':'synthetic nonsensitive input','max_output_bytes':128}
@@ -15,6 +15,16 @@ class CodexTests(RuntimeCase):
  def adapter(self,mode='ok',enabled=True):return CodexTextAdapter(enabled=enabled,test_command=[sys.executable, '-B','-I',str(FIXTURE),mode])
  def test_default_disabled_without_process_or_paid_fallback(self):
   self.assert_fault('paid_provider_disabled',lambda:self.adapter(enabled=False).run(ARGS,Context()))
+ def test_native_instruction_isolation_is_narrow_and_missing_guard_never_falls_back(self):
+  profile=instruction_isolation_profile('/synthetic home')
+  self.assertIn('(literal "/synthetic home/.codex/AGENTS.md")',profile)
+  self.assertIn('(literal "/synthetic home/.codex/AGENTS.override.md")',profile)
+  self.assertNotIn('auth.json',profile);self.assertNotIn('(deny default)',profile)
+  with patch('arl.codex_server.sys.platform','darwin'),patch('arl.codex_server.Path.is_file',return_value=True):
+   command=provider_command('/synthetic/codex',{'features.shell_tool':False})
+   self.assertEqual(command[:2],['/usr/bin/sandbox-exec','-p']);self.assertEqual(command[3:7],['/synthetic/codex','app-server','--listen','stdio://'])
+  with patch('arl.codex_server.sys.platform','darwin'),patch('arl.codex_server.Path.is_file',return_value=False):
+   self.assert_fault('provider_isolation_unavailable',lambda:provider_command('/synthetic/codex',{}))
  def test_real_fixture_process_typed_response_hash_and_format(self):
   d=self.adapter().run(ARGS,Context());self.assertEqual(d['text'],'synthetic plan');self.assertEqual(d['request_sha256'],hashlib.sha256(ARGS['input'].encode()).hexdigest());self.assertTrue(d['simulated']);self.assertFalse(d['token_hard_cap_supported']);self.assertEqual(d['format'],'codex.appserver.text.v1');self.assertIsNone(d['usage']['tokens'])
  def test_unknown_fields_raw_responses_envelope_overflow_and_action_rejected(self):

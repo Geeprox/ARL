@@ -42,7 +42,7 @@ enum ARLNASFault:Error {case invalidConfiguration}
         driver.callbacks[0](.device(.init(id:"bonjour",name:"Synthetic")))
         driver.callbacks[0](.device(.init(id:"bonjour",name:"Synthetic",host:"synthetic.local",addresses:["192.0.2.1"])))
         try expect(model.devices.count==1 && model.devices[0].id=="mount","resolved host aliases merge with stable original row identity")
-        try expect(model.devices[0].mounted && model.devices[0].shares==["fixture"] && model.devices[0].addresses==["192.0.2.1"],"mount and resolved address metadata preserved")
+        try expect(model.devices[0].mounted && model.devices[0].shares==["fixture"] && model.devices[0].addresses.contains("192.0.2.1"),"mount and resolved address metadata preserved")
         try expect(model.devices[0].seenInCurrentScan && model.devices[0].lastSeenAt==clock.date,"observed date belongs to actual event")
         driver.callbacks[0](.finished)
         let success=model.checkedAt,lastSeen=model.devices[0].lastSeenAt
@@ -91,6 +91,16 @@ enum ARLNASFault:Error {case invalidConfiguration}
         boundedDriver.callbacks[1](.device(.init(id:"new-device",name:"New",host:"new.local")))
         try expect(bounded.devices.count==64 && bounded.devices.contains(where:{$0.id=="new-device" && $0.seenInCurrentScan}),"new scan can replace stale slot at capacity")
         bounded.cancel()
+        let aliasDriver=DiscoveryEvents(),aliases=NASDiscoveryModel(driver:aliasDriver)
+        aliases.refresh()
+        aliasDriver.callbacks[0](.device(.init(id:"bare",name:"FixtureNAS",host:"FixtureNAS",mounted:true)))
+        aliasDriver.callbacks[0](.device(.init(id:"local",name:"FIXTURENAS.local.",host:"FIXTURENAS.local.",addresses:["192.0.2.8"])))
+        aliasDriver.callbacks[0](.device(.init(id:"bonjour",name:"FIXTURENAS",host:"FIXTURENAS-2.local.",addresses:["192.0.2.8"])))
+        try expect(aliases.devices.count==1 && aliases.devices[0].mounted && aliases.devices[0].addresses.contains("FIXTURENAS-2.local."),"same endpoint and resolved IP unify mount and Bonjour aliases")
+        aliasDriver.callbacks[0](.device(.init(id:"unrelated",name:"FIXTURENAS",host:"other.local.",addresses:["192.0.2.9"])))
+        aliasDriver.callbacks[0](.device(.init(id:"other-port",name:"FIXTURENAS",host:"FIXTURENAS-2.local.",port:1445,addresses:["192.0.2.8"])))
+        try expect(aliases.devices.count==3,"friendly names alone and differing ports never merge devices")
+        aliases.cancel()
         print("nas_discovery_refresh_pass checks=\(checks) actual_production_model=true actual_UI_component_typechecked=true Bonjour_calls=0 SMB_calls=0 keychain_calls=0 permissions=0")
     }
 }

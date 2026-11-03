@@ -50,9 +50,11 @@ class Client:
         from .runtime_description import validate_description
         return validate_description(self.rpc("runtime.describe"))
 
-    def open_app_session(self, name, capabilities=(), icon_ref="sf:app", version=None):
+    def open_app_session(self, name, capabilities=(), icon_ref="sf:app", version=None, *, scenarios=None):
         nonce = secrets.token_hex(32)
-        reply = self.rpc("connection.open", {"client_nonce":nonce,"name":name,"icon_ref":icon_ref,"version":version,"capabilities":list(capabilities)})
+        params = {"client_nonce":nonce,"name":name,"icon_ref":icon_ref,"version":version,"capabilities":list(capabilities)}
+        if scenarios is not None: params["scenarios"] = scenarios
+        reply = self.rpc("connection.open", params)
         if (type(reply) is not dict or reply.get("protocol") != PROTOCOL or reply.get("schema_version") != 1
                 or reply.get("client_nonce") != nonce or not isinstance(reply.get("session_id"), str)
                 or not isinstance(reply.get("challenge"), str) or not isinstance(reply.get("accepted_capabilities"), list)

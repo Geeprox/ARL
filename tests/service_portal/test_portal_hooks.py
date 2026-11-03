@@ -272,7 +272,8 @@ class PortalHooks(unittest.TestCase):
         with self.assertRaises(Fault):
             portal.dispatch(CATALOG_METHOD, {})
         _, populated = composition()
-        policies = metadata_policies(); policies["service.hub"] = policies["mio"]
+        from arl.contracts import AppPolicy
+        policies = metadata_policies(); policies["service.hub"] = AppPolicy(frozenset(), frozenset(), frozenset())
         with self.assertRaises(Fault):
             populated.policies(policies)
 

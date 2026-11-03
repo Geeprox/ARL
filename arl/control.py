@@ -44,6 +44,7 @@ class AppRegistry:
     def __init__(self, app_ids, diagnostics, clock=None, monotonic=None):
         self.clock = clock or (lambda:int(time.time()*1000))
         self.monotonic = monotonic or (lambda:time.monotonic()*1000)
+        self.policy_source = app_ids if isinstance(app_ids,dict) else None
         self.app_ids, self.diagnostics = frozenset(app_ids), diagnostics
         self.lock = threading.RLock()
         self.entries = {}
@@ -58,7 +59,8 @@ class AppRegistry:
         """Trusted manifest registration. Does not grant methods or authenticate."""
         descriptor.validate()
         if descriptor.id not in self.entries:
-            raise Fault('unknown_app')
+            if self.policy_source is None or descriptor.id not in self.policy_source:raise Fault('unknown_app')
+            self.app_ids=self.app_ids|{descriptor.id};self.diagnostics.app_ids=self.diagnostics.app_ids|{descriptor.id}
         with self.lock:
             self.entries[descriptor.id] = {'descriptor':descriptor,'registration':'registered',
                 'seen':None,'verified':None,'capability_checks':{},'active_guard':active_guard}
@@ -127,6 +129,7 @@ class AppRegistry:
                     'authorization':'limited' if tools else 'none','last_verified_at_ms':verified,
                     'last_seen_at_ms':seen,'stale_after_ms':30000,
                     'advertised_capabilities':list(d.capabilities) if session else [],'authorized_tools':tools,
+                    **({'scenarios':entry['scenarios']} if entry.get('scenarios') and session else {}),
                     'handshake_session':session['id'] if session and not stale else None,
                     'session_remaining_ms':max(0,int(session['expires_mono']-self.monotonic())) if session else None})
             return rows
@@ -260,7 +263,7 @@ class ControlPlane:
     def __init__(self, runtime, *, resources=None, clock=None):
         self.runtime = runtime
         self.clock = clock or (lambda:int(time.time()*1000))
-        self.diagnostics = Diagnostics(runtime.policies,clock=self.clock)
+        self.diagnostics = Diagnostics(runtime.policies,clock=self.clock,path=runtime.home/'diagnostics-v1.json' if getattr(runtime,'home',None) is not None else None)
         self.apps = AppRegistry(runtime.policies,self.diagnostics,clock=self.clock)
         self.resources = resources or ResourceSampler()
         self.providers = ProviderStatus(runtime,self.diagnostics,clock=self.clock)

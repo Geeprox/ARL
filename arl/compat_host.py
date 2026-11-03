@@ -1,6 +1,6 @@
-"""Production composition: metadata only, no task grants, inference or enrollment.
+"""Installed base composition: public metadata and kernel-bound SDK registration.
 
-Future product composition is host code, never a caller-selected JSON profile.
+Model service access is derived from the enabled host scope; other tools stay gated.
 The installed entry uses this fixed composition and a fixed account state home.
 """
 from __future__ import annotations
@@ -33,9 +33,7 @@ def state_home():
 
 def metadata_policies():
     return {"settings": AppPolicy(frozenset(), frozenset(), 0, 0, 0,
-        methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot", "codex.service.status.v1", "settings.app_icon.v1"}), public_metadata=True),
-        **{app: AppPolicy(frozenset(), frozenset(), 0, 0, 0, methods=frozenset())
-           for app in ("tisra", "friday", "mio")}}
+        methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1"}), public_metadata=True)}
 
 
 class PeerComposition:
@@ -136,8 +134,6 @@ def compose_codex_service(home, *, service, peer_verifier, isolated=False, servi
             type(peer_verifier) is RegisteredPeerVerifier and service.caller not in peer_verifier.app_ids):
         raise Fault('codex_caller_unverified')
     from .formal_peer import available_formal_tisra_peer, FormalTisraPeer
-    if formal_tisra_peer is None and not isolated:
-        formal_tisra_peer = available_formal_tisra_peer()
     if formal_tisra_peer is not None and type(formal_tisra_peer) is not FormalTisraPeer:
         raise Fault('app_identity_unverified')
     if application_policy is not None:
@@ -351,6 +347,11 @@ def run(home, *, capture_attachment=None, service_portal=None, formal_tisra_peer
                                codex_peer=codex_peer, codex_isolated=codex_isolated,
                                codex_application_policy=codex_application_policy,
                                messages_receive_transport=messages_receive_transport)
+        if capture_attachment is None and research_activation is None and (codex_service is None or
+                codex_service.allow_model_selection and codex_service.package_home is not None):
+            from .application_platform import ApplicationPlatform
+            runtime.application_platform = ApplicationPlatform(runtime)
+            if codex_service is not None:codex_service.adapter.timeout = 180
         runtime.codex_configuration_state = codex_configuration_state
         log.event("starting")
         def stop(signum, frame):
@@ -437,7 +438,6 @@ def main():
                        if codex_service is not None else None,
                    messages_receive_transport=messages_transport)
     from .tisra_capture_profiles import attachment_for_profiles
-    from .formal_peer import available_formal_tisra_peer
     from .research_product import build_activation
     capture_attachment = attachment_for_profiles()
     if not capture_attachment.enabled:
@@ -446,7 +446,6 @@ def main():
     activation, _ = build_activation(home) if capture_attachment is None else (None, 'capture_profile_active')
     return run(home,
                capture_attachment=capture_attachment,
-               formal_tisra_peer=available_formal_tisra_peer() if capture_attachment is None and activation is None else None,
                research_activation=activation,messages_receive_transport=messages_transport)
 
 

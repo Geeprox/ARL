@@ -23,6 +23,12 @@ final class MomentsController {
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var worker: Process?
     @ObservationIgnored private var failedWorker = false
+    @ObservationIgnored private var workerFailures=0
+    @ObservationIgnored private var nextWorkerStart=Date.distantPast
+    @ObservationIgnored private var workerStartedAt=Date.distantPast
+    @ObservationIgnored private var nextRecoveryRequest=Date.distantPast
+    private(set) var recoveryPending=false
+    private(set) var imageStopPreserved=false
     @ObservationIgnored private var lastFingerprint: String?
     @ObservationIgnored private var pendingFingerprint: String?
     @ObservationIgnored private var changedAt = Date.distantPast
@@ -114,6 +120,17 @@ final class MomentsController {
     func grantDiskAccess() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
+    func recoverImages() {
+        guard available,configuration != nil,collecting,!closing,!imageStopPreserved,
+              Date()>=nextRecoveryRequest else{return}
+        do {
+            try MomentsFiles.privateDirectory(home.appendingPathComponent("requests"))
+            let id=UUID().uuidString.lowercased()
+            try MomentsFiles.writeJSON(["schema":1,"id":id,"kind":"recover_images",
+                "created_at":ISO8601DateFormatter().string(from:Date())],home.appendingPathComponent("requests/"+id+".json"))
+            recoveryPending=true;nextRecoveryRequest=Date().addingTimeInterval(60)
+        } catch {message="image_recovery_request_failed"}
+    }
     private func riskBlocked(_ archive: URL) -> Bool {
         let q = MomentsFiles.json(archive.appendingPathComponent("data/image-queue.json"))
         return q["halted"] as? Bool == true || q["risk_control_suspected"] as? Bool == true
@@ -125,6 +142,8 @@ final class MomentsController {
         let archive = URL(fileURLWithPath: configuration.archiveRoot, isDirectory: true)
         let status = MomentsFiles.json(archive.appendingPathComponent("data/local-service-status.json"))
         let queue = MomentsFiles.json(archive.appendingPathComponent("data/image-queue.json"))
+        imageStopPreserved=queue["halted"] as? Bool == true || queue["risk_control_suspected"] as? Bool == true
+        if Date()>=nextRecoveryRequest {recoveryPending=false}
         var counts = [String: Int]()
         for record in (queue["assets"] as? [String: [String: Any]] ?? [:]).values {
             if let state = record["status"] as? String { counts[state, default: 0] += 1 }
@@ -148,7 +167,12 @@ final class MomentsController {
         // Serving the archive is offline and remains available across a queued
         // image stop. The child checks the preserved stop before any refresh or
         // CDN work; starting it here cannot resume the stopped queue.
-        if configuration.collecting, worker == nil, !failedWorker { startWorker(configuration) }
+        if let worker,!worker.isRunning {
+            self.worker=nil;running=false;workerFailures=min(workerFailures+1,5)
+            nextWorkerStart=Date().addingTimeInterval([2.0,5,15,30,60][workerFailures-1]);message="worker_stopped"
+        }
+        if worker?.isRunning == true,Date().timeIntervalSince(workerStartedAt)>120 {workerFailures=0}
+        if configuration.collecting, worker == nil, Date()>=nextWorkerStart { startWorker(configuration) }
         guard configuration.collecting,
               !FileManager.default.fileExists(atPath: archive.appendingPathComponent("data/.local-service.stop").path) else { return }
         var refreshRequests = [MomentsBridgeRequest]()
@@ -172,8 +196,6 @@ final class MomentsController {
                 lastFingerprint = fingerprint; captureDate = Date(); message = riskBlocked(archive) ? "download_stop_preserved" : nil
             }
         } catch { message = (error as? MomentsFault)?.code ?? "capture_failed" }
-        if worker == nil && !failedWorker { startWorker(configuration) }
-        if let worker, !worker.isRunning { self.worker = nil; running = false; failedWorker = true; message = "worker_stopped" }
     }
     private func startWorker(_ configuration: MomentsConfiguration) {
         guard let resources = Bundle.main.resourceURL else { return }
@@ -188,13 +210,17 @@ final class MomentsController {
                 "native_capture_lock": home.appendingPathComponent("capture.lock").path,
                 "bridge_home": home.path,
                 "owner_pid": Int(getpid()), "poll_seconds": 5, "quiet_seconds": 5, "refresh_min_seconds": 30,
-                "max_defer_seconds": 120, "images_enabled": true, "viewer_port": 8791], configPath)
+                "max_defer_seconds": 120, "images_enabled": true,"safe_image_recovery":true, "viewer_port": 8791], configPath)
             let child = Process(); child.executableURL = executable
             child.arguments = ["-I", "-B", entry.path, "--config", configPath.path]
             child.environment = ["PATH": "/usr/bin:/bin", "HOME": FileManager.default.homeDirectoryForCurrentUser.path, "LANG": "en_US.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"]
             child.standardOutput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice
-            try child.run(); worker = child; running = true
-        } catch { failedWorker = true; message = "worker_launch_failed" }
+            try child.run(); worker = child; running = true;failedWorker=false;workerStartedAt=Date()
+            if message=="worker_stopped" || message=="worker_launch_failed" {message=nil}
+        } catch {
+            failedWorker=true;message="worker_launch_failed";workerFailures=min(workerFailures+1,5)
+            nextWorkerStart=Date().addingTimeInterval([2.0,5,15,30,60][workerFailures-1])
+        }
     }
     private func syncNAS(_ configuration: MomentsConfiguration) {
         guard let destination = configuration.nasDestination, let nasOwner,

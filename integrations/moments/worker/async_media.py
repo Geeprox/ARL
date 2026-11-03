@@ -1,4 +1,4 @@
-"""Explicitly enabled, serial image queue. No login, scheduler or automatic retry.
+"""Explicitly enabled serial image queue with bounded image-only recovery.
 
 Queue(output).submit(ids) is offline. Only start(execute=True) permits requests.
 Signed locators are resolved from the private file at execution and never queued.
@@ -277,6 +277,68 @@ class Queue:
         queue['consecutive_resource_failures']=(queue.get('consecutive_resource_failures',0)+1
                                                 if resource_failure else 0)
 
+    @staticmethod
+    def _transient(code):
+        return code in ('http_500','http_502','http_503','http_504','incomplete_download',
+                        'network_error_TimeoutError','network_error_ConnectionResetError',
+                        'network_error_ConnectionRefusedError','network_error_ConnectionAbortedError') or (
+                            isinstance(code,str) and code.startswith('dns_unavailable_'))
+
+    def recover_failed(self, *, user_authorized=False):
+        """Offline admission only. Preserve stops; never replay an unchanged 4xx.
+
+        The signed owner opts in after explicit user authorization. A current
+        image-only grant remains required at admission and at execution. Old
+        failures without a locator digest establish a baseline before a later
+        changed locator can qualify. No request URL enters the queue/receipt.
+        """
+        result={'requeued':0,'waiting_for_new_locator':0,'blocked':False}
+        if user_authorized is not True:return {**result,'blocked':True}
+        grant=self._image_resume_grant()
+        if not grant or self._global_stop():return {**result,'blocked':True}
+        with (self.output / '.media.lock').open('a') as lease:
+            try:fcntl.flock(lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:return result
+            grant=self._image_resume_grant()
+            if not grant or self._global_stop():return {**result,'blocked':True}
+            data=self._edit()
+            if data.get('halted') or data.get('risk_control_suspected'):
+                return {**result,'blocked':True}
+            grant['safe_recovery']={'max_retries':3,'backoff_seconds':[60,300,1800]}
+            grant.setdefault('safe_recovery_authorized_at',now())
+            atomic_json(self.output/'private/image-resume.json',grant)
+            locators=load_json(self.output/'private/locators.json',{}).get('assets',{})
+            states=load_json(self.output/'media-state.json',{'assets':{}}).get('assets',{})
+            referenced=_referenced(self.output)
+            def update(queue):
+                for asset,item in queue['assets'].items():
+                    if item.get('status')!='failed' or asset not in referenced:continue
+                    code=item.get('error_code');locator=locators.get(asset,{})
+                    if str(locator.get('kind'))!='2':continue
+                    try:request_locator(locator)
+                    except (ValueError,KeyError):continue
+                    digest=hashlib.sha256(json.dumps(locator,sort_keys=True).encode()).hexdigest()
+                    baseline=item.get('attempt_locator_sha256') or states.get(asset,{}).get('attempt_locator_sha256')
+                    if baseline is None:
+                        item['attempt_locator_sha256']=digest
+                        baseline=digest
+                    changed=digest!=baseline
+                    attempts=item.get('recovery_attempts',0)
+                    if type(attempts) is not int or attempts>=3:continue
+                    if not self._transient(code) and not (code in ('http_400','http_404','http_410') and changed):
+                        result['waiting_for_new_locator']+=1;continue
+                    if time.time()<item.get('recovery_not_before',0):continue
+                    item.setdefault('failure_history',[]).append({'at':item.get('updated_at'),'error_code':code})
+                    item['failure_history']=item['failure_history'][-4:]
+                    item.update(status='queued',recovery_locator_sha256=digest,recovery_attempts=attempts+1,
+                                updated_at=now())
+                    result['requeued']+=1
+                if result['requeued']:
+                    queue['next_request_at']=max(queue.get('next_request_at',0),time.time()+30)
+            self._edit(update)
+        if result['requeued']:self._wake.set()
+        return result
+
     def submit(self, asset_ids, *, priority=False):
         if not isinstance(asset_ids, list) or len(asset_ids) > 10000:
             raise ValueError('asset_ids_array_limit_10000')
@@ -436,11 +498,18 @@ class Queue:
                 if error:queue['assets'][asset]['error_code'] = error
             self._edit(change)
         if _valid_existing(self.output, previous):mark('skipped');return
-        if previous.get('status') in ('failed', 'unsupported'):
+        retry=data['assets'].get(asset,{})
+        current_locator=load_json(self.output/'private/locators.json',{}).get('assets',{}).get(asset,{})
+        digest=hashlib.sha256(json.dumps(current_locator,sort_keys=True).encode()).hexdigest()
+        grant=self._image_resume_grant()
+        recovery=(grant and grant.get('safe_recovery',{}).get('max_retries')==3
+                  and retry.get('recovery_locator_sha256')==digest
+                  and type(retry.get('recovery_attempts')) is int and 1<=retry['recovery_attempts']<=3)
+        if previous.get('status') in ('failed', 'unsupported') and not recovery:
             mark('unsupported', 'previous_attempt_not_retryable');return
         try:
             if asset not in _referenced(self.output):raise ValueError('not_referenced_image')
-            locator = load_json(self.output / 'private/locators.json', {})['assets'][asset]
+            locator = current_locator
             comment_image=locator.get('kind')=='comment_emoji'
             if comment_image:
                 grant=self._image_resume_grant()
@@ -466,6 +535,7 @@ class Queue:
                 queue['network_attempts'] += 1
                 # Interrupted requests are not retried after restarting Queue.
                 queue['assets'][asset]['status'] = 'attempted'
+                queue['assets'][asset]['attempt_locator_sha256']=digest
             self._edit(attempting)
             if comment_image:raw,fmt,metadata=fetch_comment_once(selected)
             else:raw,fmt=fetch_once(selected);metadata={}
@@ -477,6 +547,7 @@ class Queue:
             _publish_asset(self.output, asset, item)
             def completed(queue):
                 queue['assets'][asset].update(status='downloaded', updated_at=now())
+                queue['assets'][asset].pop('error_code',None)
                 self._request_finished(queue)
             self._edit(completed)
         except Exception as error:
@@ -502,6 +573,14 @@ class Queue:
             mark('failed', code)
             risk=code in ('http_403','http_429','http_451','http_514') or retry_after
             grant=self._image_resume_grant()
+            if not risk and grant and grant.get('safe_recovery',{}).get('max_retries')==3 and self._transient(code):
+                def recover_later(queue):
+                    self._request_finished(queue)
+                    item=queue['assets'][asset]
+                    attempts=min(item.get('recovery_attempts',0),2)
+                    item['recovery_not_before']=time.time()+[60,300,1800][attempts]
+                self._edit(recover_later)
+                return
             if (not risk and isinstance(error,urllib.error.HTTPError) and grant
                     and error.code in grant.get('skip_resource_http_codes',[])):
                 queue=self._edit(lambda queue:self._request_finished(queue,resource_failure=True))

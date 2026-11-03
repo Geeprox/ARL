@@ -95,7 +95,7 @@ class CaptureProfilesTests(unittest.TestCase):
             with patch('arl.tisra_capture_host.RegisteredPeerVerifier',side_effect=AssertionError('unexpected observation')):
                 runtime = make_runtime(Path(directory),capture_attachment=attachment); attachment.start(runtime)
             self.assertIsNone(runtime.capture); self.assertFalse(runtime.execute_jobs); self.assertIsNone(attachment.supervisor)
-            self.assertTrue(all(not runtime.policies[p.app].providers for p in production_profiles()))
+            self.assertTrue(all(p.app not in runtime.policies for p in production_profiles()))
             attachment.close()
         with self.assertRaises(Fault):
             attachment_for_profiles((CaptureSourceProfile('tisra',enabled=True),CaptureSourceProfile('mio'),CaptureSourceProfile('friday')))

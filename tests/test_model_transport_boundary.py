@@ -22,11 +22,11 @@ class ModelTransportBoundaryTests(unittest.TestCase):
             self.assertIn("ollama", default_policies(True)[client].providers)
 
     def test_metadata_profile_does_not_create_mio_execution_grants(self):
-        policy = metadata_policies()["mio"]
-        self.assertFalse(policy.tools)
-        self.assertFalse(policy.providers)
-        self.assertFalse(policy.methods)
-        self.assertEqual((policy.max_tokens, policy.max_calls, policy.max_pending), (0, 0, 0))
+        policies=metadata_policies()
+        self.assertNotIn("mio",policies)
+        self.assertEqual(set(policies),{"settings"})
+        self.assertFalse(policies["settings"].tools)
+
 
 
 if __name__ == "__main__":

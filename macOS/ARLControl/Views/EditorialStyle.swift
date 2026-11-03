@@ -12,9 +12,9 @@ enum EditorialStyle {
     static let graphite = adaptive(NSColor(srgbRed: 0.115, green: 0.125, blue: 0.13, alpha: 1), .labelColor)
     static let accent = adaptive(NSColor(srgbRed: 0.70, green: 0.215, blue: 0.035, alpha: 1), NSColor(srgbRed: 1, green: 0.46, blue: 0.21, alpha: 1))
     static let rule = Color.primary.opacity(0.12)
-    static let cardRadius: CGFloat = 10
+    static let cardRadius: CGFloat = 12
     static let controlRadius: CGFloat = 6
-    static let controlHeight: CGFloat = 32
+    static let controlHeight: CGFloat = 36
     static let sectionSpacing: CGFloat = 20
 }
 

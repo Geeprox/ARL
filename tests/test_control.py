@@ -12,7 +12,7 @@ from unittest.mock import Mock
 from arl.capabilities import AppleAdapter
 from arl.client import Client
 from arl.control import AppDescriptor, AppRegistry, CredentialReferences, ProviderStatus
-from arl.contracts import Fault
+from arl.contracts import AppPolicy, Fault
 from arl.diagnostics import Diagnostics
 from arl.host import metadata_policies
 from arl.identity import RegisteredPeerVerifier, process_identity
@@ -96,6 +96,7 @@ class ControlUnitTests(RuntimeCase):
 
     def test_host_grant_and_public_metadata_do_not_enroll_or_authorize(self):
         runtime=self.runtime(policies=metadata_policies(),identity_verifier=lambda c,a:None,execute_jobs=False)
+        runtime.policies['friday']=AppPolicy(frozenset(),frozenset(),0,0,0,methods=frozenset())
         runtime.control.apps.register(AppDescriptor('friday','Friday','sf:house','1'))
         runtime.control.apps.observe_verified('friday')
         app=next(a for a in self.request(runtime,'settings.snapshot')['apps'] if a['id']=='friday')

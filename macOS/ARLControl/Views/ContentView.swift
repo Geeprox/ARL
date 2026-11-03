@@ -67,9 +67,8 @@ struct ContentView: View {
                     case .overview: OverviewView(store: store, navigate: navigate)
                     case .performance: MetricsView(store: store)
                     case .models:
-                        ModelConnectionSettings(controller: codexSettings ?? store.codex)
                         CodexPackagesSettingsView(home:store.service.home.appendingPathComponent("CodexPackages"),
-                            enabled:!store.demo && !store.isolated && !store.nativeActionsHeld && store.codex.enabled)
+                            enabled:!store.demo && !store.isolated && !store.nativeActionsHeld && store.codex.enabled, controller:codexSettings ?? store.codex)
                     case .capabilities:
                         RegistryView(feature: store.control.registry)
                         ApplePermissionsView(feature: store.permissions, connected: store.connected,

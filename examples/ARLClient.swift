@@ -70,11 +70,13 @@ public actor ARLClient {
         return value
     }
     /// Identity registration is host-owned. This exchange grants no new tools.
-    public func openAppSession(name: String, capabilities: [String], icon: String = "sf:app", version: String? = nil) throws -> [String] {
+    public func openAppSession(name: String, capabilities: [String], icon: String = "sf:app", version: String? = nil, scenarios: [ARLModelScenario]? = nil) throws -> [String] {
         let nonce = (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "").lowercased()
-        let reply = try rpc("connection.open", params: ["client_nonce":.string(nonce),"name":.string(name),
+        var params:[String:ARLJSON] = ["client_nonce":.string(nonce),"name":.string(name),
             "icon_ref":.string(icon),"version":version.map(ARLJSON.string) ?? .null,
-            "capabilities":.array(capabilities.map(ARLJSON.string))])
+            "capabilities":.array(capabilities.map(ARLJSON.string))]
+        if let scenarios {params["scenarios"]=try JSONDecoder().decode(ARLJSON.self,from:JSONEncoder().encode(scenarios))}
+        let reply = try rpc("connection.open",params:params)
         guard reply["schema_version"] == .number(1), reply["protocol"] == .string("arl/1"),
               reply["client_nonce"] == .string(nonce), let session = reply["session_id"]?.text,
               let challenge = reply["challenge"]?.text,
@@ -217,5 +219,29 @@ public actor ARLClient {
             _ = try await connect()
             return try rpc("submit", params: params)
         }
+    }
+}
+
+/// Model intent declared at application startup; supplier selection belongs to ARL.
+public struct ARLModelScenario: Codable, Sendable, Equatable {
+    public let id: String; public let name: String; public let task_kind: String
+    public let priority: String; public let package_id: String
+    public let deadline_ms: Int; public let max_output_bytes: Int
+    public init(id:String,name:String,taskKind:String,priority:String,packageID:String,deadlineMilliseconds:Int=180000,maxOutputBytes:Int=4096) {
+        self.id=id;self.name=name;self.task_kind=taskKind;self.priority=priority;self.package_id=packageID
+        self.deadline_ms=deadlineMilliseconds;self.max_output_bytes=maxOutputBytes
+    }
+}
+extension ARLClient {
+    public func registerApplication(name:String,scenarios:[ARLModelScenario],icon:String="sf:app",version:String?=nil) throws -> [String] {
+        return try openAppSession(name:name,capabilities:scenarios.isEmpty ? []:["codex.text.plan.v1"],icon:icon,version:version,scenarios:scenarios)
+    }
+    public func submitScenario(_ scenarioID:String,input:String,requestID:String=UUID().uuidString.lowercased()) throws -> ARLJSON {
+        guard let appSession else{throw ARLError(code:"app_session_changed")}
+        return try rpc("application.tasks.submit.v1",params:["schema_version":.number(1),"session_id":.string(appSession),"scenario_id":.string(scenarioID),"request_id":.string(requestID),"input":.string(input)])
+    }
+    public func applicationTask(_ jobID:String,cancel:Bool=false) throws -> ARLJSON {
+        guard let appSession else{throw ARLError(code:"app_session_changed")}
+        return try rpc(cancel ? "application.tasks.cancel.v1":"application.tasks.get.v1",params:["schema_version":.number(1),"session_id":.string(appSession),"job_id":.string(jobID)])
     }
 }

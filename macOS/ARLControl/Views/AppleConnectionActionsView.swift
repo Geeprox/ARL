@@ -15,15 +15,15 @@ struct AppleConnectionActionsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(permissionTitle).font(.system(size: 16, weight: .semibold))
+            if permission != .authorized { Text(permissionTitle).font(.callout.weight(.medium)) }
             if !enabled {
                 Text("连接未启用").font(.callout).foregroundStyle(.secondary)
             } else if permission == .denied {
                 Text("请在系统设置中允许访问" + targetTitle + "。")
                     .font(.callout).foregroundStyle(.secondary)
             } else if let failure = observation.lastFailure {
-                Text(failure.issue == .targetNotRunning && observation.value == nil
-                     ? "应用未运行" : failure.issue.title)
+                Text(failure.issue == .targetNotRunning
+                     ? targetTitle+"未运行，打开后会自动连接。" : failure.issue.title)
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if busy || observation.refreshing {
@@ -40,22 +40,11 @@ struct AppleConnectionActionsView: View {
                 }
             }
             if let openMessage { Text(openMessage).font(.caption).foregroundStyle(.secondary) }
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 10) {
-                    if let date = observation.observedAt {
-                        Text(observation.showingLastKnown ? "最近权限：" : "更新时间：")
-                        Text(date, format: .dateTime.month().day().hour().minute()).monospacedDigit()
-                    }
-                    HStack {
-                        Button("刷新权限", action: check).disabled(!enabled || busy || observation.refreshing)
-                        Button("打开" + targetTitle, action: openTarget)
-                        if permission != .denied { Button("系统设置", action: openSettings) }
-                    }
-                    if let code = observation.lastFailure?.nativeStatus {
-                        Text("系统状态码：" + String(code)).font(.caption.monospaced()).textSelection(.enabled)
-                    }
-                }.font(.caption).foregroundStyle(.secondary).padding(.top, 10)
-            }.font(.caption)
+            if observation.lastFailure?.issue == .targetNotRunning && permission == .authorized {
+                Button("打开"+targetTitle,action:openTarget).disabled(!enabled || busy)
+            } else if observation.lastFailure != nil {
+                Button("重试连接", action:check).disabled(!enabled || busy || observation.refreshing)
+            }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
     private var targetTitle: String { target == .messages ? "信息" : "备忘录" }
@@ -83,7 +72,7 @@ struct RemindersDefaultListSettings: View {
     var disabled = false
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("默认清单").font(.callout.weight(.medium))
+            Text("默认写入清单").font(.callout.weight(.medium))
             HStack(spacing: 10) {
                 EditorialMenu {
                     if let catalog = controller.catalog {
@@ -108,8 +97,8 @@ struct RemindersDefaultListSettings: View {
                     .disabled(disabled || controller.busy || controller.catalog?.lists.isEmpty != false)
                     .accessibilityLabel("默认提醒清单")
                     .accessibilityValue(controller.defaultTarget.map { $0.source.title + "，" + ($0.list?.title ?? "未设置") } ?? "未设置")
-                Button("刷新清单") { controller.discover() }.disabled(disabled || controller.busy)
             }
+            Text("读取和搜索覆盖所有已授权清单。").font(.caption).foregroundStyle(.secondary)
             if let target = controller.defaultTarget {
                 Text(accountTitle(target.source)).font(.caption).foregroundStyle(.secondary)
             }
@@ -123,7 +112,10 @@ struct RemindersDefaultListSettings: View {
             guard !disabled else { return }
             do {
                 _ = try await controller.execute(.init(.selection))
-                if controller.catalog == nil { _ = try await controller.execute(.init(.catalog)) }
+                while !Task.isCancelled {
+                    if !controller.busy {_ = try await controller.execute(.init(.catalog))}
+                    try await Task.sleep(for:.seconds(30))
+                }
             } catch { /* The controller retains the local recovery message. */ }
         }
     }

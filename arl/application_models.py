@@ -114,6 +114,7 @@ class ApplicationModels:
     """
     def __init__(self, registry, policies, catalog, *, package_models=None, clock=time.monotonic):
         self.registry, self.policies, self.catalog = registry, policies, catalog
+        self.package_configuration = None
         self.package_models = package_models
         self.clock = clock
         self.requests = {}
@@ -165,10 +166,13 @@ class ApplicationModels:
                 current = snapshot.get('current', {}).get('model')
             except (Fault, TypeError, KeyError, AttributeError):
                 raise Fault('application_models_catalog_unavailable')
-        mapping = self.package_models(app) if self.package_models else {p[0]: current for p in PACKAGES}
+        configured = self.package_configuration(app) if self.package_configuration else None
+        mapping = {key:row['model'] for key,row in configured.items()} if configured is not None else self.package_models(app) if self.package_models else {p[0]: current for p in PACKAGES}
         policy = self.policies[app]
         offers = []
         for package_id, name, target in PACKAGES:
+            if configured is not None:
+                name = configured[package_id]['display_name']; target = configured[package_id]['reasoning_effort']
             model = mapping.get(package_id)
             row = next((r for r in rows if r.get('model') == model), None)
             reasons, effort = [], None
@@ -177,7 +181,7 @@ class ApplicationModels:
                 if target in supported:
                     effort = target
                 else:
-                    candidates = [e for e in EFFORT_ORDER[:EFFORT_ORDER.index(target)] if e in supported]
+                    candidates = [e for e in EFFORT_ORDER[:EFFORT_ORDER.index(target)] if e in supported] if configured is None and target in EFFORT_ORDER else []
                     if candidates:
                         effort = candidates[-1]
                         reasons = ['effort_downgraded']

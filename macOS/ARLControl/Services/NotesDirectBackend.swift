@@ -143,6 +143,43 @@ final class NotesDirectBackend {
         result.offset=offset;result.next_offset=end<raw.count ? end:nil;result.total_bytes=raw.count
         return result
     }
+    /// Public Notes.app collection, independent of the default creation folder.
+    /// This read path never constructs a write proposal or exposes attachments.
+    func searchAll(query:String,offset:Int,limit:Int) throws -> NotesDirectSearch {
+        if !query.isEmpty {try NotesDirectContract.text(query,maximum:1024)}
+        guard offset >= 0,(1...50).contains(limit) else{throw AppleDirectFault("invalid_arguments")}
+        let total=try count(note,.null()),start=min(offset,total),end=min(total,min(offset,total)+200)
+        var rows:[NotesDirectRow]=[];var scanned=0
+        for index in start..<end {
+            try check();scanned += 1
+            let indexed=try AppleDirectDescriptor.indexed(note,index:index+1,parent:.null())
+            let noteID=try text(id,indexed);try NotesDirectContract.identifier(noteID,entity:"ICNote")
+            let ref=try AppleDirectDescriptor.object(note,id:noteID)
+            guard try !flag(0x70777072,ref) else{continue}
+            let revision=try modified(ref),title=try text(name,ref,maximum:4096)
+            var matches=query.isEmpty || title.localizedCaseInsensitiveContains(query)
+            if !matches {matches=try text(0x74657874,ref,maximum:32*1024*1024).localizedCaseInsensitiveContains(query)}
+            guard try text(id,ref)==noteID,try modified(ref)==revision,try text(name,ref,maximum:4096)==title else{throw AppleDirectFault("revision_changed")}
+            if matches {rows.append(.init(id:noteID,title:title,modified:revision))}
+            if rows.count==limit {break}
+        }
+        try check()
+        return .init(notes:rows,scanned:scanned,total:total,offset:offset,next_offset:offset+scanned<total ? offset+scanned:nil)
+    }
+    func readAll(row:NotesDirectRow,offset:Int,maxBytes:Int) throws -> NotesDirectRead {
+        try NotesDirectContract.identifier(row.id,entity:"ICNote")
+        let ref=try AppleDirectDescriptor.object(note,id:row.id)
+        guard try !flag(0x70777072,ref),try text(id,ref)==row.id,try modified(ref)==row.modified,try text(name,ref,maximum:4096)==row.title else{throw AppleDirectFault("revision_changed")}
+        let raw=Data(try text(0x74657874,ref,maximum:32*1024*1024).utf8)
+        guard offset>=0,offset<=raw.count,(4...65536).contains(maxBytes),String(data:raw.dropFirst(offset),encoding:.utf8) != nil else{throw AppleDirectFault("invalid_arguments")}
+        var end=min(raw.count,offset+maxBytes)
+        while String(data:raw.subdata(in:offset..<end),encoding:.utf8)==nil && end>offset {end-=1}
+        guard try modified(ref)==row.modified,try text(name,ref,maximum:4096)==row.title,try !flag(0x70777072,ref) else{throw AppleDirectFault("revision_changed")}
+        try check()
+        var value=NotesDirectRead(row:row,plaintext:String(data:raw.subdata(in:offset..<end),encoding:.utf8)!,editRestriction:"library_read_only")
+        value.offset=offset;value.next_offset=end<raw.count ? end:nil;value.total_bytes=raw.count
+        return value
+    }
     func verifyEdit(_ proposal: NotesDirectEditProposal) throws {
         try proposal.validate()
         let current = try read(proposal.scope, row: proposal.row)
@@ -252,6 +289,8 @@ final class NotesDirectHandler {
             let result: NotesDirectResult
             switch request {
             case .folders: result = .folders(try backend.folders())
+            case let .allPage(query,offset,limit):result = .search(try backend.searchAll(query:query,offset:offset,limit:limit))
+            case let .allRead(row,offset,maxBytes):result = .read(try backend.readAll(row:row,offset:offset,maxBytes:maxBytes))
             case let .list(scope):
                 try requireSelection(scope)
                 result = .search(try backend.search(scope, query: ""))

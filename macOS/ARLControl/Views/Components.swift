@@ -266,3 +266,21 @@ private struct EditorialMenuLabel: ViewModifier {
             .contentShape(Rectangle())
     }
 }
+
+/// Compact status, with a readable equivalent for assistive technology and details.
+struct ConnectionIndicator: View {
+    let ready: Bool
+    var pending = false
+    var title = "连接"
+    var inactive = false
+    var text: String? = nil
+    private var label:String {text ?? (ready ? "已连接":pending ? "连接中":inactive ? "未运行":"需要处理")}
+    private var color:Color {ready ? .green:pending ? EditorialStyle.accent:inactive ? .secondary:.orange}
+    var body: some View {
+        HStack(spacing:6) {
+            Circle().fill(color).frame(width:7,height:7).accessibilityHidden(true)
+            Text(label).font(.caption).foregroundStyle(.secondary).fixedSize()
+        }.help(title+"："+label)
+            .accessibilityElement(children:.ignore).accessibilityLabel(title+"："+label)
+    }
+}

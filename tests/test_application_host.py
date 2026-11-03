@@ -200,8 +200,7 @@ class ApplicationHostTests(unittest.TestCase):
         runtime,_=self.factory(codex=False,peer=False)
         features=self.ok(runtime,'runtime.describe',app='settings')['features']
         self.assertNotIn('application_models',features); self.assertNotIn('application_icon',features)
-        row=next(r for r in self.ok(runtime,'settings.snapshot',app='settings')['apps'] if r['id']=='tisra')
-        self.assertEqual(row['registration'],'unregistered')
+        self.assertNotIn('tisra',{r['id'] for r in self.ok(runtime,'settings.snapshot',app='settings')['apps']})
         self.assertFalse(self.rpc(runtime,'connection.open')['ok'])
 
 

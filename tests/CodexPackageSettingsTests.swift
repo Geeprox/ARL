@@ -50,6 +50,13 @@ struct ARLError: Error { let code: String }
         other.draft["low"]?.display_name = "第二处草稿"
         precondition(!other.save() && other.draft["low"]?.display_name == "第二处草稿")
         let afterConflict = try bytes();precondition(afterConflict == beforeConflict,"stale writer overwrote new revision")
+        other.reload(preservingDraft:true)
+        precondition(other.draft["low"]?.display_name == "第二处草稿" && other.draft["high"]?.display_name == "第一处修改",
+                     "automatic reload must merge remote changes without losing the user's draft")
+        precondition(other.saved?.revision == settings.saved?.revision,"rebased draft must be saveable without a manual reload action")
+        other.setParallel(3);precondition(other.maxParallel == 3)
+        let parallel=try JSONDecoder().decode(ModelSchedulerConfiguration.self,from:Data(contentsOf:home.deletingLastPathComponent().appendingPathComponent("model-scheduler-v1.json")))
+        precondition(parallel.schema_version == 1 && parallel.max_parallel == 3)
         settings.reload();settings.draft["low"]?.display_name = "过期不保存"
         catalog.refreshed_at_ms = Int64((Date().timeIntervalSince1970-120)*1000)
         try write("catalog-v2.json",catalog)

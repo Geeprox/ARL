@@ -33,7 +33,9 @@ struct ModulesSnapshot: Codable, Sendable {
         guard let checked = mio.checked_at_ms else { return .unknown }
         let nowMS = now.timeIntervalSince1970 * 1000
         let age = nowMS - Double(checked)
-        guard age >= 0, Double(checked_at_ms) <= nowMS else { return .unknown }
+        // A TimelineView tick can precede completion of the same asynchronous
+        // sample. Small observation skew must not turn a fresh success unknown.
+        guard age >= -5000, Double(checked_at_ms) <= nowMS + 5000 else { return .unknown }
         guard age <= Double(mio.stale_after_ms) else { return .stale }
         if mio.error_code != nil { return .failed }
         if mio.liveness == "unavailable" { return .unavailable }

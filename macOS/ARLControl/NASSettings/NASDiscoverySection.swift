@@ -11,12 +11,12 @@ import SwiftUI
                     Text("正在查找…").foregroundStyle(.secondary)
                 } else if discovery.phase == .failed {
                     Text("最近查找未完成").foregroundStyle(.secondary)
-                } else if let checked=discovery.checkedAt {
-                    Text(checked,format:.dateTime.hour().minute()).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("重新查找",systemImage:"arrow.clockwise") {discovery.refresh()}
-                    .disabled(setup.isPerforming || discovery.phase == .searching)
+                if discovery.phase == .failed || discovery.devices.isEmpty && discovery.phase == .complete {
+                    Button("重试",systemImage:"arrow.clockwise") {discovery.refresh()}
+                        .disabled(setup.isPerforming)
+                }
             }.font(.caption)
             ForEach(discovery.devices) { device in
                 VStack(alignment:.leading,spacing:4) {

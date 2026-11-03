@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1174,
+  "source_files": 1185,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -10,7 +10,7 @@
   "reviewed_pattern_matches": [
     {
       "path": ".github/workflows/source-checks.yml",
-      "sha256": "afaafc70966ded28c9d66bd1ff6408d4d52f14de45e2381ff5236924f7f9c3c1",
+      "sha256": "c735968d9413307105a47a144399fa200d147680ee655f2ae2d90f9fc6c18712",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -101,7 +101,7 @@
     },
     {
       "path": "arl/compat_host.py",
-      "sha256": "a1fd76a43f90dbeca81a5c159758b47e576fe402996e668c54e27c1126214ff0",
+      "sha256": "91c34b5a2b93326ac03140c80f1fbf73a46ed94d264484fdd7417d8f3b10367a",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -676,9 +676,9 @@
     },
     {
       "path": "integrations/moments/worker/local_service.py",
-      "sha256": "c568dd0e18ff686370360c29630cfe49ba921ba7e3ad26f9da7b786062da77bc",
+      "sha256": "13d6ed4876cb87eb31379b2c9a312c86c137f2f9c6f012dae5cb813be4fa424e",
       "categories": {
-        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname."
+        "local_hostname": "Logger namespace moments.local, not a network endpoint."
       }
     },
     {
@@ -866,7 +866,7 @@
     },
     {
       "path": "macOS/ARLControl/Moments/MomentsController.swift",
-      "sha256": "939c4fe21447719b1ea93ea90807fee2a921e7cba2b10836dbd2bdb8f4c90c3c",
+      "sha256": "dde70549e2a3b08113f2481a2f721d3910cb6026b19648b2bef9b8bf3e8164fb",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -894,7 +894,7 @@
     },
     {
       "path": "macOS/ARLControl/Moments/MomentsView.swift",
-      "sha256": "a41cc2fdcef7870ff28d8a1100dcc4c2fab8d9883a6932976924071402a4fb04",
+      "sha256": "026860cd2e3205017defd198c8ddc480c2220bb3c08443265259eb8620fc863f",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -943,14 +943,14 @@
     },
     {
       "path": "script/core_runtime_sources.json",
-      "sha256": "d9d3e162524e46c34f2b7b113639e7cfbef8d6c7a3fce8682677bcd53c5e890b",
+      "sha256": "a23a0209eb0b188b4f53ea691fa0e1aa7546ae4584ddf149e90c5843e0cb712a",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
     },
     {
       "path": "script/export_public_source.py",
-      "sha256": "e710628c96393eaaead59a0240d54e98fa362943869946417f04faf025b6cf0c",
+      "sha256": "748ef877ef1583b6d66e9af2efda2b8fb0133896f7c9cbf8fe265952bd740267",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -978,7 +978,7 @@
     },
     {
       "path": "script/test_profiles.json",
-      "sha256": "aac2c112f37ed1970673f172ebad6d52e63b014a15b4ba5e82eea006a4f93c22",
+      "sha256": "1e1410df7e84620528a39ea1416232d1e69c179dd5341a6fb2c30a8c510d3cb8",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1077,9 +1077,9 @@
     },
     {
       "path": "tests/NASDiscoveryRefreshTests.swift",
-      "sha256": "147fb50370e0a1a4db87b22b38832df15d8beef9d4d51b34ed025e498b9cd33f",
+      "sha256": "3e81a2ffe2333ea69b8f85e543137e7094f21daeb8141a9cc9afbc1b258cb5bc",
       "categories": {
-        "local_hostname": "Python/logger symbol or synthetic discovery/rejection hostname."
+        "local_hostname": "Synthetic FixtureNAS and Synthetic.local endpoint aliases with RFC 5737 test addresses; no real NAS hostname."
       }
     },
     {
@@ -1158,7 +1158,7 @@
     },
     {
       "path": "tests/capture_application_host.py",
-      "sha256": "57c818efd64890170181050a586451b33e5433f01fcd01badcc41928f81bb93a",
+      "sha256": "fbd952e709187f629672ad23db340ab739a5869c26684af9cfc78b3992d6a22e",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1229,7 +1229,7 @@
     },
     {
       "path": "tests/service_portal/test_review_fixes.py",
-      "sha256": "27d4a06bc9b00ecfda5906f9ced93cc108d0f2583cb0e840625da481a4488a79",
+      "sha256": "80161e041d2be5663ac58fcebe461dddfc5f81503ad59447996a980fbd9ee6a6",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1250,7 +1250,7 @@
     },
     {
       "path": "tests/test_application_host.py",
-      "sha256": "7a4bfe0b3fd6d6e5b98a36fe7e45b18ce99a2d1f61502eddffb6a15d38b0bb17",
+      "sha256": "5af97bd8c3c8b2acdcdedabdf3c13fdf3e9b7565cd3aea6a33e3d147e0b0fbfb",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1271,7 +1271,7 @@
     },
     {
       "path": "tests/test_capture_application_integration.py",
-      "sha256": "3af72fdfbe25cf5e7135e46ba5292d3d16a0ddbcc3cead5c1d05c6151047dfc0",
+      "sha256": "a42912ba720dde28ebb87589b7271e43cf3cf626710464f41bff018552eaaf63",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1327,9 +1327,9 @@
     },
     {
       "path": "tests/test_codex_server.py",
-      "sha256": "8ed829748dba0f3389ce65b03dd69d6f79d7a20f393c03991a4f4c2172de1e30",
+      "sha256": "de7fdc6f1a4af964e4b8801e4dc866828b1eac08312bfa89ca949a4488901b6f",
       "categories": {
-        "local_hostname": "Synthetic dotted tool identifier, with no network endpoint or connection.",
+        "local_hostname": "Synthetic tool identifier unrelated.local, not an endpoint.",
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
     },
@@ -1363,7 +1363,7 @@
     },
     {
       "path": "tests/test_control.py",
-      "sha256": "fac1b6c023210d22f8fa623699fb466319e1a55ee86fa6fc12f0e9e9b2c0adb4",
+      "sha256": "dc89378ebcd85eba507e28bdf6ede9a8cfbfa185ccd49d9e2501a82f826caa71",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1377,7 +1377,7 @@
     },
     {
       "path": "tests/test_formal_research_host.py",
-      "sha256": "9ad082e6b24e69951f8e8cd0b816f331824770ad51a6f4fc0eb6dde313c64cae",
+      "sha256": "0def7e666bc1dde3bd4aea9154fad81ecbc8fbea5d8f533c45108784db6d9844",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1426,7 +1426,7 @@
     },
     {
       "path": "tests/test_model_transport_boundary.py",
-      "sha256": "67d161aed3654cfabff439725bed86f3389819a2d09c375f2f6c079fcb579a8f",
+      "sha256": "dd17c3aaeff701d88810a6136192e05d6e30afeccd170e1cbe6323b12c6598be",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1490,9 +1490,9 @@
     },
     {
       "path": "tests/test_privacy_audit.py",
-      "sha256": "99ae0d2ae12527e9602a1b35af9ec87f9e531acc712267ce316648f4436a33f9",
+      "sha256": "34738e318206f71d328ae8480abc7358b63646e0ae982c375c8f3eeb0d1f9ef5",
       "categories": {
-        "credential_url": "Synthetic credential-URL rejection test; no usable service credential."
+        "credential_url": "Deliberately synthetic credential-URL parser fixture using example.invalid."
       }
     },
     {
@@ -1518,7 +1518,7 @@
     },
     {
       "path": "tests/test_research_product_entry.py",
-      "sha256": "b5565152d3d50af35a97d7bec3da4812450333b30fe0d4365d55403f78962181",
+      "sha256": "5b0034664938866ecaa56337d3987254cbb1245d125ad8543ae3f4581619c10a",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1626,13 +1626,6 @@
       "sha256": "72aa18e6400cb1c6e9032a252b90b0f48db446ddf45ff6163cd2d619ff01c9b3",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
-      }
-    },
-    {
-      "path": "PUBLIC-SOURCE-MANIFEST.json",
-      "sha256": "4d3d0579d2a1baa37a2ebf45bc7463a9888c03f18ff7e903647c11d74dd69f9e",
-      "categories": {
-        "private_app_reference": "Intentional source inventory names."
       }
     }
   ]

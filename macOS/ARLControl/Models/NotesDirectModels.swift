@@ -159,6 +159,8 @@ struct NotesDirectPageState {
 // Frozen domain wire. UI and owner adapters submit these same typed operations.
 enum NotesDirectRequest: Codable, Sendable {
     case folders
+    case allPage(query: String, offset: Int, limit: Int)
+    case allRead(row: NotesDirectRow, offset: Int, maxBytes: Int)
     case list(scope: NotesDirectScope)
     case search(scope: NotesDirectScope, query: String)
     case page(scope: NotesDirectScope, query: String, offset: Int, limit: Int)

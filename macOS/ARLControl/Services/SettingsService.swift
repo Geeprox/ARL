@@ -75,6 +75,12 @@ actor SettingsService {
         }
         return cachedModules
     }
+    func readScheduler() async -> ModelSchedulerStatus? {
+        guard !demo else { return nil }
+        guard let reply=try? await ARLClient(home:home,app:"settings").rpc("settings.scheduler.v1"),
+              let bytes=try? JSONEncoder().encode(reply),let value=try? JSONDecoder().decode(ModelSchedulerStatus.self,from:bytes),value.schema_version == 1,(1...8).contains(value.max_parallel),value.running >= 0,value.queued >= 0 else{return nil}
+        return value
+    }
     func readMioCalendarPermission() async -> MetadataFeature<MioCalendarPermissionStatus> {
         guard !nativeActionsHeld, !demo else { return .unsupported }
         let now = ProcessInfo.processInfo.systemUptime

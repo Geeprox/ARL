@@ -20,6 +20,10 @@ class Bridge:
                 if request.get('id')!=p.stem or not -30<=age<=600:raise ValueError()
                 if request.get('kind')=='refresh':
                     self.pending.append(p.stem);self.service.manual_refresh=True;p.unlink();continue
+                if request.get('kind')=='recover_images' and set(request)<= {'schema','id','created_at','kind'}:
+                    result=self.service.queue.recover_failed(user_authorized=True)
+                    self.service.manual_refresh=True
+                    atomic_json(reply,{'schema':1,'id':p.stem,'at':now(),**result});p.unlink();continue
                 ids=request.get('asset_ids')
                 if request.get('kind')!='images' or not isinstance(ids,list) or not 1<=len(ids)<=20 or any(not isinstance(x,str) or not ASSET.fullmatch(x) for x in ids):raise ValueError()
                 result=self.service.queue.submit(ids,priority=True)

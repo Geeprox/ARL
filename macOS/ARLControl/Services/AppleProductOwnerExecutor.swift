@@ -116,14 +116,14 @@ import AppKit
             case "mio_notes_folders":
                 try keys(args,[]);request = .folders
             case "mio_notes_list":
-                guard Set(args.keys).isSubset(of:["offset","limit"]),let scope else{throw AppleDirectFault("target_required")}
-                request = .page(scope:scope,query:"",offset:try pageInteger(args["offset"],default:0,maximum:Int.max),limit:try pageInteger(args["limit"],default:50,maximum:50))
+                guard Set(args.keys).isSubset(of:["offset","limit"]) else{throw AppleDirectFault("target_required")}
+                request = .allPage(query:"",offset:try pageInteger(args["offset"],default:0,maximum:Int.max),limit:try pageInteger(args["limit"],default:50,maximum:50))
             case "mio_notes_search":
-                guard Set(args.keys).isSubset(of:["query","offset","limit"]),let scope else{throw AppleDirectFault("target_required")}
+                guard Set(args.keys).isSubset(of:["query","offset","limit"]) else{throw AppleDirectFault("target_required")}
                 guard let query=args["query"] as? String else{throw OwnerReadFault.invalid}
-                request = .page(scope:scope,query:query,offset:try pageInteger(args["offset"],default:0,maximum:Int.max),limit:try pageInteger(args["limit"],default:50,maximum:50))
+                request = .allPage(query:query,offset:try pageInteger(args["offset"],default:0,maximum:Int.max),limit:try pageInteger(args["limit"],default:50,maximum:50))
             case "mio_notes_read":
-                guard Set(args.keys).isSubset(of:["row","offset","max_bytes"]),args["row"] != nil else{throw AppleDirectFault("invalid_arguments")};guard let scope else{throw AppleDirectFault("target_required")};request = .readPage(scope:scope,row:try decode(NotesDirectRow.self,args["row"]),offset:try pageInteger(args["offset"],default:0,maximum:Int.max),maxBytes:try pageInteger(args["max_bytes"],default:8192,maximum:8192))
+                guard Set(args.keys).isSubset(of:["row","offset","max_bytes"]),args["row"] != nil else{throw AppleDirectFault("invalid_arguments")};request = .allRead(row:try decode(NotesDirectRow.self,args["row"]),offset:try pageInteger(args["offset"],default:0,maximum:Int.max),maxBytes:try pageInteger(args["max_bytes"],default:8192,maximum:8192))
             case "mio_notes_create":
                 try keys(args,["task_id","title","plaintext"])
                 guard let scope else{throw AppleDirectFault("target_required")}

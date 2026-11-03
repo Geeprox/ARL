@@ -46,7 +46,7 @@ class PackageRegistry:
         return row
     def version(self,catalog,config=None):
         config=self.load() if config is None else config
-        return digest({'models':catalog,'package_revision':config['revision'],'packages':config['packages'],'execution_policy':{'service_tiers':['default','fast'],'max_input_bytes':None,'input_policy':INPUT_POLICY,'transport_max_frame_bytes':TRANSPORT_FRAME_BYTES,'max_output_bytes':32768,'max_wall_ms':180000,'priority':['explicit']}})
+        return digest({'models':catalog,'package_revision':config['revision'],'packages':config['packages'],'execution_policy':{'service_tiers':['default','fast'],'max_input_bytes':None,'input_policy':INPUT_POLICY,'transport_max_frame_bytes':TRANSPORT_FRAME_BYTES,'max_output_bytes':32768,'max_wall_ms':180000,'priority':['interactive','explicit','background']}})
     def publish(self,catalog,current):
         version=digest(catalog)
         with self.locked():

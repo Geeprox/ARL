@@ -30,6 +30,10 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         var identity: NASCredentialIdentity
         var revision: UInt64
     }
+    private var savedAccount: String?
+    private var nextServerCheck:TimeInterval = 0
+    private var automaticFailures = 0
+    private var userPausedServer = false
     private var serverRecord: ServerRecord?
     private var serverState=NASServerState()
     private var serverDeadline:Double=0
@@ -135,9 +139,39 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         }
         let granted=record.map {$0.configuration.host+":"+String($0.configuration.port)+"/"+$0.configuration.share+($0.configuration.root.isEmpty ? "" : "/"+$0.configuration.root)}
         return .init(address:serverRecord?.originalAddress ?? "",port:serverRecord?.endpoint.port ?? 445,
-            timeoutSeconds:serverRecord?.endpoint.timeoutSeconds ?? 8,saved:serverRecord != nil,
+            timeoutSeconds:serverRecord?.endpoint.timeoutSeconds ?? 8,saved:serverRecord != nil,account:savedAccount,
             state:serverState,directory:serverDirectory,share:previewShare,authorizedScope:granted,
             busy:serverIntentID != nil,fault:failure,diagnostic:failureDiagnostic)
+    }
+    func maintainServerConnection() async {
+        guard enabled,pins != nil,!userPausedServer,serverIntentID == nil,fileOperationID == nil,let saved=serverRecord,ProcessInfo.processInfo.systemUptime >= nextServerCheck else{return}
+        nextServerCheck=ProcessInfo.processInfo.systemUptime+60
+        if savedAccount == nil {savedAccount=try? await owner.savedServerAccount(endpoint:saved.endpoint,identity:saved.identity)}
+        if serverState.authenticated || state.connected {return}
+        if let record,let identity=record.identity,credentialMatchesScope() {
+            let token=UUID();serverIntentID=token
+            defer{if serverIntentID==token {serverIntentID=nil}}
+            do {
+                let next=try await owner.connect(configuration:record.configuration,identity:identity)
+                guard serverIntentID==token,self.record?.configuration==record.configuration else{return}
+                state=next;failure=nil;automaticFailures=0;startPolling()
+            } catch {
+                failure=mapped(error);automaticFailures=min(automaticFailures+1,5)
+                nextServerCheck=ProcessInfo.processInfo.systemUptime+[5.0,15,30,60,300][automaticFailures-1]
+                if failure == .authenticationFailed || failure == .credentialInvalid {nextServerCheck = .infinity}
+            }
+            return
+        }
+        guard let intent=beginServerAction(.login) else{return}
+        await performServerAction(intent,input:nil)
+        if serverState.authenticated {
+            automaticFailures=0
+            if record == nil,let shares=beginServerAction(.shares(cursor:nil)) {await performServerAction(shares,input:nil)}
+        } else {
+            automaticFailures=min(automaticFailures+1,5)
+            nextServerCheck=ProcessInfo.processInfo.systemUptime+[5.0,15,30,60,300][automaticFailures-1]
+            if failure == .authenticationFailed || failure == .credentialInvalid {nextServerCheck = .infinity}
+        }
     }
     func archiveDestination() async throws -> NASArchiveDestination {
         guard enabled, pins != nil, serverIntentID == nil, fileOperationID == nil,
@@ -179,6 +213,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             try current()
             switch intent.action {
             case .save(let address,let port,let timeout):
+                userPausedServer=false;nextServerCheck=0;savedAccount=nil
                 let normalized=try NASAddressInput(address,port:port)
                 let endpoint=try NASServerEndpoint(sourceRef:serverRecord?.endpoint.sourceRef ?? UUID().uuidString.lowercased(),host:normalized.host,port:normalized.port,timeoutSeconds:timeout,generation:(serverRecord?.endpoint.generation ?? 0)+1)
                 guard let input,input.consume({username=$0;password=$1}) else{throw ARLNASFault.credentialInvalid}
@@ -188,6 +223,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 try persist(next,to:serverPath);serverRecord=next;revision=next.revision
                 serverState = .init();state = .init();serverDirectory=nil;previewShare=nil;shareNames=[]
             case .login:
+                userPausedServer=false
                 guard let saved=serverRecord else{throw ARLNASFault.credentialNotSaved}
                 let started=ProcessInfo.processInfo.systemUptime
                 let next=try await owner.authenticateServer(endpoint:saved.endpoint,identity:saved.identity);try current()
@@ -217,7 +253,10 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 await owner.stop();try current()
                 let next=Record(configuration:config,identity:saved.identity,credentialFingerprint:saved.endpoint.fingerprint,revision:revision+1,originalAddress:saved.originalAddress)
                 try persist(next);record=next;revision=next.revision;state = .init();serverState = .init();serverDirectory=nil;previewShare=nil;shareNames=[]
+                userPausedServer=false;nextServerCheck=0;automaticFailures=0
             case .stop:
+                userPausedServer=true
+
                 await owner.stop();try current();state = .init();serverState = .init();serverDirectory=nil;previewShare=nil;shareNames=[];revision+=1
             }
             failure=nil;failureDiagnostic=nil

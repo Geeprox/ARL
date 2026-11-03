@@ -23,12 +23,14 @@ class RuntimeDescription:
     def __init__(self):
         self.boot_id = secrets.token_hex(32)
         self.source_sha256 = source_fingerprint()
-    def snapshot(self, ready, *, application_models=False):
+    def snapshot(self, ready, *, application_models=False, application_platform=False):
         features = dict(FEATURES)
         # Protocol support only. Identity, catalog availability and inference
         # approval remain separate checks on their existing methods.
         if application_models:
             features.update(application_models=1, application_icon=1)
+        if application_platform:
+            features.update(application_registration=1, application_tasks=1, model_scheduler=1)
         return {"schema_version": 1, "protocol": PROTOCOL, "version": VERSION,
                 "boot_id": self.boot_id, "source_sha256": self.source_sha256,
                 "features": features, "ready": bool(ready)}

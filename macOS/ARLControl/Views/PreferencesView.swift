@@ -41,7 +41,11 @@ struct StatusMenu: View {
         Text(store.demo ? "ARL · 演示" : "ARL · \(store.title)")
         if let snapshot = store.snapshot { Text("待处理 \(snapshot.outstanding)") }
         Divider()
-        Button("打开 ARL") { openWindow(id: "control"); NSApp.activate(ignoringOtherApps: true) }
+        Button("打开 ARL") {
+            NSApp.setActivationPolicy(.regular)
+            openWindow(id: "control")
+            NSApp.activate(ignoringOtherApps: true)
+        }
         Button("刷新状态") { Task { await store.refresh() } }.keyboardShortcut("r")
         SettingsLink { Text("偏好设置") }
         Divider()

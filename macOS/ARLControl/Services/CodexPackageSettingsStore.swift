@@ -8,6 +8,7 @@ import Darwin
     let enabled: Bool
     private(set) var catalog: CodexPackagesCatalog?
     private(set) var saved: CodexPackagesFile?
+    private(set) var maxParallel = 2
     var draft: [String:CodexPackageRow] = [:]
     private(set) var message: String?
     var changed: Bool { saved.map { $0.packages != draft } ?? false }
@@ -24,6 +25,8 @@ import Darwin
     }
     func reload(preservingDraft: Bool = false) {
         guard enabled else { return }
+        if let bytes=try? RemindersNativeIO.privateFile(home.deletingLastPathComponent().appendingPathComponent("model-scheduler-v1.json").path,limit:4096),
+           let value=try? JSONDecoder().decode(ModelSchedulerConfiguration.self,from:bytes),value.schema_version == 1,(1...8).contains(value.max_parallel) { maxParallel=value.max_parallel }
         do {
             let c = try read(CodexPackagesCatalog.self, name:"catalog-v2.json")
             let p = try read(CodexPackagesFile.self, name:"packages-v2.json")
@@ -32,8 +35,23 @@ import Darwin
             let keepDraft = preservingDraft && changed
             catalog = c
             if !keepDraft { saved = p; draft = p.packages; message = nil }
-            else if saved?.revision != p.revision { message = "套餐已在其他位置更新。草稿已保留，请重新读取后再保存。" }
+            else if let baseline=saved,baseline.revision != p.revision {
+                // Rebase untouched rows on the latest revision. Keep intentional
+                // local edits visible and save them against the observed base.
+                for id in Self.ids where draft[id] == baseline.packages[id] {draft[id]=p.packages[id]}
+                saved=p
+                message="已同步其他位置的修改，你的草稿已保留。"
+            }
         } catch { message = "暂时无法读取套餐配置，请检查 Codex 连接。" }
+    }
+    func setParallel(_ value: Int) {
+        guard enabled,(1...8).contains(value) else{return}
+        do {
+            try RemindersNativeIO.privateDirectory(home.deletingLastPathComponent().path)
+            let bytes=try JSONEncoder().encode(ModelSchedulerConfiguration(schema_version:1,max_parallel:value))
+            try RemindersNativeIO.atomicWrite(bytes,to:home.deletingLastPathComponent().appendingPathComponent("model-scheduler-v1.json").path)
+            maxParallel=value
+        } catch { message="并行设置未保存，请稍后重试。" }
     }
     func selectModel(_ model: String, for id: String) {
         guard var row = draft[id], let option = catalog?.models.first(where: { $0.model == model }) else { return }
@@ -57,11 +75,11 @@ import Darwin
             let current = try read(CodexPackagesFile.self,name:"packages-v2.json")
             let c = try read(CodexPackagesCatalog.self,name:"catalog-v2.json")
             guard current.schema_version == 2, current.revision < Int.max, current.revision == saved.revision, current.packages == saved.packages else {
-                message = "套餐已被更新，请重新读取后修改。"; return false
+                message = "套餐已被更新，正在同步；你的草稿会保留。"; return false
             }
             guard c.schema_version == 2, c.catalog_version == catalog.catalog_version, c.isFresh(), c.execution.isValid,
                   draft.values.allSatisfy({ c.execution.permits($0.selection) }) else {
-                message = "模型目录已更新或过期，请重新读取。"; return false
+                message = "正在同步最新模型选项，请稍后保存。"; return false
             }
             let next = CodexPackagesFile(schema_version:2,revision:current.revision+1,catalog_version:c.catalog_version,packages:draft)
             let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys,.withoutEscapingSlashes]
@@ -69,6 +87,6 @@ import Darwin
             guard data.count <= 131072 else { throw ARLError(code:"package_configuration_invalid") }
             try RemindersNativeIO.atomicWrite(data,to:home.appendingPathComponent("packages-v2.json").path)
             self.saved = next; message = "已保存，新任务将使用此套餐配置。"; return true
-        } catch { message = "保存失败，请重新读取后重试。"; return false }
+        } catch { message = "保存失败，正在重新同步配置。"; return false }
     }
 }

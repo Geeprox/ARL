@@ -13,6 +13,9 @@ struct RegistryView: View {
                     ForEach(connected) { entry in
                         DisclosureGroup {
                             VStack(alignment: .leading, spacing: 8) {
+                                ForEach(entry.scenarios) { scenario in
+                                    HStack { Text(scenario.name);Spacer();Text(scenario.priorityTitle+" · "+scenario.packageTitle+"套餐").foregroundStyle(.secondary) }
+                                }
                                 MetadataRow(title: "授权", value: entry.authorization)
                                 if let version = entry.version { MetadataRow(title: "版本", value: version) }
                                 if !entry.advertised.isEmpty { MetadataRow(title: "所需能力", value: entry.advertised.joined(separator: "、")) }
@@ -24,7 +27,7 @@ struct RegistryView: View {
                                 AppIcon(id: entry.id, symbol: entry.symbol, registeredIcon: entry.applicationIcon, iconHome: entry.applicationIconHome, protocolIcon: true)
                                 Text(entry.name).font(.callout.weight(.medium)).lineLimit(2)
                                 Spacer(minLength: 12)
-                                StatusBadge(title: "已连接", color: .green)
+                                ConnectionIndicator(ready:true,title:entry.name)
                             }.padding(.vertical, 4)
                         }
                         if entry.id != connected.last?.id { Divider() }

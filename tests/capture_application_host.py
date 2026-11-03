@@ -187,7 +187,7 @@ def main():
             emit(dict(event='ready', **selected, capture=runtime.capture is not None,
                 worker=runtime.worker is not None, native_pid=native.pid if native else None,
                 source_pid=process.pid if process else None, gate=gate,
-                providers=sorted(runtime.policies['tisra'].providers)))
+                providers=sorted(runtime.policies['tisra'].providers) if 'tisra' in runtime.policies else []))
             for line in sys.stdin:
                 command = json.loads(line)
                 if command == {'command': 'stop'}: runtime.shutdown(); return

@@ -1,6 +1,6 @@
 """Opt-in Codex stdio text adapter. No arbitrary tools, auth, paths or fallback."""
 from __future__ import annotations
-import hashlib,json,os,re,selectors,subprocess,tempfile,time,uuid
+import hashlib,json,os,re,selectors,subprocess,tempfile,time,uuid,sys
 from pathlib import Path
 from .contracts import Fault,Cancelled,Tool,object_schema,string,validate,encode
 from .codex_context import TRANSPORT_FRAME_BYTES, INPUT_POLICY, context_error, token_receipt
@@ -47,6 +47,22 @@ def confirmed_preferences(thread, reasoning_effort=None, service_tier=None, *, s
 
 PROVIDER_FRAME_BYTES = 36 * 32768 + 65536  # Two JSON encodings of the promised decoded text budget.
 
+def instruction_isolation_profile(home=None):
+ # Codex loads global instructions independently of project_doc_max_bytes.
+ # Deny only these reads in the child; never edit shared Codex configuration or
+ # copy/relocate OAuth credentials. The thread acknowledgement still must report
+ # zero instruction sources, so future additional sources remain fail-closed.
+ root=Path.home() if home is None else Path(home)
+ paths=[str(root/'.codex'/name) for name in ('AGENTS.md','AGENTS.override.md')]
+ return '(version 1)(allow default)(deny file-read* '+''.join('(literal '+json.dumps(p)+')' for p in paths)+')'
+
+def provider_command(binary,config):
+ command=[str(binary),'app-server','--listen','stdio://']+sum((['-c',k+'='+json.dumps(v,separators=(',',':'))] for k,v in config.items()),[])
+ if sys.platform=='darwin':
+  if not Path('/usr/bin/sandbox-exec').is_file():raise Fault('provider_isolation_unavailable')
+  command=['/usr/bin/sandbox-exec','-p',instruction_isolation_profile(),*command]
+ return command
+
 class Session:
  def __init__(self,binary,workspace,*,timeout=30,context=None,test_command=None,diagnostic=False,overrides=None,observer=None,absolute_deadline=None,frame_bytes=PROVIDER_FRAME_BYTES):
   self.frame_bytes=frame_bytes;self.requests={}
@@ -54,7 +70,7 @@ class Session:
   if time.monotonic()>=self.deadline:raise Fault('provider_deadline_exceeded')
   if context:context.check_cancelled()
   config=dict(CONFIG,**(overrides or {}))
-  command=list(test_command) if test_command else [str(binary),'app-server','--listen','stdio://']+sum((['-c',k+'='+json.dumps(v,separators=(',',':'))] for k,v in config.items()),[])
+  command=list(test_command) if test_command else provider_command(binary,config)
   self.process=subprocess.Popen(command,cwd=workspace,env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(Path.home())},stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE if diagnostic else subprocess.DEVNULL)
   os.set_blocking(self.process.stdout.fileno(),False);os.set_blocking(self.process.stdin.fileno(),False)
   self.selector=selectors.DefaultSelector();self.selector.register(self.process.stdout,selectors.EVENT_READ)
@@ -194,6 +210,7 @@ class CodexTextAdapter:
   self.binary=Path(binary).resolve(strict=True) if test_command is None else Path(binary)
   self.pin=hashlib.sha256(self.binary.read_bytes()).hexdigest() if test_command is None else None
   self.enabled=enabled;self.test_command=test_command;self.observer=observer
+  self.timeout=30
   # Private host-only observer; never grants or launches a domain.
   self._priority_readiness=None
   self.capture_execution_catalog=False
@@ -305,7 +322,8 @@ class CodexTextAdapter:
   if len(args['input'].encode())>TRANSPORT_FRAME_BYTES:raise Fault('transport_frame_too_large')
   if not self.enabled:raise Fault('paid_provider_disabled')
   timing=Timing();self.verify();context.check_cancelled();timing.mark('integrity_checked')
-  absolute_deadline=time.monotonic()+(context.remaining(30) if hasattr(context,'remaining') else 30)
+  budget=context.remaining(self.timeout) if hasattr(context,'remaining') else self.timeout
+  absolute_deadline=time.monotonic()+budget
   readiness=self._priority_readiness;attempt=None
   native=getattr(context,'native_observer',lambda *a,**kw:None)
   def observe(event,**fields):
@@ -314,7 +332,7 @@ class CodexTextAdapter:
    elif event=='rpc_rejected':native('native_rpc_error',diagnostic=fields['diagnostic'])
   input_frame_bytes=len(json.dumps(args['input'],ensure_ascii=True).encode())+PROVIDER_FRAME_BYTES
   with tempfile.TemporaryDirectory(prefix='arl-codex-text-') as workspace:
-   session=Session(self.binary,workspace,timeout=30,context=context,test_command=self.test_command,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
+   session=Session(self.binary,workspace,timeout=budget,context=context,test_command=self.test_command,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
    completed=False
    try:
     attempt=readiness.begin_model_run(self,context,args['model'],format_name) if readiness is not None else None
@@ -326,7 +344,7 @@ class CodexTextAdapter:
      overrides={'mcp_servers.'+k+'.enabled':False for k in servers}
      session.close()
      context.check_cancelled();self.verify()
-     session=Session(self.binary,workspace,timeout=30,context=context,overrides=overrides,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
+     session=Session(self.binary,workspace,timeout=budget,context=context,overrides=overrides,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
      session.initialize()
      configured_model=session.text_controls()
      account=session.response(session.send('account/read',{'refreshToken':False}))
@@ -587,7 +605,8 @@ class CodexService:
 
  def admit(self, owner, tool, args, *, completion=False):
   if tool != self.name:return
-  if owner != self.caller or not self.current():raise Fault('codex_scope_unavailable')
+  platform = getattr(self.runtime,'application_platform',None) if self.runtime is not None else None
+  if (owner != self.caller and (platform is None or not platform.active(owner))) or not self.current():raise Fault('codex_scope_unavailable')
   validate(args, self.schema)
   if self.allow_model_selection and not completion:
    from .codex_execution_options import selection
