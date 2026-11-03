@@ -1108,6 +1108,15 @@
     },
     "tests.test_research": {
       "kind": "unittest",
+      "overrides": {
+        "ResearchTests.test_real_socket_registered_mac_peer_raw_roundtrip_and_other_process_rejected": {
+          "profile": "native",
+          "reason": "Real macOS libproc process identity and registered socket peer",
+          "requires": [
+            "macos"
+          ]
+        }
+      },
       "profile": "portable",
       "reason": "Self-contained checked-in source and synthetic temporary fixtures",
       "requires": []
@@ -1126,9 +1135,11 @@
     },
     "tests.test_research_product_socket": {
       "kind": "unittest",
-      "profile": "portable",
-      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
-      "requires": []
+      "profile": "native",
+      "reason": "Real macOS libproc process identity and registered socket peer",
+      "requires": [
+        "macos"
+      ]
     },
     "tests.test_research_sdk_swift": {
       "kind": "unittest",

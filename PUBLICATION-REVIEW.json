@@ -17,7 +17,7 @@
     },
     {
       "path": "PUBLIC-SOURCE-MANIFEST.json",
-      "sha256": "98545387312f8e1dec032490a4d84e89035cc5c26c1e892b579427be25dd5497",
+      "sha256": "e8c388312c7f9bd1495e7bc0dd4995f7113f243f0768eab9951f4a77da464025",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -424,7 +424,7 @@
     },
     {
       "path": "docs/TESTING-PROFILES.md",
-      "sha256": "afd30dc4a3baf13eaaced94ca33b25edfdd7e74bc7ffae6d1ae5756e0c916628",
+      "sha256": "a9349edaf57d27a7684360f3143f7a7216061ca1dcc6227d34e8937bfd65cf16",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -978,7 +978,7 @@
     },
     {
       "path": "script/test_profiles.json",
-      "sha256": "ac03a9116cb1b50348b6bc65e1434baf7e74da585547dc53c21895a9717e5b87",
+      "sha256": "483aab9ec6654fb025c9e56f07893b9df7b8e2b01f7372f6f2156e719572e142",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1504,7 +1504,7 @@
     },
     {
       "path": "tests/test_research.py",
-      "sha256": "3ea73b1ec4031767fdb5a9d7dd0173a0f24e46c061a27db1f68540d6dcb13bda",
+      "sha256": "ccc0cb419cb9b0d604f319664a83997ff49320c069ef433230d8171f59ee2d79",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }

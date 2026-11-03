@@ -180,7 +180,8 @@ class ResearchTests(RuntimeCase):
         self.assert_fault('method_not_authorized',lambda:r.dispatch(request,verified_app='tisra'))
     def test_codex_text_adapter_is_explicitly_incompatible_not_a_responses_conversion(self):
         from arl.codex_server import CodexTextAdapter
-        self.engine.adapters['responses_fixture']=CodexTextAdapter()
+        binary=self.home/'inert-codex';binary.write_bytes(b'never executed')
+        self.engine.adapters['responses_fixture']=CodexTextAdapter(binary)
         self.assert_fault('unsupported_research_provider',lambda:self.client.rpc('research.capabilities.v1'))
     def test_completed_reply_ttl_separate_from_input_and_queue_deadline(self):
         receipt,args=self.submit();self.execute()

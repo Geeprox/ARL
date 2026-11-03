@@ -14,6 +14,12 @@ jobs:
           python-version: '3.12'
       - name: Core, policy, parser and publication regressions
         run: python -B script/check.py --profile portable --output build/ci-portable
+      - name: Preserve failing test receipts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-test-receipts
+          path: build/ci-portable/
   native-source:
     runs-on: macos-latest
     steps:
@@ -21,5 +27,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Native process identity regressions
+        run: python3 -B script/check.py --profile native --module tests.test_research --module tests.test_research_product_socket --module tests.test_notes_focus --output build/ci-native-identity
       - name: Compile complete native source without signing or launch
         run: python3 -B script/check_native_source.py
+      - name: Preserve failing native test receipts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-test-receipts
+          path: build/ci-native-identity/

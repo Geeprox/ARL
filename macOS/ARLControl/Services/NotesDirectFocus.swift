@@ -66,7 +66,8 @@ import AppKit
                 else { continuation = waiting }
             }
         }, onCancel: { [weak self] in
-            Task { @MainActor in self?.cancel() }
+            guard let attempt = self else { return }
+            Task { @MainActor [attempt] in attempt.cancel() }
         })
     }
     var confirmationStillValid: Bool {
