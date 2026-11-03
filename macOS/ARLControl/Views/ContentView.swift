@@ -66,7 +66,10 @@ struct ContentView: View {
                     switch current {
                     case .overview: OverviewView(store: store, navigate: navigate)
                     case .performance: MetricsView(store: store)
-                    case .models: ModelConnectionSettings(controller: codexSettings ?? store.codex)
+                    case .models:
+                        ModelConnectionSettings(controller: codexSettings ?? store.codex)
+                        CodexPackagesSettingsView(home:store.service.home.appendingPathComponent("CodexPackages"),
+                            enabled:!store.demo && !store.isolated && !store.nativeActionsHeld && store.codex.enabled)
                     case .capabilities:
                         RegistryView(feature: store.control.registry)
                         ApplePermissionsView(feature: store.permissions, connected: store.connected,
@@ -116,10 +119,10 @@ private struct RuntimeToolbarActions: View {
         HStack(spacing: 6) {
             if diagnostics {
             Button { Task { await store.refresh(resetLogs: true) } } label: {
-                Image(systemName: "arrow.clockwise").font(.system(size: 14))
+                Image(systemName: "arrow.clockwise").font(.system(size: 14)).frame(width: 16, height: 40)
             }.help("刷新状态（⌘R）").accessibilityLabel("刷新").disabled(store.reading)
             }
-            SettingsLink { Image(systemName: "gearshape").font(.system(size: 14)) }
+            SettingsLink { Image(systemName: "gearshape").font(.system(size: 14)).frame(width: 16, height: 40) }
                 .help("偏好设置（⌘,）").accessibilityLabel("偏好设置")
         }.buttonStyle(EditorialActionButtonStyle(emphasis: .quiet))
             .accessibilityElement(children: .contain)
@@ -190,28 +193,28 @@ struct ModelConnectionSettings: View {
     private var modelControl: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("模型").font(.caption).foregroundStyle(.secondary)
-            Menu {
+            EditorialMenu {
                 ForEach(catalog?.models ?? []) { option in
                     Button { controller.selectExecution(option.selecting(from: selection)) } label: {
                         Label(option.display_name, systemImage: option.id == selection?.model ? "checkmark" : "cpu")
                     }
                 }
             } label: { Text(model?.display_name ?? selection?.model ?? "未载入").frame(maxWidth: .infinity, alignment: .leading) }
-                .modifier(EditorialMenuSurface()).frame(width: 220).disabled(!configurable)
+                .frame(width: 220).disabled(!configurable)
                 .accessibilityLabel("Codex 模型").accessibilityValue(model?.display_name ?? "未载入")
         }
     }
     private var effortControl: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("思考强度").font(.caption).foregroundStyle(.secondary)
-            Menu {
+            EditorialMenu {
                 ForEach(model?.efforts ?? []) { effort in
                     Button { if var next = selection { next.reasoning_effort = effort.id; controller.selectExecution(next) } } label: {
                         Label(effort.title, systemImage: selection?.reasoning_effort == effort.id ? "checkmark" : "brain")
                     }
                 }
             } label: { Text(selection.map { CodexEffortOption.title($0.reasoning_effort) } ?? "未载入").frame(maxWidth: .infinity, alignment: .leading) }
-                .modifier(EditorialMenuSurface()).frame(width: 140).disabled(!configurable || model == nil)
+                .frame(width: 140).disabled(!configurable || model == nil)
                 .accessibilityLabel("Codex 思考强度")
         }
     }

@@ -12,7 +12,7 @@ import SwiftUI
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Menu {
+                EditorialMenu {
                     ForEach(catalog?.models ?? []) { option in
                         Button { choose(option.selecting(from: selection)) } label: {
                             Label(option.display_name, systemImage: option.id == selection?.model ? "checkmark" : "cpu")
@@ -20,14 +20,7 @@ import SwiftUI
                     }
                 } label: {
                     Label(model?.display_name ?? selection?.model ?? "载入可用模型", systemImage: "cpu")
-                }.menuStyle(.borderlessButton).menuIndicator(.hidden)
-                    .padding(.leading, 10).padding(.trailing, 24).frame(height: 32).frame(maxWidth: .infinity)
-                    .background(EditorialStyle.panel, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(EditorialStyle.rule, lineWidth: 0.5).allowsHitTesting(false) }
-                    .overlay(alignment: .trailing) {
-                        Image(systemName: "chevron.up.chevron.down").font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(.secondary).padding(.trailing, 10).allowsHitTesting(false)
-                    }
+                }
                     .disabled(!available).accessibilityLabel("Codex 模型").accessibilityValue(model?.display_name ?? "未载入")
                 Button {
                     if var next = selection { next.service_tier = next.fast ? "default" : "fast"; choose(next) }
@@ -39,7 +32,8 @@ import SwiftUI
                     }.padding(.horizontal, 10).frame(height: 32)
                     .foregroundStyle(selection?.fast == true ? EditorialStyle.accent : .secondary)
                     .background(selection?.fast == true ? EditorialStyle.accent.opacity(0.09) : Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 6))
-                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selection?.fast == true ? EditorialStyle.accent.opacity(0.5) : EditorialStyle.rule, lineWidth: 0.5) }
+                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selection?.fast == true ? EditorialStyle.accent.opacity(0.5) : EditorialStyle.rule, lineWidth: 0.5).allowsHitTesting(false) }
+                    .contentShape(Rectangle())
                 }.buttonStyle(.plain).disabled(!available || model?.fast_available != true)
                     .accessibilityLabel("Codex 加速").accessibilityValue(selection?.fast == true ? "开启" : "关闭")
                     .accessibilityAddTraits(selection?.fast == true ? .isSelected : [])
@@ -75,10 +69,11 @@ import SwiftUI
         let selected = effort.id == selection?.reasoning_effort
         return Button { selectEffort(effort.id) } label: {
             Text(effort.title).font(.system(size: 11, weight: selected ? .semibold : .medium))
-                .padding(.horizontal, 10).frame(height: 28)
+                .padding(.horizontal, 10).frame(minWidth: 40, minHeight: 32)
                 .foregroundStyle(selected ? EditorialStyle.accent : .secondary)
                 .background(selected ? EditorialStyle.accent.opacity(0.09) : .clear, in: RoundedRectangle(cornerRadius: 6))
-                .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? EditorialStyle.accent.opacity(0.5) : .clear, lineWidth: 0.5) }
+                .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(selected ? EditorialStyle.accent.opacity(0.5) : .clear, lineWidth: 0.5).allowsHitTesting(false) }
+                    .contentShape(Rectangle())
         }.buttonStyle(.plain).help(effort.description)
             .accessibilityLabel("思考强度：" + effort.title).accessibilityAddTraits(selected ? .isSelected : [])
     }

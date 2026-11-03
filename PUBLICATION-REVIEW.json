@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1168,
+  "source_files": 1174,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -10,7 +10,7 @@
   "reviewed_pattern_matches": [
     {
       "path": ".github/workflows/source-checks.yml",
-      "sha256": "9164e058f61671de364abc12a866bf28b57eb342ebe7eeb27eb7acd1683323d0",
+      "sha256": "afaafc70966ded28c9d66bd1ff6408d4d52f14de45e2381ff5236924f7f9c3c1",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -20,13 +20,6 @@
       "sha256": "f80a8e3042ffe47e5c7540c8415978f07ec1c03f413a5cd913b19583fc036075",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
-      }
-    },
-    {
-      "path": "PUBLIC-SOURCE-MANIFEST.json",
-      "sha256": "e1cacdd171ca4d0b4b0c41bb34f2abcac32f9ee266444f171d41f578c6cc82d7",
-      "categories": {
-        "private_app_reference": "Intentional integration module names in source inventory; no operational state."
       }
     },
     {
@@ -985,7 +978,7 @@
     },
     {
       "path": "script/test_profiles.json",
-      "sha256": "3f28b3ee51a513ce4330105a3d87315c39c4ca382be207121374b94170c1e772",
+      "sha256": "aac2c112f37ed1970673f172ebad6d52e63b014a15b4ba5e82eea006a4f93c22",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -1633,6 +1626,13 @@
       "sha256": "72aa18e6400cb1c6e9032a252b90b0f48db446ddf45ff6163cd2d619ff01c9b3",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+      }
+    },
+    {
+      "path": "PUBLIC-SOURCE-MANIFEST.json",
+      "sha256": "b9b9a6a1213fbdd02fd9a9651bd3bab23e3315560eed54cd8343d1c15fd5612c",
+      "categories": {
+        "private_app_reference": "Intentional source inventory names."
       }
     }
   ]

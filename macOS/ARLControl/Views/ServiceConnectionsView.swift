@@ -28,7 +28,7 @@ struct ServiceConnectionsView: View {
                         ForEach(destinations, id: \.self) { name in
                             Button { destination = name } label: {
                                 Text(name).font(.system(size: 13, weight: destination == name ? .semibold : .regular))
-                                    .padding(.horizontal, 13).frame(height: 34)
+                                    .padding(.horizontal, 13).frame(height: 34).contentShape(Rectangle())
                             }.buttonStyle(ConnectionDestinationStyle(selected: destination == name))
                                 .accessibilityAddTraits(destination == name ? .isSelected : [])
                         }
@@ -166,7 +166,7 @@ private struct ConnectionDestinationStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.foregroundStyle(EditorialStyle.graphite)
             .background(selected ? EditorialStyle.panel : hovered || configuration.isPressed ? Color.primary.opacity(0.035) : .clear, in: RoundedRectangle(cornerRadius: 7))
-            .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2) }
+            .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2).allowsHitTesting(false) }
             .onHover { hovered = $0 }
     }
 }
@@ -183,14 +183,14 @@ private struct TaskNotesConnectionView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("默认文件夹").font(.callout.weight(.medium))
                     if !controller.folders.isEmpty {
-                        Menu {
+                        EditorialMenu {
                             ForEach(controller.folders) { folder in
                                 Button(folder.label) {
                                     controller.performUserActionAfterClick { ticket in await controller.select(folder, ticket: ticket) }
                                 }
                             }
                         } label: { Text(controller.scope?.folder.label ?? "选择文件夹") }
-                            .modifier(EditorialMenuSurface()).frame(maxWidth: 360, alignment: .leading)
+                            .frame(maxWidth: 360, alignment: .leading)
                             .disabled(controller.busy)
                     } else {
                         if let folder = controller.scope?.folder { Text(folder.label).font(.callout).foregroundStyle(.secondary) }
@@ -240,11 +240,11 @@ private struct TaskNASConnectionView: View {
             field("目录范围", text: $model.draft.root)
             HStack {
                 Text("访问方式").frame(width: 90, alignment: .leading)
-                Menu {
+                EditorialMenu {
                     Button("只读访问") { model.draft.applicationScope = .readOnly }
                     Button("申请读写") { model.draft.applicationScope = .readWriteRequested }
                 } label: { Text(model.draft.applicationScope == .readOnly ? "只读访问" : "申请读写") }
-                    .modifier(EditorialMenuSurface()).frame(width: 180, alignment: .leading).disabled(model.isPerforming)
+                    .frame(width: 180, alignment: .leading).disabled(model.isPerforming)
             }.font(.callout)
             HStack {
                 Text("连接端口").frame(width: 90, alignment: .leading)

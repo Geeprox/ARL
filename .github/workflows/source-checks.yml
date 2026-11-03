@@ -28,7 +28,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Native lifecycle and identity regressions
-        run: python3 -B script/check.py --profile native --module tests.test_research --module tests.test_research_product_socket --module tests.test_notes_focus --module tests.test_install_child_drain --module tests.test_tisra_capture_process --module tests.test_bundled_runtime_watchdog --output build/ci-native-identity
+        run: python3 -B script/check.py --profile native --module tests.test_research --module tests.test_research_product_socket --module tests.test_notes_focus --module tests.test_install_child_drain --module tests.test_tisra_capture_process --module tests.test_bundled_runtime_watchdog --module tests.test_codex_package_settings --output build/ci-native-identity
       - name: Compile complete native source without signing or launch
         run: python3 -B script/check_native_source.py
       - name: Preserve failing native test receipts

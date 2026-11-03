@@ -90,14 +90,14 @@ private struct EditorialButtonSurface: View {
     }
     var body: some View {
         configuration.label.font(.system(size: 13, weight: .medium))
-            .padding(.horizontal, 12).frame(minWidth: 32, minHeight: EditorialStyle.controlHeight)
+            .padding(.horizontal, 12).frame(minWidth: 40, minHeight: EditorialStyle.controlHeight)
             .foregroundStyle(ink).background(fill, in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
             .overlay {
                 RoundedRectangle(cornerRadius: EditorialStyle.controlRadius)
                     .strokeBorder(focused ? EditorialStyle.accent : emphasis == .quiet ? .clear : EditorialStyle.rule,
                                   lineWidth: focused ? 2 : 0.5).allowsHitTesting(false)
             }
-            .contentShape(RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
+            .contentShape(Rectangle())
             .opacity(enabled ? 1 : 0.45)
             .offset(y: configuration.isPressed && !reduceMotion ? 0.5 : 0)
             .onHover { hovered = $0 }
@@ -242,11 +242,20 @@ private struct EditorialDestinationButtonStyle: ButtonStyle {
     }
 }
 
-/// Native menu behavior with bounded, consistent control chrome.
-struct EditorialMenuSurface: ViewModifier {
+/// Keep the complete surface inside the native menu label: outer padding is not a target.
+struct EditorialMenu<Items: View, Label: View>: View {
+    @ViewBuilder let content: () -> Items
+    @ViewBuilder let label: () -> Label
+    var body: some View {
+        Menu(content: content) {
+            label().modifier(EditorialMenuLabel())
+        }.menuStyle(.borderlessButton).menuIndicator(.hidden).tint(EditorialStyle.graphite)
+    }
+}
+
+private struct EditorialMenuLabel: ViewModifier {
     func body(content: Content) -> some View {
-        content.menuStyle(.borderlessButton).menuIndicator(.hidden)
-            .frame(maxWidth: .infinity, alignment: .leading).tint(EditorialStyle.graphite)
+        content.frame(maxWidth: .infinity, alignment: .leading)
             .padding(.leading, 10).padding(.trailing, 25).frame(height: EditorialStyle.controlHeight)
             .background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
             .overlay { RoundedRectangle(cornerRadius: EditorialStyle.controlRadius).strokeBorder(EditorialStyle.rule, lineWidth: 0.5).allowsHitTesting(false) }
@@ -254,5 +263,6 @@ struct EditorialMenuSurface: ViewModifier {
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
                     .foregroundStyle(.secondary).padding(.trailing, 10).allowsHitTesting(false)
             }
+            .contentShape(Rectangle())
     }
 }

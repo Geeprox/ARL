@@ -54,7 +54,7 @@ struct EditorialSidebar: View {
                             .font(.system(size: 16)).frame(width: 21).accessibilityHidden(true)
                         Text(title(section)).font(.system(size: 13, weight: selected ? .semibold : .regular))
                         Spacer(minLength: 0)
-                    }.padding(.horizontal, 10).frame(minHeight: 42).contentShape(Rectangle())
+                    }.padding(.horizontal, 10).frame(maxWidth: .infinity, minHeight: 42, alignment: .leading).contentShape(Rectangle())
                 }.buttonStyle(SidebarButtonStyle(selected: selected))
                     .keyboardShortcut(shortcut(section), modifiers: section == .models ? [.command, .shift] : .command)
                     .accessibilityAddTraits(selected ? .isSelected : [])
@@ -72,7 +72,7 @@ private struct SidebarButtonStyle: ButtonStyle {
         configuration.label.foregroundStyle(EditorialStyle.graphite)
             .background(selected ? EditorialStyle.panel : configuration.isPressed || hovered ? Color.primary.opacity(0.045) : .clear,
                         in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
-            .overlay { RoundedRectangle(cornerRadius: EditorialStyle.controlRadius).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2) }
+            .overlay { RoundedRectangle(cornerRadius: EditorialStyle.controlRadius).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2).allowsHitTesting(false) }
             .onHover { hovered = $0 }
     }
 }

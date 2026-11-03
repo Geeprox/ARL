@@ -218,7 +218,10 @@
       "macOS/ARLControl/Moments/MomentsFiles.swift",
       "macOS/ARLControl/Moments/MomentsNAS.swift",
       "macOS/ARLControl/Moments/MomentsView.swift",
-      "macOS/ARLControl/Moments/MomentsNASPicker.swift"
+      "macOS/ARLControl/Moments/MomentsNASPicker.swift",
+      "macOS/ARLControl/Models/CodexPackageConfiguration.swift",
+      "macOS/ARLControl/Services/CodexPackageSettingsStore.swift",
+      "macOS/ARLControl/Views/CodexPackagesSettingsView.swift"
     ]
   },
   "compression_c": "integrations/credentials_login/Module/Sources/FlyAICompression/FlyAICompression.c",

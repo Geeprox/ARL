@@ -85,7 +85,7 @@ struct RemindersDefaultListSettings: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("默认清单").font(.callout.weight(.medium))
             HStack(spacing: 10) {
-                Menu {
+                EditorialMenu {
                     if let catalog = controller.catalog {
                         ForEach(catalog.sources) { source in
                             if catalog.lists.contains(where: { $0.source_id == source.id }) {
@@ -104,7 +104,7 @@ struct RemindersDefaultListSettings: View {
                 } label: {
                     Text(controller.defaultTarget?.list?.title ?? (controller.busy ? "正在读取" : "选择清单"))
                         .frame(maxWidth: .infinity, alignment: .leading)
-                }.modifier(EditorialMenuSurface()).frame(maxWidth: 360)
+                }.frame(maxWidth: 360)
                     .disabled(disabled || controller.busy || controller.catalog?.lists.isEmpty != false)
                     .accessibilityLabel("默认提醒清单")
                     .accessibilityValue(controller.defaultTarget.map { $0.source.title + "，" + ($0.list?.title ?? "未设置") } ?? "未设置")

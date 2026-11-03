@@ -392,6 +392,15 @@
       "reason": "Self-contained checked-in source and synthetic temporary fixtures",
       "requires": []
     },
+    "tests.test_codex_package_settings": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Swift package settings persistence with synthetic local files",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
     "tests.test_codex_production": {
       "kind": "unittest",
       "profile": "native",

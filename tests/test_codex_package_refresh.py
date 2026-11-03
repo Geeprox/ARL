@@ -3,7 +3,7 @@ import tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 from arl.codex_packages import PackageRegistry
-from arl.codex_server import CodexTextAdapter
+from arl.codex_server import CodexTextAdapter,CodexService
 from arl.contracts import Fault
 
 class PackageRefreshTests(unittest.TestCase):
@@ -48,4 +48,26 @@ class PackageRefreshTests(unittest.TestCase):
   executable.write_bytes(b'raced')
   with patch.object(adapter,'verify_official_binary',side_effect=lambda:executable.write_bytes(b'changed-during-check')):
    with self.assertRaises(Fault):adapter.refresh_official_binary()
+ def test_service_recovers_after_verified_upgrade_refreshes_catalog_and_keeps_user_packages(self):
+  import hashlib
+  executable=Path(self.tmp.name)/'provider';executable.write_bytes(b'old-official-build')
+  adapter=CodexTextAdapter(executable,enabled=True)
+  service=CodexService(adapter,caller='upgrade-fixture',model='offline',reasoning_effort='high',
+   authorization_current=lambda:True,peer_current=lambda:True,allow_model_selection=True,package_home=self.registry.home)
+  row=self.registry.load();row['packages']['medium']['display_name']='User choice';saved=self.save(row)
+  refreshed=[dict(self.catalog[0],efforts=[{'id':'high','description':''},{'id':'new-effort','description':''}]),
+   dict(self.catalog[0],model='new-provider-model')]
+  executable.write_bytes(b'new-official-build')
+  with patch.object(adapter,'verify_official_binary') as verify, \
+       patch.object(adapter,'refresh_catalog',return_value=refreshed) as read, \
+       patch.object(adapter,'preflight_model',return_value={'catalog':refreshed}), \
+       patch('arl.codex_server.subprocess.Popen') as process:
+   service.preflight()
+  verify.assert_called_once();read.assert_called_once();process.assert_not_called()
+  self.assertEqual(adapter.pin,hashlib.sha256(executable.read_bytes()).hexdigest())
+  self.assertEqual(service.status()['state'],'ready')
+  self.assertEqual(service.status()['execution_catalog']['models'],refreshed)
+  self.assertEqual(self.registry.load()['packages'],saved['packages'])
+  self.assertEqual(self.registry.load()['revision'],saved['revision'])
+  self.assertEqual(__import__('json').loads((self.registry.home/'catalog-v2.json').read_text())['models'],refreshed)
 if __name__=='__main__':unittest.main()
