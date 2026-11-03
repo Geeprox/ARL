@@ -155,6 +155,7 @@ protocol NASConnectionRuntime: Sendable {
     func fileOperation(_ request: NASFileRequest) async throws -> Data
     func browseDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage
     func uploadNew(_ proposal: NASUploadProposal) async throws -> NASUploadResult
+    func fixedAcceptance(_ phase: NASAcceptancePhase) async throws -> Data
     func stop() async
     func authenticate(endpoint: NASServerEndpoint, identity: NASCredentialIdentity, secret: CredentialInput) async throws -> NASServerState
     func serverStatus() async -> NASServerState
@@ -163,6 +164,7 @@ protocol NASConnectionRuntime: Sendable {
 }
 
 extension NASConnectionRuntime {
+    func fixedAcceptance(_ phase: NASAcceptancePhase) async throws -> Data { throw CredentialError.deploymentNotApproved }
     func fileOperation(_ request: NASFileRequest) async throws -> Data { throw CredentialError.deploymentNotApproved }
     func authenticate(endpoint: NASServerEndpoint, identity: NASCredentialIdentity, secret: CredentialInput) async throws -> NASServerState { throw CredentialError.deploymentNotApproved }
     func serverStatus() async -> NASServerState { .init(failure:"nas_unavailable") }
@@ -431,6 +433,26 @@ public actor NASCredentialService {
         let proposal = try NASUploadProposal(configuration: config, identity: identity, directory: directory)
         pendingUpload = proposal
         return proposal
+    }
+    /// Local signed-app management only. Fixed reviewed data and existing scope;
+    /// never accepts a name, path, body, endpoint, credential or arbitrary action.
+    public func runFixedAcceptance(_ phase: NASAcceptancePhase, approvedManifestSHA256: String) async throws -> Data {
+        guard enabled, !busy, let runtime, let identity=active, let configuration=activeConfiguration
+        else { throw CredentialError.missing }
+        try NASAcceptanceProtocol.validate(configuration:configuration,approvedManifestSHA256:approvedManifestSHA256)
+        try current(identity); try Task.checkCancellation()
+        let captured=operation
+        busy=true;defer{busy=false}
+        do {
+            let result=try await runtime.fixedAcceptance(phase)
+            try current(identity);try Task.checkCancellation()
+            guard operation==captured,active==identity,activeConfiguration==configuration else { throw CancellationError() }
+            try NASAcceptanceProtocol.validateResponse(result,phase:phase)
+            return result
+        } catch {
+            await runtime.stop();active=nil;activeConfiguration=nil
+            throw error
+        }
     }
     /// Called only by the native exact-target confirmation flow. The opaque
     /// proposal must be the same live object prepared by this owner.

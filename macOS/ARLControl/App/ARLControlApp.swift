@@ -46,7 +46,7 @@ final class ControlDelegate: NSObject, NSApplicationDelegate {
 @main enum ARLEntry {
     @MainActor static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
-        if ["--manage","--internal-app-state","--internal-app-quit","--internal-code-check","--internal-codex-plan","--internal-reminders-state","--internal-reminders-quit"].contains(args.first ?? "") {
+        if ["--manage","--internal-app-state","--internal-app-quit","--internal-code-check","--internal-codex-plan","--internal-reminders-state","--internal-reminders-quit","--internal-nas-acceptance"].contains(args.first ?? "") {
             exit(InstallManagement.run(args))
         }
         ARLControlApp.main()

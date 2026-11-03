@@ -9,6 +9,7 @@ struct MessagesDirectView: View {
     @State private var query = ""
     var body: some View {
         ScrollView {
+            VStack(spacing: 16) {
             DetailCard(title: "信息") {
                 Text("选择账号，查询会话或发送信息。").font(.callout).foregroundStyle(.secondary)
                 AppleConnectionActionsView(target: .messages, permission: controller.permission,
@@ -93,6 +94,8 @@ struct MessagesDirectView: View {
                     }
                     if let detail = controller.detail { Text(detail).textSelection(.enabled) }
                 }.font(.caption).foregroundStyle(.secondary)
+            }
+            MessagesReceiveView(controller: controller.receiver)
             }.padding(22).frame(maxWidth: 1180, alignment: .leading).frame(maxWidth: .infinity)
         }
         .task {

@@ -422,6 +422,15 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             startPolling()
             guard next.connected, next.readable else { throw ARLNASFault.connectionFailed }
         } catch {
+            if serial == captured,fileOperationID == id,!Task.isCancelled,
+               self.record?.configuration == record.configuration,self.record?.identity == identity,
+               NASNetworkDiagnostic.eligible(error,configuration:record.configuration) {
+                let diagnostic=await NASNetworkDiagnostic.capture(configuration:record.configuration)
+                if serial == captured,fileOperationID == id,!Task.isCancelled,
+                   self.record?.configuration == record.configuration,self.record?.identity == identity {
+                    try? persist(diagnostic,to:path.deletingLastPathComponent().appendingPathComponent("network-diagnostic.json"))
+                }
+            }
             if serial == captured { state = .init(); failure = mapped(error); revision += 1 }
             throw error
         }

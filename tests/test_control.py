@@ -291,7 +291,7 @@ class ControlNativeTests(RuntimeCase):
             # Xcode's sys.executable can be a trampoline. Pin/launch the kernel-
             # observed actual interpreter; never weaken verifier path equality.
             native=Path(process_identity(os.getpid())['executable'])
-            spec=LaunchSpec('friday',native,(str(fixture),str(self.home)),root,
+            spec=LaunchSpec('friday',native,('-B',str(fixture),str(self.home)),root,
                            pin_sources([fixture,root/'arl/client.py']),python_paths=(root,))
             supervisor=ControlledSupervisor([spec],registry,control=runtime.control,
                 descriptors=[AppDescriptor('friday','Friday','sf:house','test.1',('household.state.read',))])

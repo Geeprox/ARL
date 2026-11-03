@@ -1,0 +1,9 @@
+# NAS socket failure family
+
+`nas_diagnostic.failure_record` may add `socket_family: "ipv4" | "ipv6"` to an existing errno-bearing exception-chain row. It reads only `af` from a traceback frame whose code object is exactly `socket.create_connection.__code__`; matching a module/function name is insufficient. Only an exact integer or the standard `socket.AddressFamily` enum is accepted. Unknown values and malformed errno values produce no family field.
+
+This observes the final failed address family retained by the original exception. It does not call DNS or a socket, install a trace/audit hook, retry, change connection arguments, or read `sa`, `address`, `timeout`, exception messages or request data. Locals are never copied or serialized. The strict local-diagnostics reader accepts only the two fixed strings with an errno and a corresponding socket code-location row; older records remain valid.
+
+Python's unchanged `create_connection` normally keeps the final error. Its same frame may occur twice in one traceback due to the original failure and later re-raise. Neither fact reveals earlier attempt errors or an attempt count. The diagnostic makes no claim about those, server availability or a Local Network decision. Existing 137 records that omitted `af` cannot retrospectively establish the family.
+
+Offline regressions use unchanged standard-library function code with an isolated synthetic globals dictionary for DNS and socket objects. They verify IPv4/IPv6 final errors, unchanged attempt order, repeated frames, forged names, unknown/malicious family objects and unrenderable address/timeout canaries. No real connection or global socket monkeypatch is needed. The existing real pinned-SMB synthetic dialer tests remain the dependency check for library wrapping and fallback behavior.

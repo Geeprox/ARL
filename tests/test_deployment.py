@@ -58,7 +58,7 @@ class DeploymentTests(unittest.TestCase):
         plan = self.manager.plan('install',self.m1['release'])
         self.assertEqual(plan['profile'],'metadata-only')
         self.assertFalse(self.manager.home.exists()); self.assertEqual(self.calls(),[])
-        result=subprocess.run([sys.executable,'deployment/manage.py','install','--package',str(self.one),
+        result=subprocess.run([sys.executable, '-B','deployment/manage.py','install','--package',str(self.one),
             '--test-root',str(self.root),'--fake-launchctl',str(self.fake)],cwd=ROOT,capture_output=True)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertFalse(self.manager.home.exists()); self.assertEqual(self.calls(),[])
@@ -152,7 +152,7 @@ class DeploymentTests(unittest.TestCase):
     def test_installed_fixed_entry_real_process_metadata_and_sanitized_logs(self):
         self.install()
         # Launch only the exact test-installed host; fake launchctl never runs it.
-        process=subprocess.Popen([sys.executable,'-I',str(self.manager.runtime/'run_host.py'),'--isolated-test'],
+        process=subprocess.Popen([sys.executable, '-B','-I',str(self.manager.runtime/'run_host.py'),'--isolated-test'],
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,env={**os.environ,'OPENAI_API_KEY':'synthetic-secret-never-log'})
         client=Client(self.manager.home,'settings')
         try:
@@ -175,7 +175,7 @@ class DeploymentTests(unittest.TestCase):
 class HostTests(unittest.TestCase):
     def test_keepalive_successful_exit_false_stops_and_explicit_enable_recovers(self):
         with tempfile.TemporaryDirectory(prefix='arl-h-',dir='/tmp') as directory:
-            home=Path(directory); command=[sys.executable,'-m','arl.host','--isolated-test','--home',str(home)]
+            home=Path(directory); command=[sys.executable, '-B','-m','arl.host','--isolated-test','--home',str(home)]
             attempts=[]; exits=[]; done=threading.Event()
             def launchd_model():
                 for _ in range(3):
@@ -199,7 +199,7 @@ class HostTests(unittest.TestCase):
                 # Next-login launch of a persistently disabled job is also success.
                 disabled=subprocess.run(command,cwd=ROOT,capture_output=True,timeout=5)
                 self.assertEqual(disabled.returncode,0); self.assertEqual(disabled.stderr,b'')
-                cli=subprocess.run([sys.executable,'-m','arl','serve','--home',str(home)],cwd=ROOT,capture_output=True,timeout=5)
+                cli=subprocess.run([sys.executable, '-B','-m','arl','serve','--home',str(home)],cwd=ROOT,capture_output=True,timeout=5)
                 self.assertEqual(cli.returncode,0)
                 (home/'disabled').unlink() # Explicit isolated admin enable.
                 recovered=subprocess.Popen(command,cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

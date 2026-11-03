@@ -1,6 +1,6 @@
 # NAS 文档文本提取组件
 
-2026-10-24，主仓源码与本地合成格式回归通过。正式 ARL 仍为133；本组件已接入134候选但尚未正式发布为 Mio 新工具，没有进行 NAS 文档类型实测。
+2026-10-30 状态：当前正式安装及实机结果统一见 [TODO 收尾状态](TODO-CLOSURE-20261030.md)；主仓目录与 owner 已包含文档工具。当前会话目录尚未显示该工具，真实 NAS 列表请求仍返回 `nas_transport_failed`，没有据此宣称文档实测完成。新增固定样例、真实调用与精确清理入口、只读故障诊断，以及支持宿主文件 API 的组件路径，见 [NAS 收尾与验收](NAS-TODO-CLOSURE-20261030.md)。下文2026-10-24的候选与验证记录保留为当时的证据。
 
 ## 支持范围
 
@@ -53,7 +53,7 @@ DOC/XLS/PPT、宏文档等其他扩展名返回 unsupported_document_format。�
 
 已验证路径仍是客户端编排：真实NAS download/transfer → Library create → 官方下载助手 →37字节/SHA复验。回执在 build/audit/apple-nas-133-20261024.noindex/；对应文件 [private Library reference omitted]。该路径无需改变NAS只读scope，可继续使用。
 
-## 134 候选的正式 host 接线（未发布）
+## 2026-10-24：134 候选的正式 host 接线（历史记录）
 
 2026-10-24：新增兼容接口 mio_nas_read_document，读取指定 object_ref / revision / size / name 的 PDF、DOCX、XLSX、PPTX。mio_nas_read_text 继续严格 UTF-8；原始 download / transfer_read 保留。文档读取不恢复 scope、不重连，不接受 root、主机、凭据、worker 路径或模型执行参数。正式运行版本仍133。
 

@@ -66,6 +66,8 @@ final class RuntimeStore {
     let codex: CodexNativeController
     let credentialBootstrap: CredentialHostBootstrap
     @ObservationIgnored private var bundledRuntimeOwner: BundledRuntimeOwner?
+    @ObservationIgnored private var messagesReceiveRelay: MessagesReceiveRelayServer?
+    @ObservationIgnored private var messagesReceiveRelayStopping=false
     @ObservationIgnored private var credentialReadOwner: CredentialReadOwnerServer?
     private(set) var credentialOwnerStatus = OwnerReadLifecycle.Snapshot.disabled
     @ObservationIgnored private var lifecycleOperation: UUID?
@@ -134,6 +136,7 @@ final class RuntimeStore {
             enabled: !actionsHeld && !demo && !isolated && !requiresIsolatedHome)
         notesPermissions = NotesPermissionController(home: home, demo: demo, sourceHeld: actionsHeld)
         bundledRuntimeOwner = .start(home: home, enabled: !sourceActionsHeld && !demo && !isolated && !requiresIsolatedHome)
+        configureMessagesReceiveRelay()
         configureAppleExecutor()
         configureAppleProductExecutor()
         configureNASFileExecutor()
@@ -157,10 +160,17 @@ final class RuntimeStore {
                     nasFileExecutor?.resumeAfterCancelledExit()
                     observeCredentialOwner()
                     notesDirect.resumeAfterCancelledExit(); messagesDirect.resumeAfterCancelledExit(); calendarPermission.resumeAfterCancelledExit(); calendarBusiness?.resumeAfterCancelledExit(); codex.resumeAfterCancelledExit()
+                    configureMessagesReceiveRelay()
                 }
             }
         }
         exitRequested = true; bundledRuntimeOwner?.requestExit()
+        messagesDirect.receiver.setAgentTransportState(available:false,code:"receive_stopping")
+        if let relay=messagesReceiveRelay {
+            messagesReceiveRelayStopping=true
+            guard await relay.stopAndDrain() else{return false}
+            messagesReceiveRelay=nil
+        }
         nasFileExecutor?.suspendForExit()
         remindersRestoreTask?.cancel(); appleReminderTask?.cancel()
         #if ARL_LIFECYCLE_TEST
@@ -169,10 +179,10 @@ final class RuntimeStore {
         let waitSeconds: TimeInterval = 40
         #endif
         let deadline = ProcessInfo.processInfo.systemUptime + waitSeconds
-        while (lifecycleOperation != nil || permissionBusy || codex.busy || nasFileExecutor?.busy == true || remindersRestoring || notesDirect.busy || messagesDirect.busy || calendarPermission.busy || calendarBusiness?.busy == true || calendarBusinessHandler?.busy == true) && ProcessInfo.processInfo.systemUptime < deadline {
+        while (lifecycleOperation != nil || permissionBusy || codex.busy || nasFileExecutor?.busy == true || remindersRestoring || notesDirect.busy || messagesDirect.busy || messagesDirect.receiver.busy || calendarPermission.busy || calendarBusiness?.busy == true || calendarBusinessHandler?.busy == true) && ProcessInfo.processInfo.systemUptime < deadline {
             do { try await Task.sleep(for: .milliseconds(20)) } catch { return false }
         }
-        guard lifecycleOperation == nil, !permissionBusy, !codex.busy, nasFileExecutor?.busy != true, !remindersRestoring, !notesDirect.busy, !messagesDirect.busy, !calendarPermission.busy, calendarBusiness?.busy != true, calendarBusinessHandler?.busy != true, !Task.isCancelled else { return false }
+        guard lifecycleOperation == nil, !permissionBusy, !codex.busy, nasFileExecutor?.busy != true, !remindersRestoring, !notesDirect.busy, !messagesDirect.busy, !messagesDirect.receiver.busy, !calendarPermission.busy, calendarBusiness?.busy != true, calendarBusinessHandler?.busy != true, !Task.isCancelled else { return false }
         let token = UUID(); lifecycleOperation = token
         defer { if lifecycleOperation == token { lifecycleOperation = nil } }
         guard await moments.stop() else { return false }
@@ -200,9 +210,48 @@ final class RuntimeStore {
             try await RemindersNativeClient(home:calendarHome).stopForAppExit()
         }
     }
+    private func configureMessagesReceiveRelay() {
+        #if !ARL_LIFECYCLE_TEST
+        guard !exitRequested,!nativeActionsHeld,!demo,!isolated,!requiresIsolatedHome,
+              bundledRuntimeOwner?.activated == true else {
+            messagesDirect.receiver.setAgentTransportState(available:false,code:"receive_core_unavailable")
+            return
+        }
+        if let relay=messagesReceiveRelay {
+            guard relay.drained else {
+                messagesDirect.receiver.setAgentTransportState(available:!messagesReceiveRelayStopping,
+                    code:messagesReceiveRelayStopping ? "receive_stopping":nil)
+                return
+            }
+            messagesReceiveRelay=nil
+        }
+        do {
+            messagesReceiveRelay=try MessagesReceiveRelayServer.start(home:calendarHome,authorize:{[weak self] fd in
+                try await MainActor.run {
+                    guard let self,!self.exitRequested,!self.nativeActionsHeld,
+                          let owner=self.bundledRuntimeOwner else{throw MessagesReceiveFault("receive_core_unavailable")}
+                    return try owner.messagesReceivePeer(fd)
+                }
+            },call:{[weak self] request,peer in
+                let receiver=try await MainActor.run {
+                    guard let self,!self.exitRequested,!self.nativeActionsHeld else{throw MessagesReceiveFault("receive_stopping")}
+                    return self.messagesDirect.receiver
+                }
+                return try await receiver.agent(method:request.method,parameters:request.parameters,
+                    consumer:request.consumer,verify:{_ in try peer.verify()})
+            })
+            messagesReceiveRelayStopping=false
+            messagesDirect.receiver.setAgentTransportState(available:true,code:nil)
+        } catch {
+            messagesDirect.receiver.setAgentTransportState(available:false,
+                code:(error as? MessagesReceiveFault)?.code ?? "receive_relay_unavailable")
+        }
+        #endif
+    }
     func observeCredentialOwner() {
         bundledRuntimeError = bundledRuntimeOwner?.failure
         credentialOwnerStatus = credentialReadOwner?.snapshot ?? .disabled
+        configureMessagesReceiveRelay()
     }
     func recoverBundledRuntime() {
         guard let owner = bundledRuntimeOwner, owner.failure != nil, !bundledRuntimeRecovering, !exitRequested, lifecycleOperation == nil else { return }

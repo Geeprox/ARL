@@ -55,7 +55,7 @@ class SourcedResearchTests(RuntimeCase):
         super().setUp(); self.configure()
 
     def configure(self, mode='ok'):
-        self.text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-I', str(FIXTURE), mode])
+        self.text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-B', '-I', str(FIXTURE), mode])
         self.adapter = CodexSourcedAdapter([MODEL], text_adapter=self.text)
         self.grant = CodexResearchGrant('codex_app_server', frozenset({MODEL}), 'original-auth-epoch', CONTRACT_SHA256)
         self.engine = CodexSourcedResearchEngine({'tisra': self.grant}, {'codex_app_server': self.adapter})

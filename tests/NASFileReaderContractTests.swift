@@ -100,7 +100,7 @@ import CryptoKit
         for changes: [String: Any] in [["source_ref": "other"], ["connection_epoch": String(repeating: "f", count: 32)],
             ["config_generation": 2], ["schema_version": true], ["operation": "search"], ["recursive": false],
             ["recursive": 1], ["keyword": "other"], ["snapshot_consistent": true], ["unexpected": 1], ["partial": true],
-            ["next_cursor": token], ["pages": true], ["pages": 5], ["scanned_count": 33], 
+            ["next_cursor": token], ["pages": true], ["pages": 5], ["scanned_count": 33],
             ["stopped_reasons": ["unknown"]], ["stopped_reason": "page_budget"], ["directory_ref": object],
             ["enumeration_complete": false], ["entries": Array(repeating: entry(0), count: 33)]] {
             try reject(searchReply(changes), search)

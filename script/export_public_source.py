@@ -49,7 +49,7 @@ PUBLIC_SOURCE_RECORDS={'macOS/ARLControl/Resources/AppIcon/provenance.json'}
 def selected(name):
  p=Path(name)
  if name in OMIT_FILES or name in DOCS_WITH_PRIVATE_CONTEXT or name.startswith(OMIT_PREFIXES):return False
- if any(part in {'__pycache__','node_modules','dist','module-cache'} or part.endswith('.app') for part in p.parts):return False
+ if any(part in {'__pycache__','node_modules','dist','module-cache'} or part.endswith(('.app', '.egg-info')) for part in p.parts):return False
  if p.suffix in {'.json','.md'} and HISTORICAL.search(p.name) and name not in PUBLIC_SOURCE_RECORDS|{'OPEN-SOURCE-REVIEW.md'}:return False
  return p.suffix in SOURCE or p.name in {'.gitignore','LICENSE','LICENSE.proposed','NOTICE','build.sh','Build.command'} or name.startswith('macOS/ARLControl/Resources/AppIcon/') and p.suffix in {'.png','.icns'}
 

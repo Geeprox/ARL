@@ -68,7 +68,13 @@ def main():
             directory=app/'Contents/Resources/NASRuntime'
             for p in [directory,*directory.rglob('*')]:p.chmod(0o700 if p.is_dir() else 0o600)
             shutil.rmtree(directory)
-            nas=ctx['nas_packager'].stage(app,cache_pin=ctx['recipe']['nas_runtime_cache_sha256'],build_only=False,signing_identity=ctx['recipe']['signing_identity'])
+            # A restaged NAS runtime needs its native document worker too.
+            # Compile its pinned current source rather than passing a missing
+            # worker or silently borrowing an unchecked baseline executable.
+            b.assert_inputs(ctx)
+            worker_step=ctx['nas_packager'].document_compile_step(out,ctx['tools']['swiftc'],ctx['sdk'],ctx['recipe']['product']['target'])
+            b.run(worker_step['argv'],worker_step['name'],out,b.BASE_ENV,worker_step['seconds'])
+            nas=ctx['nas_packager'].stage(app,cache_pin=ctx['recipe']['nas_runtime_cache_sha256'],build_only=False,signing_identity=ctx['recipe']['signing_identity'],document_worker=out/'work/NASPDFTextExtractor')
             probe=ctx['nas_packager'].import_probe_command(app)
             b.run(probe['argv'],probe['name'],out,b.BASE_ENV,probe['seconds'])
         else:
@@ -92,7 +98,7 @@ def main():
             if key in {'Contents/Resources/NASRuntime/inventory.json','Contents/Resources/NASRuntime/provenance.json'}:continue
             expected={**row,'mode':row['mode'] & ~0o022} if key.startswith('Contents/Resources/NASRuntime/') else row
             b.require(actual==expected,'增量期间已验证组件字节改变')
-        manifest={**old,'build':ctx['build'],'version':ctx['version'],'executableSHA256':hash_exe,'signature':signature,'source_inputs':ctx['source_hashes'],'recipe_sha256':ctx['recipe_sha256'],'bundle_files':new_inventory,
+        manifest={**old,'build':ctx['build'],'version':ctx['version'],'product':{**old['product'],'build':ctx['build'],'version':ctx['version']},'executableSHA256':hash_exe,'signature':signature,'source_inputs':ctx['source_hashes'],'recipe_sha256':ctx['recipe_sha256'],'bundle_files':new_inventory,
           'runtime_stage_before_signing':{**old['runtime_stage_before_signing'],'core':core,'nas':nas,'moments':moments_record},'authority_candidate_sha256':b.sha(out/'package/ARL.authority.candidate.json'),'authority_before_sha256':ctx['recipe']['authority_template_sha256'],
           'authority_changed_fields':['executableSHA256'],'all_other_authority_fields_preserved':True,'incremental_base_manifest_sha256':artifact['manifest_sha256'],'unchanged_nested_components_reused':True,'main_relinked':main_changed,'installed':False,'launched':False}
         b.save(out/'package/manifest.json',manifest);b.assert_inputs(ctx)

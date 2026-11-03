@@ -55,6 +55,8 @@ private struct CodexPackageRow: Codable, Equatable {
     var display_name: String
     var model: String
     var reasoning_effort: String
+    var service_tier: String?
+    var tier: String { service_tier ?? "default" }
 }
 private struct CodexPackagesFile: Codable {
     var schema_version: Int
@@ -66,9 +68,11 @@ private struct CodexPackagesCatalog: Codable {
     var schema_version: Int
     var catalog_version: String
     var models: [CodexExecutionModel]
+    var refreshed_at_ms: Int64?
+    var fresh: Bool { refreshed_at_ms.map { Date().timeIntervalSince1970 * 1000 - Double($0) < 90000 } ?? false }
     var current: CodexExecutionSelection
     var execution: CodexExecutionCatalog {
-        .init(schema_version: 1, source: "app_server_model_list", models: models.map { .init(model: $0.model, display_name: $0.display_name, description: $0.description, default_effort: $0.default_effort, efforts: $0.efforts, fast_available: false, fast_description: "") }, selection_enabled: true, current: current)
+        .init(schema_version: 1, source: "app_server_model_list", models: models.map { .init(model: $0.model, display_name: $0.display_name, description: $0.description, default_effort: $0.default_effort, efforts: $0.efforts, fast_available: $0.fast_available, fast_description: $0.fast_description) }, selection_enabled: true, current: current)
     }
 }
 @MainActor private struct CodexPackagesPreferences: View {
@@ -80,21 +84,25 @@ private struct CodexPackagesCatalog: Codable {
     @State private var message: String?
     private var home: URL { SettingsService.defaultHome.appendingPathComponent("CodexPackages") }
     private var valid: Bool {
-        guard let catalog, Set(draft.keys) == Set(ids) else { return false }
-        return draft.values.allSatisfy { !$0.display_name.isEmpty && $0.display_name.count <= 40 && catalog.execution.permits(.init(model: $0.model, reasoning_effort: $0.reasoning_effort, service_tier: "default")) }
+        guard let catalog, catalog.fresh, Set(draft.keys) == Set(ids) else { return false }
+        return draft.values.allSatisfy { !$0.display_name.isEmpty && $0.display_name.count <= 40 && catalog.execution.permits(.init(model: $0.model, reasoning_effort: $0.reasoning_effort, service_tier: $0.tier)) }
     }
     private var changed: Bool { saved?.packages != draft }
     var body: some View {
         DetailCard(title: "Codex 应用套餐") {
             if let catalog, let saved {
-                Text("每档可独立选择模型和思考强度。修改用于之后的新任务。")
+                Text("模型目录自动刷新；每档可独立选择模型、思考强度和加速。修改用于之后的新任务。")
                     .font(.caption).foregroundStyle(.secondary)
+                if !catalog.fresh { Text("模型目录已过期，等待应用服务自动刷新。").font(.caption).foregroundStyle(.orange) }
                 ForEach(ids, id: \.self) { id in
                     if let row = draft[id] {
                         HStack(spacing: 12) {
                             TextField("套餐名称", text: Binding(get: { draft[id]?.display_name ?? "" }, set: { draft[id]?.display_name = $0 }))
                                 .frame(width: 58).accessibilityLabel("\(id) 套餐名称")
                             Picker("模型", selection: Binding(get: { draft[id]?.model ?? "" }, set: { draft[id]?.model = $0 })) {
+                                if !catalog.models.contains(where: { $0.model == row.model }) {
+                                    Text("不可用：\(row.model)").tag(row.model)
+                                }
                                 ForEach(catalog.models) { Text($0.display_name).tag($0.model) }
                             }.labelsHidden().accessibilityLabel("\(id) 套餐模型").frame(maxWidth: .infinity)
                             Picker("思考强度", selection: Binding(get: { draft[id]?.reasoning_effort ?? "" }, set: { draft[id]?.reasoning_effort = $0 })) {
@@ -104,6 +112,11 @@ private struct CodexPackagesCatalog: Codable {
                                 }
                                 ForEach(efforts) { Text($0.title).tag($0.id) }
                             }.labelsHidden().accessibilityLabel("\(id) 套餐思考强度").frame(width: 100)
+                            Toggle("加速", isOn: Binding(get: { draft[id]?.tier == "fast" }, set: { draft[id]?.service_tier = $0 ? "fast" : "default" }))
+                                .toggleStyle(.checkbox)
+                                .disabled(row.tier != "fast" && catalog.models.first(where: { $0.model == row.model })?.fast_available != true)
+                                .accessibilityLabel("\(id) 套餐加速")
+                                .help("仅支持模型目录公布的加速档位，可能更快消耗账户额度。")
                         }
                     }
                 }
@@ -113,11 +126,11 @@ private struct CodexPackagesCatalog: Codable {
                     Spacer()
                     Text("版本 \(saved.revision)").font(.caption).foregroundStyle(.secondary)
                 }
-                if !valid { Text("请为每档选择当前模型支持的思考强度。").font(.caption).foregroundStyle(.orange) }
+                if !valid { Text("请检查各档模型、思考强度和加速是否仍受当前目录支持。").font(.caption).foregroundStyle(.orange) }
                 Divider()
                 Text("应用显式选型").font(.callout.weight(.medium))
                 CodexExecutionSelector(catalog: catalog.execution, selection: explicit, disabled: false, choose: { value in
-                    explicit = .init(model: value.model, reasoning_effort: value.reasoning_effort, service_tier: "default")
+                    explicit = value
                 })
                 HStack {
                     Button("复制模型与强度选项", action: copyOption).disabled(explicit == nil)
@@ -132,19 +145,31 @@ private struct CodexPackagesCatalog: Codable {
                 Button("重新读取", action: reload)
             }
             if let message { Text(message).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
-        }.onAppear(perform: reload)
+        }.task {
+            reload()
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { break }
+                reload(preservingDraft: true)
+            }
+        }
     }
     private func read<T: Decodable>(_ type: T.Type, name: String) throws -> T {
         try JSONDecoder().decode(type, from: RemindersNativeIO.privateFile(home.appendingPathComponent(name).path, limit: 131072))
     }
-    private func reload() {
+    private func reload() { reload(preservingDraft: false) }
+    private func reload(preservingDraft: Bool) {
         do {
             let c = try read(CodexPackagesCatalog.self, name: "catalog-v2.json")
             let p = try read(CodexPackagesFile.self, name: "packages-v2.json")
             guard c.schema_version == 2, c.execution.isValid, p.schema_version == 2, p.revision > 0, Set(p.packages.keys) == Set(ids) else { throw ARLError(code: "package_configuration_invalid") }
-            catalog = c; saved = p; draft = p.packages
+            let keepDraft = preservingDraft && changed
+            catalog = c
+            if !keepDraft { saved = p; draft = p.packages }
+            if keepDraft && saved?.revision != p.revision {
+                message = "套餐已在其他位置更新。草稿已保留，请重新读取后再保存。"
+            }
             if explicit == nil { explicit = c.current }
-            message = nil
+            if !keepDraft { message = nil }
         } catch { message = "暂时无法读取套餐配置，请检查 Codex 应用服务。" }
     }
     private func save() {
@@ -172,7 +197,7 @@ private struct CodexPackagesCatalog: Codable {
     }
     private func copyOption() {
         guard let explicit else { return }
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString("arl/option/" + explicit.model + "/" + explicit.reasoning_effort, forType: .string)
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString("arl/option/" + explicit.model + "/" + explicit.reasoning_effort + (explicit.fast ? "/fast" : ""), forType: .string)
         message = "已复制 \(explicit.model) · \(CodexEffortOption.title(explicit.reasoning_effort))。"
     }
 }

@@ -1,5 +1,7 @@
 # 本机验收状态 · 2026-09-30
 
+> **历史快照：** 本文记录 2026-09-30 的版本、进程及验收事实。当前正式安装、本轮源码和实机证据见 [2026-10-30 收尾状态](TODO-CLOSURE-20261030.md)。旧文中的“未接入”“未授权”或“已通过”均不自动代表当前状态。
+
 已安装的 metadata-only release 为 `0.1.1-a0b5138d84c5f712`，真实 runtime PID23017，正式设置 App PID23564已从安装路径重新启动。动态列表实际验收见 [CONNECTED-APPS-ACCEPTANCE.md](CONNECTED-APPS-ACCEPTANCE.md)。v1/v2、资源首次空值→间隔采样、日志筛选/导出、零任务/零推理和只读身份边界已验；见 [CONTROL-UPDATE-ACCEPTANCE.md](CONTROL-UPDATE-ACCEPTANCE.md)。首个安装历史证据保留在 [DEPLOYMENT-ACCEPTANCE.md](DEPLOYMENT-ACCEPTANCE.md)。登录自启已配置，没有真实登录/重启/24小时或睡眠验收。本机 Mac mini M4 / 16 GB / macOS27.0.1，Python3.9.6。无commit/push。
 
 主列表现在只显示已登记、身份核验且有新鲜建联证据的应用，当前真实连接为零；安装版概览AX确认“尚无已连接的应用”。14项专项、46项schema、SwiftUI类型检查和7项隔离真实peer检查通过。名称/版本/SF图标引用来自host描述，不从Friday/Tisra名单或预算生成；历史离线应用不显示。UI/shared client源码已冻结供独立设计任务接手，未开始视觉重设计。

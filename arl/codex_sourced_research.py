@@ -72,7 +72,12 @@ class CodexSourcedAdapter(NativeCodexAdapter):
             from .codex_execution_contract import preferences as validate_preferences
             envelope['schema_version'] = 3
             envelope['execution_options'] = selected
-            envelope['execution_preferences'] = validate_preferences(result.get('execution_preferences'), selected)
+            observed = result.get('execution_preferences')
+            # Provider-tier diagnostics are internal; the versioned public receipt
+            # retains its exact original contract and hash.
+            confirmed = ({key: observed[key] for key in ('reasoning_effort', 'service_tier', 'source')
+                          if key in observed} if isinstance(observed, dict) else observed)
+            envelope['execution_preferences'] = validate_preferences(confirmed, selected)
         reply = encode(envelope)
         self.contract.result_body(reply, args, binding=binding, native=native,
             model_evidence=evidence, reviewed_evidence=envelope['reviewed_evidence_bindings'],

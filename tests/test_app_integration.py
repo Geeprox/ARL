@@ -67,7 +67,7 @@ class IntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="arl-friday-app-") as home:
             script = ROOT/"integrations/friday/smoke.py"
             interpreter = FRIDAY/".venv/bin/python"
-            spec = LaunchSpec("friday", interpreter, (str(script), home), ROOT,
+            spec = LaunchSpec("friday", interpreter, ('-B', str(script), home), ROOT,
                 pin_sources([script, FRIDAY/"homeplane/arl.py", FRIDAY/"homeplane/__init__.py"]),
                 python_paths=(ROOT, FRIDAY))
             result = self.run_apps(home, [spec])[0]
@@ -78,7 +78,7 @@ class IntegrationTests(unittest.TestCase):
     def test_fixed_launch_manifest_rejects_source_drift(self):
         with tempfile.TemporaryDirectory(prefix="arl-launch-pin-") as directory:
             source = Path(directory)/"entry.py"; source.write_text("print('prepared',flush=True)")
-            spec = LaunchSpec("friday", Path(sys.executable), (str(source),), Path(directory), pin_sources([source]))
+            spec = LaunchSpec("friday", Path(sys.executable), ('-B', str(source)), Path(directory), pin_sources([source]))
             host = ControlledSupervisor([spec], RegisteredPeerVerifier({"friday"}))
             source.write_text("print('unreviewed code')")
             with self.assertRaises(Fault) as fault:
@@ -110,7 +110,7 @@ class IntegrationTests(unittest.TestCase):
                 self.assertTrue(json.loads(output)["deduplicated"])
                 # A separately running Python interpreter declares the same app but fails signing.
                 program = "from arl.client import Client; from arl.contracts import Fault; import sys;\ntry: Client(sys.argv[1],'tisra').rpc('health')\nexcept Fault as e: print(e.code)"
-                spoof = subprocess.run([sys.executable, "-c", program, home], capture_output=True, timeout=5)
+                spoof = subprocess.run([sys.executable, '-B', "-c", program, home], capture_output=True, timeout=5)
                 self.assertEqual(spoof.stdout.decode().strip(), "app_identity_unverified")
             finally:
                 if process.poll() is None: process.kill(); process.wait()

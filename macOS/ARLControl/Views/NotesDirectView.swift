@@ -10,25 +10,26 @@ struct NotesDirectView: View {
     @State private var editTitle = ""
     @State private var editText = ""
     @State private var draftID = UUID()
+    @State private var appearance:UUID?
     var body: some View {
         DetailCard(title: "备忘录") {
             Text("在选定文件夹内查看和编辑。").font(.callout).foregroundStyle(.secondary)
             AppleConnectionActionsView(target: .notes, permission: controller.permission,
                 enabled: controller.enabled, busy: controller.busy, observation: controller.connection.state,
                 check: { Task { await controller.prepareForDisplay() } },
-                request: { if let ticket = controller.ticket() { Task { await controller.checkPermission(ticket: ticket, request: true); await controller.prepareForDisplay() } } })
+                request: { controller.performUserActionAfterClick { ticket in await controller.checkPermission(ticket: ticket, request: true); await controller.prepareForDisplay() } })
             Divider()
             if controller.permission == .authorized && controller.scope == nil {
                 Text("请选择备忘录文件夹。").font(.callout).foregroundStyle(.secondary)
             }
-            Button(controller.scope == nil ? "选文件夹" : "换文件夹") { if let ticket = controller.ticket() { Task { await controller.loadFolders(ticket: ticket) } } }
+            Button(controller.scope == nil ? "选文件夹" : "换文件夹") { controller.performUserActionAfterClick { ticket in await controller.loadFolders(ticket: ticket) } }
                 .disabled(!controller.enabled || controller.busy || controller.permission != .authorized)
                 .help("读取账户名称和顶层非共享文件夹，不读取笔记正文")
             ForEach(controller.folders) { folder in
                 HStack {
                     Text(folder.label).font(.callout)
                     Spacer()
-                    Button("选用目录") { if let ticket = controller.ticket() { Task { await controller.select(folder, ticket: ticket) } } }.disabled(controller.busy)
+                    Button("选用目录") { controller.performUserActionAfterClick { ticket in await controller.select(folder, ticket: ticket) } }.disabled(controller.busy)
                 }
             }
             if let scope = controller.scope {
@@ -36,25 +37,25 @@ struct NotesDirectView: View {
                 Text("每次操作前核对当前文件夹。").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     TextField("搜索标题和正文", text: $query)
-                    Button(query.isEmpty ? "列出笔记" : "查找笔记") { let exactQuery = query; if let ticket = controller.ticket() { Task { await controller.search(query: exactQuery, ticket: ticket) } } }
+                    Button(query.isEmpty ? "列出笔记" : "查找笔记") { let exactQuery = query; controller.performUserActionAfterClick { ticket in await controller.search(query: exactQuery, ticket: ticket) } }
                 }.disabled(controller.busy || !controller.scopeCurrent)
                 if let result = controller.searchResult {
                     Text("检查 \(result.scanned) / \(result.total) 条 · 最多显示 50 条").font(.caption).foregroundStyle(.secondary)
                     if let next = result.next_offset {
-                        Button("下一页") { let exactQuery = controller.searchQuery; if let ticket = controller.ticket() { Task { await controller.search(query: exactQuery, offset: next, ticket: ticket) } } }.disabled(controller.busy)
+                        Button("下一页") { let exactQuery = controller.searchQuery; controller.performUserActionAfterClick { ticket in await controller.search(query: exactQuery, offset: next, ticket: ticket) } }.disabled(controller.busy)
                     }
                     ForEach(result.notes) { row in
                         HStack {
                             Text(row.title).lineLimit(2)
                             Spacer()
-                            Button("读取笔记") { if let ticket = controller.ticket() { Task { await controller.read(row, ticket: ticket) } } }.disabled(controller.busy)
+                            Button("读取笔记") { controller.performUserActionAfterClick { ticket in await controller.read(row, ticket: ticket) } }.disabled(controller.busy)
                         }
                     }
                 }
                 if let result = controller.readResult {
                     Text(result.row.title).font(.headline)
                     if let next = result.next_offset {
-                        Button("继续读取正文") { if let ticket=controller.ticket() {Task {await controller.read(result.row, offset: next, ticket: ticket)}} }.disabled(controller.busy)
+                        Button("继续读取正文") { controller.performUserActionAfterClick { ticket in await controller.read(result.row, offset: next, ticket: ticket) } }.disabled(controller.busy)
                     }
                     if result.editableText != nil {
                         TextField("笔记标题", text: $editTitle).disabled(controller.busy)
@@ -63,7 +64,7 @@ struct NotesDirectView: View {
                         Button("保存修改") {
                             guard let exactSource = editSource else { return }
                             let exactTitle = editTitle, exactText = editText
-                            if let ticket = controller.ticket() { Task { await controller.update(source: exactSource, title: exactTitle, plaintext: exactText, ticket: ticket) } }
+                            controller.performUserActionAfterClick { ticket in await controller.update(source: exactSource, title: exactTitle, plaintext: exactText, ticket: ticket) }
                         }.disabled(controller.busy || !controller.scopeCurrent || editTitle.isEmpty || editSource == nil || editSource != controller.editorSource)
                     } else {
                         ScrollView { Text(result.plaintext).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(maxHeight: 260)
@@ -77,9 +78,7 @@ struct NotesDirectView: View {
                     .accessibilityLabel("新笔记全文")
                 Button("新建笔记") {
                     let exactTitle = title, exactText = plaintext, exactDraftID = draftID
-                    if let ticket = controller.ticket() {
-                        Task { await controller.create(title: exactTitle, plaintext: exactText, draftID: exactDraftID, ticket: ticket) }
-                    }
+                    controller.performUserActionAfterClick { ticket in await controller.create(title: exactTitle, plaintext: exactText, draftID: exactDraftID, ticket: ticket) }
                 }
                     .disabled(controller.busy || !controller.scopeCurrent || title.isEmpty || plaintext.isEmpty)
             }
@@ -97,7 +96,7 @@ struct NotesDirectView: View {
             }.font(.caption).foregroundStyle(.secondary)
         }
         .task {
-            controller.appear(); await controller.prepareForDisplay()
+            appearance=controller.appear(); await controller.prepareForDisplay()
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(60)) } catch { break }
                 await controller.prepareForDisplay()
@@ -117,6 +116,6 @@ struct NotesDirectView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await controller.prepareForDisplay() }
         }
-        .onDisappear { controller.disappear() }
+        .onDisappear { if let appearance {controller.disappear(appearance:appearance)};appearance=nil }
     }
 }

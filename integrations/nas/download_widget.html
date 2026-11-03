@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{color-scheme:light dark;font:14px/1.5 system-ui,-apple-system,sans-serif}body{margin:0;padding:18px;color:light-dark(#262626,#eee);background:transparent}main{max-width:560px}h1{margin:0 0 4px;font-size:16px;font-weight:600;overflow-wrap:anywhere}p{margin:4px 0;color:light-dark(#666,#bbb)}button,a{display:inline-block;margin-top:12px;padding:8px 14px;border-radius:8px;font:inherit}button{border:1px solid light-dark(#ccc,#666);color:inherit;background:transparent;cursor:pointer}button:disabled{cursor:default;opacity:.5}a{background:light-dark(#262626,#eee);color:light-dark(#fff,#262626);text-decoration:none}button:focus-visible,a:focus-visible{outline:3px solid #3276df;outline-offset:3px}progress{display:block;width:100%;margin-top:12px}#status{min-height:21px;overflow-wrap:anywhere}[hidden]{display:none!important}
+</style></head><body><main aria-label="网络硬盘文件下载">
+<h1 id="name">准备下载文件</h1><p id="detail"></p><p id="status" role="status" aria-live="polite">正在接收文件信息。</p>
+<progress id="progress" hidden></progress><button id="prepare" disabled>准备下载</button><button id="refresh" hidden>重新获取下载链接</button><a id="download" hidden target="_blank" rel="noopener noreferrer">下载文件</a>
+</main>
+<script>/* ARL_NAS_DOWNLOAD_CORE */</script>
+<script>
+(function(){
+  "use strict";
+  const $=id=>document.getElementById(id), pending=new Map(); let next=1, delivery=null, active=false, bridgeReady;
+  function request(method,params){const id=next++;return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error("host_request_timeout"));},45000);pending.set(id,{resolve,reject,timer});window.parent.postMessage({jsonrpc:"2.0",id,method,params},"*");});}
+  function status(text){$("status").textContent=text;}
+  function persist(value){window.openai?.setWidgetState?.({modelContent:{name:value.name,state:value.state},privateContent:{nasDelivery:value}});}
+  function renderLink(result){$("download").href=result.downloadUrl;$("download").textContent="下载 "+result.name;$("download").hidden=false;$("refresh").hidden=false;status("文件已准备好。");}
+  function receive(value){
+    if(active)return;
+    try{
+      delivery=new ARLNASDownload.Delivery(value,{now:()=>performance.now(),crypto,File,atob,btoa,persist,
+        platform:window.openai,callTool:async(name,args)=>{await bridgeReady;return request("tools/call",{name,arguments:args});},
+        progress:(done,total)=>{$("progress").hidden=false;$("progress").max=Math.max(1,total);$("progress").value=done;}});
+      $("name").textContent=delivery.manifest.name;$("detail").textContent=delivery.manifest.size.toLocaleString()+" 字节";
+      const previous=window.openai?.widgetState?.privateContent?.nasDelivery;
+      if(previous?.operation_id===delivery.manifest.operation_id&&previous?.source_sha256===delivery.manifest.sha256&&previous?.name===delivery.manifest.name&&previous?.size===delivery.manifest.size){
+        if(["uploading","upload_unknown","uploaded","download_ready"].includes(previous.state)){
+          delivery.publishStarted=true;$("prepare").disabled=true;
+          if(typeof previous.fileId==="string"&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,511}$/.test(previous.fileId)){
+            delivery.fileId=previous.fileId;delivery.state="uploaded";$("refresh").hidden=false;status("文件已上传，可重新获取下载链接。");
+          }else{delivery.state="upload_unknown";status("上次上传结果尚未确认。请在当前会话核对上传结果，避免重复上传。");}
+          return;
+        }
+      }
+      $("prepare").disabled=false;status("准备后可下载文件。");
+    }catch(_){status("未收到有效的文件信息，请重新获取文件。");}
+  }
+  window.addEventListener("message",event=>{
+    if(event.source!==window.parent||event.data?.jsonrpc!=="2.0")return;
+    const message=event.data;
+    if(pending.has(message.id)){const task=pending.get(message.id);pending.delete(message.id);clearTimeout(task.timer);message.error?task.reject(new Error("host_tool_failed")):task.resolve(message.result);return;}
+    if(message.method==="ui/notifications/tool-result")receive(message.params?.structuredContent);
+  });
+  bridgeReady=request("ui/initialize",{appInfo:{name:"arl-nas-download",version:"1.0.0"},appCapabilities:{},protocolVersion:"2026-01-26"}).then(()=>{
+    window.parent.postMessage({jsonrpc:"2.0",method:"ui/notifications/initialized",params:{}},"*");
+  });
+  bridgeReady.catch(()=>status("当前客户端尚未连接文件组件，请在会话中继续下载。"));
+  $("prepare").onclick=async()=>{
+    if(!delivery||active)return;active=true;$("prepare").disabled=true;status("正在核验文件并准备下载。");
+    try{renderLink(await delivery.publish());}
+    catch(error){
+      const code=error.code||error.message;
+      if(delivery.fileId){$("refresh").hidden=false;status("文件已上传，暂时未取得下载链接。可重新获取链接。");}
+      else if(delivery.publishStarted)status("上传结果尚未确认。请在当前会话核对上传结果，避免重复上传。");
+      else if(code==="platform_file_api_unavailable")status("当前客户端未提供文件下载接口。可由会话继续交付已核验文件。");
+      else if(code==="browser_memory_budget")status("该文件超过组件的内存预算，请使用客户端的磁盘下载路径。");
+      else if(code==="transfer_expired")status("本次文件准备已过期，请重新获取文件。");
+      else status("文件核验未完成，请在会话中查看错误后重新获取文件。");
+    }finally{active=false;$("progress").hidden=true;}
+  };
+  $("refresh").onclick=async()=>{if(active||!delivery?.fileId)return;active=true;$("refresh").disabled=true;try{await bridgeReady;renderLink(await delivery.refreshDownloadUrl());}catch(_){status("暂时无法取得下载链接，请稍后重试。");}finally{active=false;$("refresh").disabled=false;}};
+  // MCP Apps notifications are primary. This compatibility snapshot avoids
+  // losing the initial result in hosts that deliver it before the listener.
+  if(window.openai?.toolOutput)receive(window.openai.toolOutput);
+})();
+</script></body></html>

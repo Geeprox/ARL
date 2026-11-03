@@ -116,7 +116,7 @@ class ControlledFridayPlanningTests(unittest.TestCase):
    review=candidate/'reviewed-request.json';review.write_text(json.dumps({'request':req,'model':MODEL}));review.chmod(0o600)
    manifest=candidate/'source-manifest.json';mh=hashlib.sha256(manifest.read_bytes()).hexdigest();rh=hashlib.sha256(review.read_bytes()).hexdigest()
    import subprocess
-   checked=subprocess.run([__import__('sys').executable,'-I',str(candidate/'planning_host.py'),'--validate-only','--manifest-sha256',mh,'--approved-review-sha256',rh],capture_output=True,timeout=3)
+   checked=subprocess.run([__import__('sys').executable, '-B','-I',str(candidate/'planning_host.py'),'--validate-only','--manifest-sha256',mh,'--approved-review-sha256',rh],capture_output=True,timeout=3)
    self.assertEqual(json.loads(checked.stdout)['status'],'source_and_review_verified');self.assertEqual(json.loads(checked.stdout)['calls_started'],0)
    disabled,unused=compose_isolated(candidate,mh,rh);self.assertFalse(disabled.execute_jobs);self.assertFalse(disabled.policies['friday'].tools);unused.close()
    p=provider(req,simulated=False);runtime,supervisor=compose_isolated(candidate,mh,rh,adapter=p)

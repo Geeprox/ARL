@@ -1,5 +1,7 @@
 # Incremental product decisions and acceptance
 
+> **历史决策记录：** 以下条目主要来自 2026-09-30 至 2026-10-01，不是当前缺失功能清单。当前正式安装、已完成源码、真实与合成证据、维护及待验项统一见 [2026-10-30 收尾状态](TODO-CLOSURE-20261030.md)。新源码不能据此视为已经安装或获授业务权限。
+
 2026-09-30: installed release `0.1.1-a0b5138d84c5f712` is running; see CONNECTED-APPS-ACCEPTANCE.md. Resources, multistate health and redacted log reads/UI are installed. Connected-only primary list is installed and actually empty; host metadata never substitutes for a connection. Credentials/Apple/Friday real operations remain unfinished/ungranted. Canonical UI/shared client consolidation is complete; no automatic deployment or package mutation.
 
 Navigation stays local Agent / cloud Bot capabilities / management. Discovery is evidence, not consent or authorization.

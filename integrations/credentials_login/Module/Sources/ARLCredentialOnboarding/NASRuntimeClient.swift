@@ -68,6 +68,7 @@ private final class NASOwnedPipe: @unchecked Sendable {
     private var readBuffer = Data()
     private var scope: [String: Any]?
     private var uploadAuthorization: NASUploadAuthorization?
+    private var acceptanceAuthorization: NASAcceptanceAuthorization?
     private var caller: [String: Any] = [:]
     private let config: NASConnectionConfiguration?
     private let endpoint: NASServerEndpoint?
@@ -188,15 +189,17 @@ private final class NASOwnedPipe: @unchecked Sendable {
         else { throw CredentialError.identityMismatch }
         authorizationSequence = requestSequence
         if kind.hasPrefix("upload_") {
-            guard let uploadAuthorization, frame["plan_digest"] as? String == uploadAuthorization.planDigest
-            else { throw CredentialError.staleReference }
-            try uploadAuthorization.authorize(consume: kind == "upload_consume")
+            if let uploadAuthorization, frame["plan_digest"] as? String == uploadAuthorization.planDigest {
+                try uploadAuthorization.authorize(consume: kind == "upload_consume")
+            } else if let acceptanceAuthorization, frame["plan_digest"] as? String == acceptanceAuthorization.planDigest {
+                try acceptanceAuthorization.authorize(consume:kind == "upload_consume")
+            } else { throw CredentialError.staleReference }
         }
         if let scope, config != nil {
             guard (scope as NSDictionary) == currentScope as NSDictionary else { throw CredentialError.staleReference }
         } else { scope = currentScope }
         var reply: [String: Any] = ["kind": "authorization", "sequence": requestSequence, "nonce": nonce,
-                                    "ok": true, "remaining_seconds": min(max(0, deadline - ProcessInfo.processInfo.systemUptime), uploadAuthorization?.remaining ?? 120)]
+                                    "ok": true, "remaining_seconds": min(max(0, deadline - ProcessInfo.processInfo.systemUptime), uploadAuthorization?.remaining ?? acceptanceAuthorization?.remaining ?? 120)]
         if kind == "lease" {
             guard !leaseSent else { throw CredentialError.staleReference }
             leaseSent = true
@@ -210,7 +213,7 @@ private final class NASOwnedPipe: @unchecked Sendable {
     }
     func exchange(_ action: String, upload: NASUploadProposal? = nil, journalDirectory: URL? = nil,
                   directoryPath: String? = nil, directoryCursor: String? = nil, serverShare: String? = nil,
-                  fileRequest: NASFileRequest? = nil) throws -> [String: Any] {
+                  fileRequest: NASFileRequest? = nil, acceptancePhase: NASAcceptancePhase? = nil) throws -> [String: Any] {
         try exchangeLock.withLock {
             try verify()
             if endpoint != nil {
@@ -231,14 +234,26 @@ private final class NASOwnedPipe: @unchecked Sendable {
                 uploadAuthorization = try NASUploadAuthorization(proposal: upload, scope: scope, epoch: epoch,
                     directory: journalDirectory, verify: { [self] in try verify() })
             }
-            defer { uploadAuthorization = nil }
+            if let acceptancePhase {
+                guard action == "acceptance", upload == nil, endpoint == nil,let config,scope != nil,let journalDirectory
+                else { throw CredentialError.wrongPurpose }
+                acceptanceAuthorization=try NASAcceptanceAuthorization(phase:acceptancePhase,configuration:config,
+                    directory:journalDirectory.deletingLastPathComponent().appendingPathComponent("nas-acceptance-20261030"),
+                    verify:{ [self] in try verify() })
+            }
+            defer { uploadAuthorization = nil;acceptanceAuthorization=nil }
             sequence += 1
             let id = sequence
             // A file request composes several separately timed SMB calls and native
             // authorization callbacks. Its total budget never extends this pipe lease.
-            let requestSeconds = ["files", "connect"].contains(action) ? 90.0 : Double((config?.timeoutSeconds ?? endpoint?.timeoutSeconds ?? 8) + 10)
+            let requestSeconds = ["files", "connect", "acceptance"].contains(action) ? 90.0 : Double((config?.timeoutSeconds ?? endpoint?.timeoutSeconds ?? 8) + 10)
             let until = min(deadline, ProcessInfo.processInfo.systemUptime + requestSeconds)
             var frame: [String: Any] = ["kind": action, "id": id, "nonce": nonce]
+            if let acceptanceAuthorization {
+                frame["phase"]=acceptanceAuthorization.phase.rawValue
+                frame["manifest_sha256"]=NASAcceptanceProtocol.manifestSHA256
+                frame["journal"]=acceptanceAuthorization.journalDescriptor
+            }
             if let fileRequest {
                 guard config != nil, endpoint == nil, action == "files", upload == nil else { throw CredentialError.wrongPurpose }
                 frame["request"] = try MusicStrictJSON.object(fileRequest.wireJSON, limit: 16384)
@@ -455,6 +470,14 @@ final class NASRuntimeClient: NASConnectionRuntime, @unchecked Sendable {
                       value["content_sha256"] as? String == proposal.sha256 else { throw CredentialError.uncertainLocalState }
             }
             return .init(status: status, failure: value["failure"] as? String)
+        } onCancel: { current.stop() }
+    }
+    func fixedAcceptance(_ phase: NASAcceptancePhase) async throws -> Data {
+        guard let current=lock.withLock({pipe}),let journalDirectory else { throw CredentialError.deploymentNotApproved }
+        return try await withTaskCancellationHandler {
+            try await Task.detached {
+                try JSONSerialization.data(withJSONObject:current.exchange("acceptance",journalDirectory:journalDirectory,acceptancePhase:phase),options:[.sortedKeys])
+            }.value
         } onCancel: { current.stop() }
     }
     func stop() async {

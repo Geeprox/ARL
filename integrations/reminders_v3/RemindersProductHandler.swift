@@ -30,13 +30,14 @@ final class RemindersProductHandler: @unchecked Sendable {
         if !hasDir {
             guard create else{return false}
             guard mkdir(root,0o700)==0,mkdir(root+"/tasks",0o700)==0,lstat(root,&dir)==0,lstat(root+"/tasks",&tasks)==0 else{throw RemindersTransportFault("unsafe_home")}
-            let binding=Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n"+String(tasks.st_dev)+"\n"+String(tasks.st_ino)+"\n").utf8)
+            let binding=try RemindersNativeIO.directoryBinding([root,root+"/tasks"])
             try RemindersNativeIO.writeNew(binding,to:anchor)
         }
         try RemindersNativeIO.privateDirectory(root);try RemindersNativeIO.privateDirectory(root+"/tasks")
         guard lstat(root,&dir)==0,lstat(root+"/tasks",&tasks)==0 else{throw RemindersTransportFault("unsafe_home")}
-        let binding=Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n"+String(tasks.st_dev)+"\n"+String(tasks.st_ino)+"\n").utf8)
-        guard try RemindersNativeIO.privateFile(anchor)==binding else{throw RemindersTransportFault("product_journal_missing_or_replaced")}
+        let legacy=Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n"+String(tasks.st_dev)+"\n"+String(tasks.st_ino)+"\n").utf8)
+        let bytes=try RemindersNativeIO.privateFile(anchor)
+        guard bytes == (try RemindersNativeIO.directoryBinding([root,root+"/tasks"])) || bytes == legacy else{throw RemindersTransportFault("product_journal_missing_or_replaced")}
         return true
     }
     private func path(_ id:String)throws->String {
@@ -105,6 +106,11 @@ final class RemindersProductHandler: @unchecked Sendable {
     private func publishDefault(_ values:RemindersProductCatalog,to reply:inout RemindersProductReply)throws {
         do {reply.default_target=try defaultTarget(in:values);reply.default_status="available"}
         catch let fault as RemindersTransportFault where ["target_required","default_list_required","default_list_unavailable","target_changed"].contains(fault.code) {reply.default_status=fault.code}
+        // A damaged operation journal prevents using a saved default and every
+        // business operation. It does not invalidate independently read OS
+        // catalog metadata. Preserve that distinct failure in default_status;
+        // never recreate its anchor or reinterpret unknown operation records.
+        catch let fault as RemindersTransportFault where fault.code=="product_journal_missing_or_replaced" {reply.default_status=fault.code}
         catch let fault as AdapterFault where ["target_not_authorized","list_not_found","list_not_writable"].contains(fault.code) {reply.default_status="default_list_unavailable"}
     }
     private func verify(_ value:RemindersProductTarget,writable:Bool=true)throws {

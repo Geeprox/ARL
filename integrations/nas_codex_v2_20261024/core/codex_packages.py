@@ -3,6 +3,7 @@ import contextlib, fcntl, hashlib, json, os, stat, uuid
 from pathlib import Path
 from .contracts import Fault
 from .codex_execution_options import selection
+from .codex_context import TRANSPORT_FRAME_BYTES, INPUT_POLICY
 IDS=('low','medium','high','very_high','highest')
 TITLES=('低','中','高','很高','最高')
 def canonical(value):
@@ -22,8 +23,8 @@ def atomic(path,value):
 def validate_packages(packages,catalog):
     if type(packages)!=dict or set(packages)!=set(IDS):raise Fault('invalid_package_configuration')
     for row in packages.values():
-        if type(row)!=dict or set(row)!={'display_name','model','reasoning_effort'} or type(row['display_name'])!=str or not 1<=len(row['display_name'])<=40:raise Fault('invalid_package_configuration')
-        selection(catalog,row['model'],row['reasoning_effort'],'default')
+        if type(row)!=dict or set(row) not in ({'display_name','model','reasoning_effort'},{'display_name','model','reasoning_effort','service_tier'}) or type(row['display_name'])!=str or not 1<=len(row['display_name'])<=40:raise Fault('invalid_package_configuration')
+        selection(catalog,row['model'],row['reasoning_effort'],row.get('service_tier','default'))
 class PackageRegistry:
     def __init__(self,home):
         self.home=Path(home)
@@ -45,16 +46,16 @@ class PackageRegistry:
         return row
     def version(self,catalog,config=None):
         config=self.load() if config is None else config
-        return digest({'models':catalog,'package_revision':config['revision'],'packages':config['packages'],'execution_policy':{'service_tiers':['default'],'max_input_bytes':8192,'max_output_bytes':32768,'max_wall_ms':180000,'priority':['explicit']}})
+        return digest({'models':catalog,'package_revision':config['revision'],'packages':config['packages'],'execution_policy':{'service_tiers':['default','fast'],'max_input_bytes':None,'input_policy':INPUT_POLICY,'transport_max_frame_bytes':TRANSPORT_FRAME_BYTES,'max_output_bytes':32768,'max_wall_ms':600000,'priority':['explicit']}})
     def publish(self,catalog,current):
         version=digest(catalog)
         with self.locked():
             if not (self.home/'packages-v2.json').exists():
-                model=next(m for m in catalog if m['model']==current['model']);efforts={e['id'] for e in model['efforts']}
-                packages={key:{'display_name':title,'model':model['model'],'reasoning_effort':effort if effort in efforts else model['default_effort']} for key,title,effort in zip(IDS,TITLES,('low','medium','high','xhigh','max'))}
+                model=next((m for m in catalog if m['model']==current['model']),catalog[0]);efforts={e['id'] for e in model['efforts']}
+                packages={key:{'display_name':title,'model':model['model'],'reasoning_effort':effort if effort in efforts else model['default_effort'],'service_tier':'default'} for key,title,effort in zip(IDS,TITLES,('low','medium','high','xhigh','max'))}
                 atomic(self.home/'packages-v2.json',{'schema_version':2,'revision':1,'catalog_version':version,'packages':packages})
             version=self.version(catalog)
-            atomic(self.home/'catalog-v2.json',{'schema_version':2,'catalog_version':version,'models':catalog,'current':current})
+            atomic(self.home/'catalog-v2.json',{'schema_version':2,'catalog_version':version,'models':catalog,'current':current,'refreshed_at_ms':__import__('time').time_ns()//1000000})
         return version
     def save(self,value,catalog):
         with self.locked():

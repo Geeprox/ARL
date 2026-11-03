@@ -227,6 +227,6 @@ class ResearchTests(RuntimeCase):
             self.assert_fault('app_identity_unverified',lambda:Client(home,'friday').rpc('research.capabilities.v1'))
             import subprocess
             program="from arl.client import Client;from arl.contracts import Fault;import sys;\ntry:Client(sys.argv[1],'tisra').rpc('research.capabilities.v1')\nexcept Fault as e:print(e.code)"
-            result=subprocess.run([sys.executable,'-c',program,str(home)],capture_output=True,timeout=5)
+            result=subprocess.run([sys.executable, '-B','-c',program,str(home)],capture_output=True,timeout=5)
             self.assertEqual(result.stdout.decode().strip(),'app_identity_unverified')
         self.runtime.store=Store(self.home/'state.sqlite')

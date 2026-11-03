@@ -30,6 +30,10 @@ enum OwnerReadWire {
     // The response frame carries its length as an unsigned 32-bit integer.
     static let responseLimit = Int(UInt32.max)
     static let seconds: Double = 20
+    // Accept/cold signature verification share one bounded admission window.
+    // Once a frame starts, its original short transfer budget still applies.
+    static let admissionSeconds: Double = 10
+    static let frameSeconds: Double = 2
     static let travel: Set<String> = [
         "mio_maps_geo", "mio_maps_regeocode", "mio_maps_text_search", "mio_maps_around_search",
         "mio_maps_search_detail", "mio_maps_direction_driving", "mio_maps_direction_walking",

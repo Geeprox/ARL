@@ -87,7 +87,10 @@ class ApplicationHostTests(unittest.TestCase):
             finally: b.close()
         thread=threading.Thread(target=handler); thread.start()
         try:
-            a.sendall(raw); a.shutdown(socket.SHUT_WR); reply=bytearray()
+            # The protocol is newline framed, just like Client.rpc. The handler
+            # can reply and close before a redundant half-close, which makes
+            # shutdown race with ENOTCONN on a fast metadata-only request.
+            a.sendall(raw); reply=bytearray()
             while True:
                 chunk=a.recv(4096)
                 if not chunk: break

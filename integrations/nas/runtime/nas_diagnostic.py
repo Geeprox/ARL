@@ -5,10 +5,16 @@ import os
 from pathlib import Path
 import pwd
 import re
+import socket
 import time
+import stat
+import uuid
+
+LOGIN_STAGES = {'server_login', 'share_list', 'directory_list'}
+FILE_STAGES = {'file_connect', 'file_health', 'file_list', 'file_stat', 'file_read'}
 
 def failure_record(error, stage):
-    if stage not in {'server_login','share_list','directory_list'}:return
+    if stage not in LOGIN_STAGES | FILE_STAGES:return
     chain=[]; current=error; seen=set()
     for _ in range(8):
         if current is None or id(current) in seen:break
@@ -26,6 +32,14 @@ def failure_record(error, stage):
         frames=[]; tb=current.__traceback__
         while tb is not None:
             code=tb.tb_frame.f_code
+            if 'errno' in row and code is socket.create_connection.__code__:
+                # The failed call retains its final address family. Read only
+                # this scalar from the exact stdlib frame; never copy/render
+                # locals or inspect address, sa, timeout, or exception text.
+                family=tb.tb_frame.f_locals.get('af')
+                if type(family) in (int,socket.AddressFamily):
+                    if family == socket.AF_INET:row['socket_family']='ipv4'
+                    elif family == socket.AF_INET6:row['socket_family']='ipv6'
             module=tb.tb_frame.f_globals.get('__name__','unknown')
             function=code.co_name
             frames.append({'module':module if type(module) is str and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.]{0,159}',module) else 'unknown',
@@ -45,11 +59,21 @@ def failure_record(error, stage):
     root=Path(pwd.getpwuid(os.getuid()).pw_dir)/'Library/Application Support/ARL/nas'
     try:
         if root.is_symlink() or not root.is_dir() or root.stat().st_uid != os.getuid():return
-        path=root/'login-diagnostic.json'
-        fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_NOFOLLOW,0o600)
+        path=root/('login-diagnostic.json' if stage in LOGIN_STAGES else 'file-diagnostic.json')
+        if path.exists() or path.is_symlink():
+            existing=path.lstat()
+            if not stat.S_ISREG(existing.st_mode) or existing.st_uid != os.getuid() or existing.st_nlink != 1:return
+        temporary=root/('.diagnostic-'+uuid.uuid4().hex)
+        fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
         with os.fdopen(fd,'wb') as stream:
             info=os.fstat(stream.fileno())
             if info.st_uid != os.getuid() or info.st_nlink != 1:return
-            os.fchmod(stream.fileno(),0o600);stream.truncate(0)
+            os.fchmod(stream.fileno(),0o600)
             stream.write(json.dumps(record,separators=(',',':')).encode())
+            stream.flush();os.fsync(stream.fileno())
+        os.replace(temporary,path)
     except OSError:pass
+    finally:
+        if 'temporary' in locals():
+            try:temporary.unlink()
+            except OSError:pass

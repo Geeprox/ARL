@@ -98,10 +98,10 @@ class RemindersBoundaryTests(unittest.TestCase):
         files={str(p.relative_to(self.home/'code')):hashlib.sha256(p.read_bytes()).hexdigest() for p in code.iterdir()}
         launcher=self.home/'launch_reminders.py';launcher.write_text(render(files,self.home));launcher.chmod(0o600)
         hostile=self.home/'hostile';(hostile/'arl').mkdir(parents=True);(hostile/'arl/__init__.py').write_text('raise Exception("cwd")')
-        p=subprocess.run(['/usr/bin/python3','-I',str(launcher)],cwd=hostile,env=dict(os.environ,PYTHONPATH=str(hostile)),capture_output=True,timeout=3)
+        p=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher)],cwd=hostile,env=dict(os.environ,PYTHONPATH=str(hostile)),capture_output=True,timeout=3)
         self.assertEqual(json.loads(p.stdout),{'source':'sealed'})
         (code/'reminders_review.py').write_text('raise Exception("changed")')
-        p=subprocess.run(['/usr/bin/python3','-I',str(launcher)],cwd=hostile,capture_output=True,timeout=3)
+        p=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher)],cwd=hostile,capture_output=True,timeout=3)
         self.assertEqual(json.loads(p.stdout),{'status':'sealed_source_changed'});self.assertFalse(p.stderr)
     def test_owned_signed_native_client_actual_sdk_rpc_with_injected_store(self):
         account=self.home/'account';base=account/'Library/Application Support/ARL/reminders-once';base.mkdir(parents=True,mode=0o700);base.chmod(0o700)
@@ -118,7 +118,7 @@ class RemindersBoundaryTests(unittest.TestCase):
         (base/'review.json').write_text(json.dumps(self.review));(base/'review.json').chmod(0o600)
         files={str(p.relative_to(code)):hashlib.sha256(p.read_bytes()).hexdigest() for p in code.rglob('*') if p.is_file()}
         launcher=base/'launch_reminders.py';launcher.write_text(render(files,base));launcher.chmod(0o600)
-        direct=subprocess.run(['/usr/bin/python3','-I',str(launcher),'--native-broker','--approved-sha256',json.loads((SOURCE/'approval-proposal.json').read_text())['request_sha256']],capture_output=True,timeout=5)
+        direct=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher),'--native-broker','--approved-sha256',json.loads((SOURCE/'approval-proposal.json').read_text())['request_sha256']],capture_output=True,timeout=5)
         self.assertEqual(json.loads(direct.stdout)['broker_receipt']['error'],'native_broker_required');self.assertFalse((base/'state.sqlite').exists())
         p=subprocess.run([str(bundle/'Contents/MacOS/ARLRemindersBridge'),'--fixture-broker',str(base),str(launcher),hashlib.sha256(launcher.read_bytes()).hexdigest()],capture_output=True,timeout=15)
         receipt=json.loads(p.stdout);self.assertEqual(receipt['status'],'host_completed',receipt)

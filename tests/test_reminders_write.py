@@ -3,7 +3,10 @@ from pathlib import Path
 from arl.contracts import Cancelled,Fault
 from arl.reminders_write import NAME,RemindersWriteAdapter,checked
 from arl.reminders_review import APP,ReviewGate
-PROPOSAL=json.loads((Path(__file__).resolve().parents[1]/'integrations/apple_reminders/approval-proposal.json').read_text())['args']
+# Explicit protocol-only input. The original frozen proposal/package remains a
+# separate historical acceptance gate and is not part of public unit fixtures.
+PROPOSAL={'operation_id':'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          'title':'Synthetic reminder protocol fixture','target_policy':'system_default_at_confirmation'}
 class Context:
     def __init__(self,key=None,cancelled=False):self.row={'key':key or PROPOSAL['operation_id']};self.cancelled=cancelled
     def check_cancelled(self):

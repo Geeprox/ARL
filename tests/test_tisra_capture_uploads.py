@@ -538,7 +538,7 @@ class CaptureUploadTests(unittest.TestCase):
             program = ('import json,socket,sys\n'
                 's=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.connect(sys.argv[1]);'
                 's.sendall(sys.argv[2].encode()+b"\\n");print(s.makefile("rb").readline().decode())')
-            rejected = subprocess.run([sys.executable, '-c', program, endpoint,
+            rejected = subprocess.run([sys.executable, '-B', '-c', program, endpoint,
                 encode(dict(protocol=PROTOCOL, app='tisra', method='capture.upload.begin.v2', params=args)).decode()],
                 capture_output=True, text=True, timeout=5)
             self.assertEqual(rejected.returncode, 0, rejected.stderr)

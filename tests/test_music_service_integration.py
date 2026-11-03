@@ -151,7 +151,7 @@ from tests.test_music_service_integration import legacy
 serve(MioMusicGateway(legacy),sys.stdin,sys.stdout)
 """
         frames=[{'jsonrpc':'2.0','id':1,'method':'tools/list'}, request(STATUS), request('mio_netease_playlist_list'),request('mio_netease_playlist_create',{'name':'未执行'})]
-        result=subprocess.run([sys.executable,'-c',script],cwd=ROOT,
+        result=subprocess.run([sys.executable, '-B','-c',script],cwd=ROOT,
             env={'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','TMPDIR':'/tmp','PYTHONDONTWRITEBYTECODE':'1'},
             input=''.join(json.dumps(x)+'\n' for x in frames),text=True,capture_output=True,timeout=10)
         self.assertEqual(result.returncode,0,result.stderr)

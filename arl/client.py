@@ -38,11 +38,13 @@ class RuntimeLauncher:
 
 
 class Client:
-    def __init__(self, home, app, launcher=None):
+    def __init__(self, home, app, launcher=None, *, max_frame_bytes=16384):
         self.home = private_home(home)
         self.app = app
         self.launcher = launcher
         self.app_session = None
+        if type(max_frame_bytes)!=int or not 16384<=max_frame_bytes<=64*1024*1024:raise Fault("invalid_frame")
+        self.max_frame_bytes=max_frame_bytes
 
     def describe_runtime(self):
         from .runtime_description import validate_description
@@ -74,7 +76,7 @@ class Client:
     def rpc(self, method, params=None):
         request = {"protocol": PROTOCOL, "app": self.app, "method": method, "params": params or {}}
         payload = encode(request)+b"\n"
-        if len(payload) > 16384:
+        if len(payload) > self.max_frame_bytes:
             raise Fault("invalid_frame")
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
@@ -82,8 +84,8 @@ class Client:
                 connection.connect(str(self.home/"runtime.sock"))
                 connection.sendall(payload)
                 with connection.makefile("rb") as stream:
-                    raw = stream.readline(131073)
-                    if not raw or len(raw) > 131072 or not raw.endswith(b"\n"):
+                    raw = stream.readline(max(131072,self.max_frame_bytes)+1)
+                    if not raw or len(raw) > max(131072,self.max_frame_bytes) or not raw.endswith(b"\n"):
                         raise Fault("disconnected")
                     response = json.loads(raw)
         except OSError:

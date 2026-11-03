@@ -57,7 +57,7 @@ class ReviewFixes(unittest.TestCase):
     def test_runtime_without_settings_retains_legacy_policy_behavior(self):
         policy = AppPolicy(frozenset(), frozenset(), 0, 0, 0, methods=frozenset({"health"}))
         policies = {"tisra": policy}
-        with tempfile.TemporaryDirectory(prefix="policy-fix-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="policy-fix-", dir=Path("/tmp").resolve()) as folder:
             for name, constructor in (("fixed", Runtime),):
                 with patch("socket.socket", side_effect=deny), patch("subprocess.Popen", side_effect=deny), patch("threading.Thread.start", side_effect=deny):
                     runtime = constructor(Path(folder) / name, policies=policies, execute_jobs=False)
@@ -110,7 +110,7 @@ class ReviewFixes(unittest.TestCase):
             portal.policies(overflow)
 
     def test_default_host_retains_empty_read_only_portal(self):
-        with tempfile.TemporaryDirectory(prefix="host-fix-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="host-fix-", dir=Path("/tmp").resolve()) as folder:
             with patch("socket.socket", side_effect=deny), patch("subprocess.Popen", side_effect=deny), patch("threading.Thread.start", side_effect=deny):
                 runtime = make_runtime(Path(folder) / "home")
                 self.assertEqual(runtime.service_portal._manifests, ())
@@ -127,7 +127,7 @@ class ReviewFixes(unittest.TestCase):
         value["manifests"][0]["credential_requirements"] = [{"key": "API_TOKEN", "purpose": "synthetic", "required": True}]
         value["configurations"][0]["credential_refs"] = {"API_TOKEN": "opaque-secret-sentinel"}
         raw = encode(value)
-        with tempfile.TemporaryDirectory(prefix="cli-fix-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="cli-fix-", dir=Path("/tmp").resolve()) as folder:
             path = Path(folder) / "catalog.json"
             path.write_bytes(raw)
             code, result, output = cli(path)
@@ -141,7 +141,7 @@ class ReviewFixes(unittest.TestCase):
             self.assertEqual((stdin_code, stdin_result), (code, result))
 
     def test_symlink_fifo_directory_and_mocked_device_fail_without_blocking(self):
-        with tempfile.TemporaryDirectory(prefix="cli-types-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="cli-types-", dir=Path("/tmp").resolve()) as folder:
             root = Path(folder); regular = root / "catalog.json"; regular.write_bytes(DATA)
             symlink = root / "secret-path-sentinel"; symlink.symlink_to(regular)
             fifo = root / "fifo-secret-path-sentinel"; os.mkfifo(fifo)
@@ -162,7 +162,7 @@ class ReviewFixes(unittest.TestCase):
             self.assertEqual(cli(alias / "catalog.json")[0], 0)
 
     def test_oversize_regular_file_is_bounded_and_short_reads_are_assembled(self):
-        with tempfile.TemporaryDirectory(prefix="cli-size-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="cli-size-", dir=Path("/tmp").resolve()) as folder:
             large = Path(folder) / "large"; large.write_bytes(b"x" * (MAX_INPUT_BYTES + 1))
             actual_read = os.read; requested = []
             def record_read(fd, count):
@@ -183,7 +183,7 @@ class ReviewFixes(unittest.TestCase):
 
     def test_one_read_only_fd_is_closed_on_success_stat_and_read_errors(self):
         actual_open, actual_stat, actual_read, actual_close = os.open, os.fstat, os.read, os.close
-        with tempfile.TemporaryDirectory(prefix="cli-fds-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="cli-fds-", dir=Path("/tmp").resolve()) as folder:
             regular = Path(folder) / "regular"; regular.write_bytes(DATA)
             for failure in (None, "stat", "read"):
                 opened, checked, closed, reads = [], [], [], []

@@ -30,6 +30,8 @@ class SMBUploadNewMedium:
         if self.closed or self.clock() >= self.deadline:
             raise UploadFault("expired")
         self.verify("smb_medium")
+        if self.closed or self.clock() >= self.deadline:
+            raise UploadFault("expired")
         if self.reader.tree is None or self.reader.tree.is_dfs_share:
             raise UploadFault("source_changed")
 

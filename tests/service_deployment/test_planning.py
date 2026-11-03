@@ -6,7 +6,7 @@ from arl.contracts import Fault, encode
 from arl.service_deployment import build_plan, parse_configuration, parse_manifest, parse_inventory
 from arl.service_deployment.__main__ import plan_catalog
 from arl.service_deployment.models import PortBinding
-from support import fixture, single
+from tests.service_deployment.support import fixture, single
 
 
 class PlanningTests(unittest.TestCase):

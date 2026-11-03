@@ -12,14 +12,14 @@ import unittest
 from script.stage_core_runtime import stage
 from script.bundled_runtime_entry import verify
 from script.prepare_mio_migration import candidates
-from deployment.manage import Manager, DeploymentError
 from arl.client import Client
 
 ROOT=Path(__file__).resolve().parents[1]
 
 class CorePackageTests(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix='core-package-',dir=ROOT/'build')
+        # Socket acceptance must not depend on the clone's pathname depth.
+        self.temp=tempfile.TemporaryDirectory(prefix='core-package-',dir=Path('/tmp').resolve())
         self.root=Path(self.temp.name);self.app=self.root/'package'
         (self.app/'Contents').mkdir(parents=True)
         (self.app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'test.package.only'}))
@@ -59,6 +59,9 @@ class CorePackageTests(unittest.TestCase):
             if parent.poll() is None:parent.terminate()
             parent.communicate(timeout=3)
     def test_legacy_production_installer_cannot_touch_real_state(self):
+        # Historical deployment source is a separate acceptance prerequisite;
+        # it must not prevent importing the public core package regressions.
+        from deployment.manage import Manager, DeploymentError
         with self.assertRaisesRegex(DeploymentError,'legacy_installer_retired'):
             Manager().deploy('/nonexistent-package','unapproved')
 

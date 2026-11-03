@@ -24,7 +24,7 @@ class IdentityTests(RuntimeCase):
             self.assert_fault("app_identity_unverified", lambda: Client(self.home, "friday").rpc("health"))
             # Another real process, same UID and same interpreter, cannot claim Tisra.
             program = "from arl.client import Client; from arl.contracts import Fault; import sys;\ntry: Client(sys.argv[1], 'tisra').rpc('health')\nexcept Fault as e: print(e.code)"
-            result = subprocess.run([sys.executable, "-c", program, str(self.home)], capture_output=True, timeout=5)
+            result = subprocess.run([sys.executable, '-B', "-c", program, str(self.home)], capture_output=True, timeout=5)
             self.assertEqual(result.stdout.decode().strip(), "app_identity_unverified")
             verifier.revoke(os.getpid())
             self.assert_fault("app_identity_unverified", lambda: client.rpc("health"))

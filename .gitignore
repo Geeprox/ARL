@@ -26,3 +26,6 @@ build/
 
 # Offline, pinned image-decoder cache for Moments.
 /vendor/moments/pillow/
+
+# Generated Python packaging metadata.
+*.egg-info/

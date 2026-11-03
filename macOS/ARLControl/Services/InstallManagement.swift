@@ -3,6 +3,7 @@ import AppKit
 import Security
 import Darwin
 import ARLCredentialHostCore
+import ARLCredentialOnboarding
 
 /// Local signed-app management entry, selected before SwiftUI/credential owner
 /// construction. Fixed bundle ID and current-user paths; no UI automation.
@@ -55,6 +56,10 @@ enum InstallManagement {
     }
     @MainActor static func run(_ args: [String]) -> Int32 {
         do {
+            if args.first == "--internal-nas-acceptance" {
+                guard args.count == 3 else{throw ARLError(code:"nas_acceptance_arguments_invalid")}
+                try output(NASAcceptanceExecutor.runBlocking(phase:args[1],approvedManifestSHA256:args[2]));return 0
+            }
             if args == ["--internal-codex-plan"] {
                 try output(CodexScopeOwner.configurationCandidate()); return 0
             }
@@ -113,7 +118,9 @@ enum InstallManagement {
             child.standardInput=FileHandle.nullDevice;child.standardOutput=FileHandle.standardOutput;child.standardError=FileHandle.standardError
             try child.run();child.waitUntilExit();return child.terminationStatus
         } catch {
-            try? output(["status":"blocked","error":(error as? ARLError)?.code ?? "install_management_failed"])
+            let code=(error as? ARLError)?.code ?? (error as? NASRuntimeFailure)?.rawValue
+                ?? (error as? CredentialError).map{"credential_"+$0.rawValue} ?? "install_management_failed"
+            try? output(["status":"blocked","error":code])
             return 2
         }
     }

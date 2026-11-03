@@ -25,8 +25,9 @@ def main():
     if child.stdout.readline()!='prepared\n':raise RuntimeError('caller_not_prepared')
     registered=RegisteredPeerVerifier({config['caller']});registered.register(config['caller'],child.pid,config['peer_executable']);lease=registered.capture_registration(config['caller'],child.pid)
     signed=SignedPeerVerifier(ROOT/'PeerSignatureHelper',{config['caller']:config['signature_requirement']})
-    adapter=CodexTextAdapter(binary=config['codex_binary'],enabled=True,max_wall_seconds=180)
-    if adapter.pin!=config['codex_sha256']:raise RuntimeError('provider_binary_changed')
+    adapter=CodexTextAdapter(binary=config['codex_binary'],enabled=True,max_wall_seconds=600)
+    # The original hash is historical provenance, not a lifetime version lock.
+    adapter.verify_official_binary()
     service=CodexServiceV2(adapter,package_home=Path.home()/"Library/Application Support/ARL/CodexPackages",caller=config['caller'],model=config['model'],max_calls=None,max_output_bytes=32768,reasoning_effort=config['reasoning_effort'],service_tier='default',scope_generation=config['scope_generation'],authorization_current=closure_current,peer_current=lambda: child.poll() is None and lease.is_current())
     runtime=None;stop=threading.Event()
     def shutdown(*_):stop.set()

@@ -76,7 +76,7 @@ class IntegrationTests(unittest.TestCase):
         codec = wire if operation == 'rerank' else sourced
         adapter_type = SelectedRerankAdapter if operation == 'rerank' else SelectedExplanationAdapter
         engine_type = SelectedRerankEngine if operation == 'rerank' else SelectedExplanationEngine
-        text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-I', str(Path(__file__).resolve())])
+        text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-B', '-I', str(Path(__file__).resolve())])
         self.adapter = adapter_type([MODEL], text_adapter=text)
         self.auth = SyntheticAuthorization(codec.NAME)
         self.review = SelectedReviewProducer(self.auth, lambda owner: self.subject,

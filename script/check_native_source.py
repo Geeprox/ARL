@@ -44,6 +44,6 @@ def main():
   run(name,common+['-parse-as-library','-whole-module-optimization','-emit-module','-emit-object','-I',str(output),'-Xcc','-fmodule-map-file='+str(module/'module.modulemap'),'-module-name',name,'-emit-module-path',str(output/(name+'.swiftmodule')),*[str(ROOT/p) for p in sources],'-o',str(output/(name+'.o'))],sources)
  run('archive',['xcrun','ar','rcs',str(output/'libARLCredentialHostCore.a'),*[str(output/(n+'.o')) for n in ('ARLCredentialOnboarding','ARLCredentialHostCore','FlyAICompression')]])
  sources=recipe['source_groups']['Control_complete_link']
- run('Control_complete_link',common+['-I',str(output),'-L',str(output),'-lARLCredentialHostCore','-lz','-Xcc','-fmodule-map-file='+str(module/'module.modulemap'),*[str(ROOT/p) for p in sources],'-o',str(output/'Control-compile-only')],sources)
+ run('Control_complete_link',common+['-I',str(output),'-L',str(output),'-lARLCredentialHostCore','-lz','-lsqlite3','-Xcc','-fmodule-map-file='+str(module/'module.modulemap'),*[str(ROOT/p) for p in sources],'-o',str(output/'Control-compile-only')],sources)
  print('Native source compilation passed. No application was signed, installed or launched.')
 if __name__=='__main__':main()

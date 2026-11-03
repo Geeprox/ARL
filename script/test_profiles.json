@@ -1,0 +1,1486 @@
+{
+  "modules": {
+    "tests.Moments.test_archive_storage": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "integrations/moments/worker"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.Moments.test_native_capture": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "integrations/moments/worker"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.Moments.test_owner_lifetime": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "integrations/moments/worker"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.Moments.test_refresh_bridge": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "integrations/moments/worker"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_deployment.test_no_effects": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "tests/service_deployment"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_deployment.test_planning": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "tests/service_deployment"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_deployment.test_readiness": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "tests/service_deployment"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_deployment.test_validation": {
+      "kind": "unittest",
+      "profile": "portable",
+      "python_paths": [
+        "tests/service_deployment"
+      ],
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_portal.test_portal_hooks": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.service_portal.test_review_fixes": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_app_connections": {
+      "kind": "unittest",
+      "overrides": {
+        "SocketSessionTests": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos"
+          ]
+        },
+        "SwiftConsumerTests": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Module default is standard-library synthetic source testing; native/private cases are explicitly partitioned",
+      "requires": []
+    },
+    "tests.test_app_integration": {
+      "kind": "unittest",
+      "overrides": {
+        "IntegrationTests.test_current_friday_adapter_uses_shared_sdk_under_supervisor": {
+          "profile": "external",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "friday_integration"
+          ]
+        },
+        "IntegrationTests.test_identifier_only_native_policy_is_rejected": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "core_native_fixtures"
+          ]
+        },
+        "IntegrationTests.test_native_audit_token_signature_check_accepts_only_pinned_cdhash": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "tisra_opt_in_fixture",
+            "core_native_fixtures"
+          ]
+        },
+        "IntegrationTests.test_tisra_opt_in_native_action_module": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "tisra_opt_in_fixture"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_apple_reusable_review": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_application_host": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_application_models": {
+      "kind": "unittest",
+      "overrides": {
+        "ApplicationModelTests.test_real_swift_consumer_to_python_full_offline_loop": {
+          "profile": "external",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift",
+            "tisra_source"
+          ]
+        },
+        "ApplicationModelTests.test_unchanged_swift_consumer_registers_real_icon_with_empty_catalog": {
+          "profile": "external",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift",
+            "tisra_source"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": []
+    },
+    "tests.test_attachment_inspection": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_bootstrap_checks": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_build_release": {
+      "kind": "unittest",
+      "overrides": {
+        "ReleaseTests.test_build_only_preflight_does_not_enumerate_keychain": {
+          "profile": "private",
+          "reason": "Current full production preflight validates original offline resource shells before this boundary; not a source-only unit fixture",
+          "requires": [
+            "release_resources"
+          ]
+        },
+        "ReleaseTests.test_missing_identity_blocks_before_any_native_command": {
+          "profile": "private",
+          "reason": "Current full production preflight validates original offline resource shells before this boundary; not a source-only unit fixture",
+          "requires": [
+            "release_resources"
+          ]
+        },
+        "ReleaseTests.test_output_rejects_external_directory": {
+          "profile": "private",
+          "reason": "Current full production preflight validates original offline resource shells before this boundary; not a source-only unit fixture",
+          "requires": [
+            "release_resources"
+          ]
+        },
+        "ReleaseTests.test_real_offline_resources_are_rebound_without_changing_helper_or_vendor": {
+          "profile": "private",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "release_resources"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Module default is standard-library synthetic source testing; native/private cases are explicitly partitioned",
+      "requires": []
+    },
+    "tests.test_bundled_startup_diagnostics": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_calendar_boundary": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Requires original historical candidate resource evidence",
+      "requires": [
+        "macos",
+        "swift",
+        "historical_calendar_closure"
+      ]
+    },
+    "tests.test_calendar_review": {
+      "kind": "unittest",
+      "overrides": {
+        "CalendarReviewTests.test_actual_signed_native_client_to_real_source_runtime_double_effect": {
+          "profile": "private",
+          "reason": "Original historical signed Calendar package required",
+          "requires": [
+            "macos",
+            "historical_calendar_bundle"
+          ]
+        },
+        "CalendarReviewTests.test_same_signed_binary_without_host_registration_is_rejected": {
+          "profile": "private",
+          "reason": "Original historical signed Calendar package required",
+          "requires": [
+            "macos",
+            "historical_calendar_bundle"
+          ]
+        },
+        "CalendarReviewTests.test_unbrokered_host_rejected_before_permission_or_job": {
+          "profile": "private",
+          "reason": "Original historical signed Calendar package required",
+          "requires": [
+            "macos",
+            "historical_calendar_bundle"
+          ]
+        },
+        "CalendarReviewTests.test_uncertain_real_signed_client_write_no_restart_replay": {
+          "profile": "private",
+          "reason": "Original historical signed Calendar package required",
+          "requires": [
+            "macos",
+            "historical_calendar_bundle"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_calendar_write": {
+      "kind": "unittest",
+      "overrides": {
+        "NativeValidationTests": {
+          "profile": "private",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "historical_calendar_bundle"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_capture_application_integration": {
+      "kind": "unittest",
+      "overrides": {
+        "CaptureApplicationTests": {
+          "profile": "external",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "capture_application",
+            "capture_native_fixture"
+          ]
+        }
+      },
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_capture_host_attachment": {
+      "kind": "unittest",
+      "profile": "external",
+      "reason": "Actual separately built native Capture process; no synthetic replacement",
+      "requires": [
+        "macos",
+        "capture_native_fixture"
+      ]
+    },
+    "tests.test_capture_process_end_to_end": {
+      "kind": "unittest",
+      "profile": "external",
+      "reason": "Actual separately built native Capture process; no synthetic replacement",
+      "requires": [
+        "macos",
+        "capture_native_fixture"
+      ]
+    },
+    "tests.test_codex_binary_admission": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_context": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_contract": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_deadline": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_execution_options": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_package_refresh": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_production": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_codex_research": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_research_client": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_rpc_diagnostics": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_server": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_sourced_client": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_sourced_contract": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_sourced_execution": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_codex_sourced_research": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_control": {
+      "kind": "unittest",
+      "overrides": {
+        "ControlNativeTests": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_core_import_closure": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_dependency_preparation": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_deployment": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Historical deployment package source is deliberately excluded from public exports",
+      "requires": [
+        "deployment_source"
+      ]
+    },
+    "tests.test_deployment_lifecycle": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Historical deployment package source is deliberately excluded from public exports",
+      "requires": [
+        "deployment_source"
+      ]
+    },
+    "tests.test_finalize_build": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_finder_package": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_formal_research_host": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_formal_research_r4_transaction": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_friday_actor": {
+      "kind": "unittest",
+      "profile": "external",
+      "reason": "Separately owned actor/dependency closure; no substitute evidence",
+      "requires": [
+        "macos",
+        "friday_source",
+        "friday_owner_review"
+      ]
+    },
+    "tests.test_friday_planning": {
+      "kind": "unittest",
+      "overrides": {
+        "ControlledFridayPlanningTests": {
+          "profile": "external",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "friday_source",
+            "friday_owner_review"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_friday_real_priority": {
+      "kind": "unittest",
+      "profile": "external",
+      "reason": "Separately pinned real Friday adapter; pin mismatch remains incomplete",
+      "requires": [
+        "friday_adapter"
+      ]
+    },
+    "tests.test_identity": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_install_child_drain": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_codex_scope": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_gui_rehearsal": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_management_interrupt": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_install_parent_guard": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_install_platform": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_snapshot_layout": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_transaction": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_install_unified_update": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_journal_anchor_upgrade": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Current journal migration/volume identity source checks",
+      "requires": []
+    },
+    "tests.test_journal_volume_identity": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Current journal migration/volume identity source checks",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_messages_receive": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_messages_receive_bridge": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Core receive authority uses actual sessions and fixed synthetic transport only",
+      "requires": []
+    },
+    "tests.test_messages_receive_relay": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual native managed-core audit token/signature relay with synthetic chat database",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_mio_apple_consumer": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_mio_host_lifecycle": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Reviewed offline tunnel resource shell and native signed fixture",
+      "requires": [
+        "macos",
+        "swift",
+        "tunnel_runtime",
+        "tunnel_client"
+      ]
+    },
+    "tests.test_model_transport_boundary": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_modules": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_music_runtime_resource_limit": {
+      "argv": [
+        "{python}",
+        "-B",
+        "{root}/tests/test_music_runtime_resource_limit.py",
+        "--source",
+        "{root}",
+        "--runtime",
+        "{root}/vendor/release/ARL.resources/Contents/Resources/ServiceRuntime",
+        "--fixture-parent",
+        "{temporary}"
+      ],
+      "kind": "command",
+      "profile": "private",
+      "reason": "Standalone actual pinned runtime resource-limit check",
+      "requires": [
+        "music_runtime"
+      ]
+    },
+    "tests.test_music_service_integration": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_acceptance": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_acceptance_host": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual fixed-manifest host and durable journal with synthetic SMB medium",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_attachment_bridge": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_authorization_timing": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Pure timing aggregation, wire-shape classification and fixed-record reader; no NAS packages or network",
+      "requires": []
+    },
+    "tests.test_nas_authorization_wire": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual private NAS wire and files/list dispatcher with synthetic native replies; imports locked NAS APIs",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_diagnostic": {
+      "kind": "unittest",
+      "overrides": {
+        "NASDiagnosticTests.test_private_record_replacement_has_no_trailing_bytes": {
+          "profile": "dependency",
+          "reason": "Uses actual locked SMB exception classes",
+          "requires": [
+            "nas_dependencies"
+          ]
+        },
+        "NASDiagnosticTests.test_real_library_concrete_subclasses_are_not_misreported": {
+          "profile": "dependency",
+          "reason": "Uses actual locked SMB exception classes",
+          "requires": [
+            "nas_dependencies"
+          ]
+        },
+        "NASDiagnosticTests.test_real_library_preserves_errno_and_exact_callsite_without_secret_text": {
+          "profile": "dependency",
+          "reason": "Uses actual locked SMB exception classes",
+          "requires": [
+            "nas_dependencies"
+          ]
+        },
+        "SMBDialPolicyTests": {
+          "profile": "dependency",
+          "reason": "Exercises the actual locked smbprotocol Tcp dialer; only DNS and sockets are synthetic",
+          "requires": [
+            "nas_dependencies"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_diagnostics_reader": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_directory_ui": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_document_host": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies",
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_nas_document_text": {
+      "kind": "unittest",
+      "overrides": {
+        "OfficeChecks.test_independent_native_docx_conversion": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos"
+          ]
+        },
+        "OfficeChecks.test_real_password_encrypted_zip_is_refused": {
+          "profile": "portable",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "zip"
+          ]
+        },
+        "PDFKitChecks": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Module default is standard-library synthetic source testing; native/private cases are explicitly partitioned",
+      "requires": []
+    },
+    "tests.test_nas_file_operations": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_file_params_importer": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_file_search": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_inventory": {
+      "kind": "unittest",
+      "overrides": {
+        "FileConsumerTests": {
+          "profile": "dependency",
+          "reason": "Actual production NAS host imports locked Pydantic/SMB dependencies",
+          "requires": [
+            "nas_dependencies"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_packaging_permissions": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_nas_reader_host": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_runtime_assembly": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_server_setup": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_nas_widget_resources": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_native": {
+      "kind": "unittest",
+      "overrides": {
+        "NativeTests.test_authorization_query_does_not_prompt_or_read_private_data": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "eventkit_status_fixture"
+          ]
+        },
+        "NativeTests.test_supervisor_registers_real_swift_client_without_credentials": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift_smoke"
+          ]
+        },
+        "NativeTests.test_swift6_client_real_rpc": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos",
+            "swift_smoke"
+          ]
+        }
+      },
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_netease_music": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_notes_create": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_notes_focus": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Notes focus intent, activation observation, deadline, cancellation and current-page admission against synthetic AppKit signals",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_notes_host": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_notes_page_lifecycle": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Notes page/ticket lease isolation against stale view lifecycle callbacks",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_notes_permission_native": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_owner_read_handshake": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual signed fixture, kernel Unix socket identity and production owner handshake deadlines; no installed app or personal data",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_priority_host": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_priority_r2": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_priority_r3": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_priority_v1": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_privacy_audit": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_providers": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_public_catalog_pins": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_read_owner_review_id": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Requires original historical candidate resource evidence",
+      "requires": [
+        "old_read_owner_metadata"
+      ]
+    },
+    "tests.test_reminders_boundary": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Requires original historical candidate resource evidence",
+      "requires": [
+        "macos",
+        "swift",
+        "historical_reminders_closure"
+      ]
+    },
+    "tests.test_reminders_catalog_journal": {
+      "kind": "unittest",
+      "overrides": {
+        "RemindersCatalogJournalTests.test_catalog_keeps_independent_metadata_without_repairing_journal": {
+          "profile": "native",
+          "reason": "Compile current actual helper handler against a synthetic repository",
+          "requires": [
+            "macos",
+            "swift"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Read-only journal diagnostic is standard library; native handler is partitioned",
+      "requires": []
+    },
+    "tests.test_reminders_code_rebind": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_reminders_confirmation": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_reminders_static_build": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_reminders_write": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_research": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_research_client": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_research_product_entry": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_research_product_socket": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_research_sdk_swift": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_research_swift": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Apple source compilation or kernel process identity",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
+    "tests.test_resource_publication_budget": {
+      "argv": [
+        "{python}",
+        "-B",
+        "{root}/tests/test_resource_publication_budget.py",
+        "{temporary}"
+      ],
+      "kind": "command",
+      "profile": "portable",
+      "reason": "Standalone synthetic packager publication-budget assertions",
+      "requires": []
+    },
+    "tests.test_responses_adapter": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_review_payload_boundaries": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_review_regressions": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_runtime": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_runtime_description": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_scheduling": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_selected_integration": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_service_connections": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_settings": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_smb_read_ancestry": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_smb_upload_new_medium": {
+      "kind": "unittest",
+      "profile": "dependency",
+      "reason": "Actual NAS modules using locked dependency APIs; transport is synthetic",
+      "requires": [
+        "nas_dependencies"
+      ]
+    },
+    "tests.test_supervisor_native_requirement": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_taobao_capability_evidence": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_taobao_robustness_fixture_packet": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_test_profiles": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Complete inventory, explicit prerequisites and no false passing skips",
+      "requires": []
+    },
+    "tests.test_tisra_capture_contract": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_tisra_capture_frozen_evidence": {
+      "kind": "unittest",
+      "profile": "private",
+      "reason": "Frozen acceptance evidence is intentionally separate from synthetic transport tests",
+      "requires": [
+        "capture_frozen_evidence"
+      ]
+    },
+    "tests.test_tisra_capture_process": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_tisra_capture_runtime": {
+      "kind": "unittest",
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_tisra_capture_uploads": {
+      "kind": "unittest",
+      "overrides": {
+        "CaptureUploadTests.test_handler_uses_genuine_registered_peer_and_rejects_other_process": {
+          "profile": "native",
+          "reason": "This case has additional concrete prerequisites",
+          "requires": [
+            "macos"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Self-contained checked-in source and synthetic temporary fixtures",
+      "requires": []
+    },
+    "tests.test_unified_runtime_package": {
+      "kind": "unittest",
+      "overrides": {
+        "CorePackageTests.test_legacy_production_installer_cannot_touch_real_state": {
+          "profile": "private",
+          "reason": "Actual historical retired installer rejection, no synthetic substitute",
+          "requires": [
+            "deployment_source"
+          ]
+        }
+      },
+      "profile": "portable",
+      "reason": "Public core packaging and source-contained migration tests",
+      "requires": []
+    }
+  },
+  "profiles": {
+    "dependency": "Locked public third-party runtime/API dependencies must be prepared explicitly",
+    "external": "Actual separately owned consumer/app/source; absence is a blocked acceptance gate",
+    "native": "Self-contained macOS framework/compiler/kernel tests; source-built fixtures, no real business effects",
+    "portable": "Python standard library plus checked-in source; no external consumer, account, signing or private shell",
+    "private": "Frozen private evidence, historical signed package or maintainer resource shell; never synthetic substitution"
+  },
+  "requirements": {
+    "capture_application": {
+      "kind": "env_path",
+      "reason": "Explicit isolated Tisra application bundle; never launch the installed personal app implicitly",
+      "suffix": "Contents/MacOS/Tisra",
+      "variable": "TISRA_CAPTURE_TEST_BUNDLE"
+    },
+    "capture_frozen_evidence": {
+      "kind": "path",
+      "reason": "Original frozen consumer acceptance evidence, never replaced with synthetic passing evidence",
+      "value": "integrations/tisra/capture-inner-frozen-v1.json"
+    },
+    "capture_native_fixture": {
+      "kind": "path",
+      "reason": "Separately owned real Capture native executable and source closure",
+      "value": "../TisraCaptureProcessV2/.build-process/out/Products/Debug/CaptureProcessFixture"
+    },
+    "core_native_fixtures": {
+      "kind": "path",
+      "reason": "Prepare checked-in native fixtures with script/build_and_run.sh --build-only",
+      "value": "build/PeerSignatureHelper"
+    },
+    "deployment_source": {
+      "kind": "path",
+      "reason": "Historical deployment source, not a production install action",
+      "value": "deployment/manage.py"
+    },
+    "eventkit_status_fixture": {
+      "kind": "path",
+      "reason": "Prepare checked-in status-only EventKit fixture",
+      "value": "build/EventKitHelper"
+    },
+    "friday_adapter": {
+      "default": "build/optional-friday/arl.py",
+      "kind": "env_path",
+      "reason": "Separately pinned Friday priority adapter",
+      "variable": "ARL_FRIDAY_ADAPTER"
+    },
+    "friday_integration": {
+      "default": "build/optional-friday-source",
+      "kind": "env_path",
+      "reason": "Actual separately provisioned Friday integration checkout",
+      "suffix": "homeplane/arl.py",
+      "variable": "ARL_FRIDAY_SOURCE"
+    },
+    "friday_owner_review": {
+      "default": "../Friday",
+      "kind": "env_path",
+      "reason": "Original separately owned Friday review/source pin, not replaceable with a synthetic owner review",
+      "suffix": "docs/evidence/arl-rule-planning-registration-proposal.json",
+      "variable": "ARL_FRIDAY_SOURCE"
+    },
+    "friday_source": {
+      "default": "../Friday",
+      "kind": "env_path",
+      "reason": "Actual separately owned Friday actor source",
+      "suffix": "homeplane/arl.py",
+      "variable": "ARL_FRIDAY_SOURCE"
+    },
+    "historical_calendar_bundle": {
+      "kind": "path",
+      "reason": "Historical sealed Calendar validation bundle, separate from current source compilation",
+      "value": "integrations/apple_calendar/dist/ARLCalendarBridge.app/Contents/MacOS/ARLCalendarBridge"
+    },
+    "historical_calendar_closure": {
+      "kind": "path",
+      "reason": "Historical sealed Calendar candidate source/package closure is not a current source-build fixture",
+      "value": "integrations/apple_calendar/dist/build/main.swift"
+    },
+    "historical_reminders_closure": {
+      "kind": "path",
+      "reason": "Historical sealed Reminders candidate source/package closure",
+      "value": "integrations/apple_reminders/dist/build/main.swift"
+    },
+    "macos": {
+      "kind": "platform",
+      "reason": "Apple frameworks and kernel identity",
+      "value": "darwin"
+    },
+    "music_runtime": {
+      "kind": "path",
+      "reason": "Original pinned offline music resource shell required by this standalone packager regression",
+      "value": "vendor/release/ARL.resources/Contents/Resources/ServiceRuntime/inventory.json"
+    },
+    "nas_dependencies": {
+      "distributions": [
+        "smbprotocol",
+        "pydantic",
+        "cryptography"
+      ],
+      "kind": "python_locked_modules",
+      "lock": "vendor/nas/DEPENDENCIES.lock.json",
+      "reason": "Exact NAS dependency versions from checked-in lock; use the prepared locked interpreter"
+    },
+    "node": {
+      "kind": "executable",
+      "reason": "Run synthetic checked-in Node fixtures",
+      "value": "node"
+    },
+    "old_read_owner_metadata": {
+      "kind": "path",
+      "reason": "Original signed resource metadata required for genuine migration comparison",
+      "value": "vendor/release/ARL.resources/Contents/Resources/CredentialReadOwner/authority.json"
+    },
+    "pillow": {
+      "kind": "python_module",
+      "reason": "Decode synthetic Moments image fixtures",
+      "value": "PIL"
+    },
+    "release_resources": {
+      "kind": "release_cache",
+      "reason": "Private signed/resource shell is intentionally omitted from source exports",
+      "recipe": "script/release_recipe.json"
+    },
+    "smbprotocol": {
+      "kind": "python_module",
+      "reason": "Use the locked NAS interpreter/dependencies",
+      "value": "smbprotocol"
+    },
+    "swift": {
+      "kind": "executable",
+      "reason": "Compile checked-in Swift source",
+      "value": "xcrun"
+    },
+    "swift_smoke": {
+      "kind": "path",
+      "reason": "Prepare checked-in Swift RPC fixture",
+      "value": "build/SwiftSmoke"
+    },
+    "tisra_opt_in_fixture": {
+      "kind": "path",
+      "reason": "Prepare checked-in opt-in Swift fixture",
+      "value": "build/TisraIntegrationSmoke"
+    },
+    "tisra_source": {
+      "kind": "path",
+      "reason": "Actual separately owned consumer source",
+      "value": "../Tisra/Sources/TisraCore/Research/ARLApplicationModels.swift"
+    },
+    "tunnel_client": {
+      "kind": "path",
+      "reason": "Reviewed local tunnel profile parser executable",
+      "value": "/opt/homebrew/bin/tunnel-client"
+    },
+    "tunnel_runtime": {
+      "kind": "any_path",
+      "reason": "Match the historical test own approved-template or installed offline resource fallback; only filesystem metadata is checked",
+      "values": [
+        {
+          "base": "root",
+          "path": "build/local-config/MioTemplate.app/Contents/Resources/MioRuntime/manifest.json"
+        },
+        {
+          "base": "user_home",
+          "path": "Applications/ARL.app/Contents/Library/LoginItems/ARLMioAppleBridge.app/Contents/Resources/MioRuntime/manifest.json"
+        }
+      ]
+    },
+    "zip": {
+      "kind": "executable",
+      "reason": "Create a real encrypted synthetic ZIP",
+      "value": "zip"
+    }
+  },
+  "schema_version": 1
+}

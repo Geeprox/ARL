@@ -32,10 +32,18 @@ enum MioReadOwnerAdapter {
             guard Set(params.keys).isSubset(of: ["protocolVersion", "capabilities", "clientInfo"]) else { return invalidParams(id) }
             let requested = params["protocolVersion"] as? String ?? "2024-11-05"
             let version = ["2024-11-05", "2025-03-26", "2025-06-18"].contains(requested) ? requested : "2024-11-05"
-            result = ["protocolVersion": version, "capabilities": ["tools": ["listChanged": true]],
+            result = ["protocolVersion": version, "capabilities": ["tools": ["listChanged": true], "resources": [:]],
                       "serverInfo": ["name": "arl-native-owner-read", "version": "1"]]
         case "ping":
             guard params.isEmpty else { return invalidParams(id) }; result = [:]
+        case "resources/list":
+            guard params.isEmpty else { return invalidParams(id) }
+            result = ["resources": [NASDownloadWidget.listing]]
+        case "resources/read":
+            guard Set(params.keys) == ["uri"],params["uri"] as? String == NASDownloadWidget.uri else {
+                return invalidParams(id)
+            }
+            result = ["contents": [NASDownloadWidget.resource]]
         case "tools/list":
             guard params.isEmpty else { return invalidParams(id) }
             var registry = try CapabilityRegistry(legacy: MioReadCatalog.descriptors())

@@ -103,12 +103,12 @@ class ReleaseTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             out = Path(directory).resolve();(out/'logs').mkdir()
             with self.assertRaises(b.BuildError):
-                b.run([sys.executable,'-c','raise SystemExit(7)'],'failure',out,b.BASE_ENV,2)
+                b.run([sys.executable, '-B','-c','raise SystemExit(7)'],'failure',out,b.BASE_ENV,2)
             receipt = b.load(out/'logs/failure.json')
             self.assertEqual(receipt['returncode'],7)
             self.assertTrue(receipt['direct_child_reaped'])
             with self.assertRaises(b.BuildError):
-                b.run([sys.executable,'-c','import time;time.sleep(30)'],'timeout',out,b.BASE_ENV,0.1)
+                b.run([sys.executable, '-B','-c','import time;time.sleep(30)'],'timeout',out,b.BASE_ENV,0.1)
             receipt = b.load(out/'logs/timeout.json')
             self.assertEqual(receipt['timeout_or_interruption'],'TimeoutExpired')
             self.assertTrue(receipt['direct_child_reaped'])

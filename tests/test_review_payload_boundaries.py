@@ -3,6 +3,8 @@ import importlib.util
 import json
 from pathlib import Path
 import time
+import sys
+from unittest.mock import patch
 import unittest
 import uuid
 
@@ -14,6 +16,7 @@ class PayloadBoundaryTests(unittest.TestCase):
     def receive(self, value):
         session=Session.__new__(Session)
         session.buffer=bytearray(json.dumps(value).encode()+b'\n')
+        session.frame_bytes=PROVIDER_FRAME_BYTES
         session.messages=0;session.context=None;session.observer=None;session.deadline=time.monotonic()+5
         return session.receive()
 
@@ -26,6 +29,7 @@ class PayloadBoundaryTests(unittest.TestCase):
     def test_many_valid_notifications_follow_deadline_not_a_lifetime_counter(self):
         session=Session.__new__(Session)
         session.buffer=bytearray(b'{"method":"turn/progress","params":{}}\n'*2500)
+        session.frame_bytes=PROVIDER_FRAME_BYTES
         session.messages=0;session.context=None;session.observer=None;session.deadline=time.monotonic()+5
         for _ in range(2500):self.assertEqual(session.receive()['method'],'turn/progress')
         self.assertEqual(session.messages,2500)
@@ -40,7 +44,11 @@ class PayloadBoundaryTests(unittest.TestCase):
     def contract(self):
         path=Path(__file__).resolve().parents[1]/'integrations/nas_codex_v2_20261024/nas/contract.py'
         spec=importlib.util.spec_from_file_location('review_nas_v2_contract',path)
-        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        module=importlib.util.module_from_spec(spec)
+        # stage_update.py installs this exact source as model_context.py.
+        from arl import codex_context
+        with patch.dict(sys.modules, {'model_context': codex_context}):
+            spec.loader.exec_module(module)
         return module
 
     def test_nas_codex_new_intents_get_new_ids_but_explicit_retry_keeps_one(self):

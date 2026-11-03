@@ -25,7 +25,7 @@ class ExecutionContractTests(RuntimeCase):
   super().setUp();self.configure()
  def configure(self,mode='ok'):
   fixture=Path(__file__).parent/'fixtures/CodexSourcedExecutionServer.py'
-  self.text=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(fixture),mode])
+  self.text=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(fixture),mode])
   self.adapter=CodexExecutionAdapter([MODEL],text_adapter=self.text)
   self.grant=CodexResearchGrant('codex_app_server',frozenset({MODEL}),'original-auth-epoch',CONTRACT_SHA256)
   self.snapshot={'schema_version':1,'source':'test_double','selection_enabled':True,'current':{'model':MODEL},

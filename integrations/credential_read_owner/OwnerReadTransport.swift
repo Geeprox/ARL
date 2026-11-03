@@ -8,6 +8,24 @@ final class OwnerReadStop: @unchecked Sendable {
     var cancelled: Bool { lock.withLock { stopped } }
 }
 
+struct OwnerReadAdmission {
+    let deadline: Double
+    init(started: Double, overallDeadline: Double) {
+        deadline = min(overallDeadline, started + OwnerReadWire.admissionSeconds)
+    }
+    func check(cancelled: () -> Bool) throws {
+        guard !cancelled() else { throw OwnerReadFault.cancelled }
+        guard OwnerReadSocket.now < deadline else { throw OwnerReadFault.deadline }
+    }
+    func verifying<T>(cancelled: () -> Bool, _ verify: () throws -> T) throws -> T {
+        try check(cancelled: cancelled)
+        let value = try verify()
+        try check(cancelled: cancelled)
+        return value
+    }
+    var frameDeadline: Double { min(deadline, OwnerReadSocket.now + OwnerReadWire.frameSeconds) }
+}
+
 enum OwnerReadSocket {
     static var now: Double { ProcessInfo.processInfo.systemUptime }
     static func address(_ socketPath: String = OwnerReadAuthority.socketPath) throws -> sockaddr_un {
@@ -54,18 +72,30 @@ enum OwnerReadSocket {
         try withUnsafeBytes(of: &size) { try writeAll($0) }
         try bytes.withUnsafeBytes { try writeAll($0) }
     }
-    static func readFrame(_ fd: Int32, limit: Int, deadline: Double, cancelled: () -> Bool) throws -> Data {
+    static func readFrame(_ fd: Int32, limit: Int, deadline: Double,
+                          firstByteFrameSeconds: Double? = nil, cancelled: () -> Bool) throws -> Data {
+        // Before the first byte, an authenticated peer may still be accepting
+        // or checking its complete signed bundle. After any byte arrives, one
+        // short deadline covers the entire header and body, without renewal.
+        var transferDeadline = deadline, receivedFirstByte = false
         func take(_ count: Int) throws -> Data {
             var result = Data()
             // An advertised length must never allocate its entire body up front.
             // This is an IO chunk size, not a result-size restriction.
             var chunk = [UInt8](repeating: 0, count: min(count, 64 * 1024))
             while result.count < count {
-                try wait(fd, event: Int16(POLLIN), deadline: deadline, cancelled: cancelled)
+                try wait(fd, event: Int16(POLLIN), deadline: transferDeadline, cancelled: cancelled)
                 let wanted = min(chunk.count, count - result.count)
                 let received = chunk.withUnsafeMutableBytes { Darwin.read(fd, $0.baseAddress!, wanted) }
                 if received < 0 && (errno == EAGAIN || errno == EINTR) { continue }
                 guard received > 0 else { throw OwnerReadFault.unavailable }
+                if !receivedFirstByte {
+                    receivedFirstByte = true
+                    if let seconds = firstByteFrameSeconds {
+                        guard seconds.isFinite, seconds > 0 else { throw OwnerReadFault.invalid }
+                        transferDeadline = min(deadline, now + seconds)
+                    }
+                }
                 result.append(contentsOf: chunk.prefix(received))
             }
             return result
@@ -174,13 +204,15 @@ struct OwnerReadClient {
         guard OwnerReadWire.isTool(tool) else { throw OwnerReadFault.unsupported }
         guard !cancelled() else { throw OwnerReadFault.cancelled }
         let logStarted = ProcessInfo.processInfo.systemUptime
-        let authority = try OwnerReadAuthority.load(role: .mio)
-        let deadline = OwnerReadSocket.now + OwnerReadWire.seconds(for: tool)
-        let fd = try OwnerReadSocket.connect(deadline: min(deadline, OwnerReadSocket.now + 2), cancelled: cancelled)
+        let deadline = logStarted + OwnerReadWire.seconds(for: tool)
+        let admission = OwnerReadAdmission(started: logStarted, overallDeadline: deadline)
+        let authority = try admission.verifying(cancelled: cancelled) { try OwnerReadAuthority.load(role: .mio) }
+        let fd = try OwnerReadSocket.connect(deadline: admission.frameDeadline, cancelled: cancelled)
         defer { _ = shutdown(fd, SHUT_RDWR); close(fd) }
-        let peer = try OwnerReadPeer(fd: fd, authority: authority)
+        let peer = try admission.verifying(cancelled: cancelled) { try OwnerReadPeer(fd: fd, authority: authority) }
         let hello = try OwnerReadJSON.object(OwnerReadSocket.readFrame(fd, limit: 1024,
-            deadline: min(deadline, OwnerReadSocket.now + 2), cancelled: cancelled), limit: 1024)
+            deadline: admission.deadline, firstByteFrameSeconds: OwnerReadWire.frameSeconds, cancelled: cancelled), limit: 1024)
+        try admission.check(cancelled: cancelled)
         guard Set(hello.keys) == ["schema", "generation", "event"], OwnerReadWire.integer(hello["schema"], OwnerReadWire.schema),
               hello["event"] as? String == "ready", let generation = OwnerReadWire.uuid(hello["generation"])
         else { throw OwnerReadFault.identity }
@@ -191,11 +223,11 @@ struct OwnerReadClient {
         var logFailed = true
         ARLConnectionLog.production.record("gateway","owner_request",logFields)
         defer { logFields["elapsed_ms"]=max(0,Int((ProcessInfo.processInfo.systemUptime-logStarted)*1000));logFields["failed"]=logFailed;ARLConnectionLog.production.record("gateway","owner_finished",logFields) }
-        try peer.verify()
+        try admission.verifying(cancelled: cancelled) { try peer.verify() }
         let encoded = try request.encoded()
         let result = try Self.receiveAfterPossibleSend(tool: tool) {
             try OwnerReadSocket.writeFrame(encoded, fd: fd, limit: OwnerReadWire.requestLimit,
-                                           deadline: min(deadline, OwnerReadSocket.now + 2), cancelled: cancelled)
+                                           deadline: admission.frameDeadline, cancelled: cancelled)
             let bytes = try OwnerReadSocket.readFrame(fd, limit: OwnerReadWire.responseLimit, deadline: deadline,
                 cancelled: { cancelled() || (try? peer.checkBirth()) == nil })
             guard !cancelled(), OwnerReadSocket.now < deadline else { throw OwnerReadFault.cancelled }

@@ -11,7 +11,7 @@ from arl.contracts import encode
 from arl.control import AppRegistry
 from arl.service_deployment import EvidenceSource, project_status
 from arl.service_deployment.__main__ import main, plan_catalog
-from support import NOW, evidence, fixture, single
+from tests.service_deployment.support import NOW, evidence, fixture, single
 
 
 class NoEffectsTests(unittest.TestCase):

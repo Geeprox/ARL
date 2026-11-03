@@ -366,8 +366,8 @@ def commands(ctx):
             *[str(ROOT/r) for r in recipe['source_groups'][name]],'-o',str(sdk_dir/(name+'.o'))]})
     steps.append({'name':'archive_SDK','seconds':15,'argv':[ctx['tools']['ar'],'rcs',str(sdk_dir/'libARLCredentialHostCore.a'),
         *[str(sdk_dir/(n+'.o')) for n in ('ARLCredentialOnboarding','ARLCredentialHostCore','FlyAICompression')]]})
-    steps.append({'name':'Control_complete_link','seconds':150,'argv':common+['-I',str(sdk_dir),'-L',str(sdk_dir),
-        '-lARLCredentialHostCore','-lz','-Xcc',module_map,
+    steps.append({'name':'Control_complete_link','seconds':300,'argv':common+['-I',str(sdk_dir),'-L',str(sdk_dir),
+        '-lARLCredentialHostCore','-lz','-lsqlite3','-Xcc',module_map,
         *[str(ROOT/r) for r in recipe['source_groups']['Control_complete_link']],'-o',str(out/'package/ARL.app/Contents/MacOS/ARL')]})
     steps.append({'name':'PackageInspector','seconds':30,'argv':common+['-parse-as-library',str(ROOT/'script/ReleasePackageInspector.swift'),
         '-o',str(work/'PackageInspector')]})

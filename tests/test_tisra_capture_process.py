@@ -293,7 +293,7 @@ class ProcessTests(unittest.TestCase):
         info = self.ledger.stat()
         metadata = dict(self.pin.__dict__, ledger_device=info.st_dev, ledger_inode=info.st_ino)
         environment = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
-        self.native = subprocess.Popen([sys.executable, '-m', 'tests.test_tisra_capture_process',
+        self.native = subprocess.Popen([sys.executable, '-B', '-m', 'tests.test_tisra_capture_process',
             '--fixture', str(self.root), json.dumps(metadata), mode], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
         ready = self.native.stdout.readline().strip()
@@ -477,7 +477,7 @@ class ProcessTests(unittest.TestCase):
 
     def test_actual_source_process_exit_invalidates_registration(self):
         environment = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
-        source = subprocess.Popen([sys.executable, '-c',
+        source = subprocess.Popen([sys.executable, '-B', '-c',
             'import sys; print("ready", flush=True); sys.stdin.buffer.read()'],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, env=environment)

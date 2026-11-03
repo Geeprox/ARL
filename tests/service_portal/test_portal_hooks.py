@@ -100,7 +100,11 @@ class PortalHooks(unittest.TestCase):
 
     def test_host_factory_forwards_attachment_into_existing_runtime(self):
         portal = ServicePortal()
-        with patch("arl.host.Runtime", return_value="same_runtime") as factory:
+        # The source host delegates its optional compatibility composition; mock
+        # the actual constructor owner rather than an unused re-export.
+        from arl import host
+        constructor = "arl.compat_host.Runtime" if host.compatibility else "arl.host.Runtime"
+        with patch(constructor, return_value="same_runtime") as factory:
             self.assertEqual(make_runtime(Path("/never-created"), service_portal=portal), "same_runtime")
             self.assertIs(factory.call_args.kwargs["service_portal"], portal)
             self.assertFalse(factory.call_args.kwargs["execute_jobs"])
@@ -109,7 +113,7 @@ class PortalHooks(unittest.TestCase):
 
     def test_real_host_constructor_attaches_one_existing_runtime_without_starting(self):
         portal = ServicePortal(encode(catalog_value()))
-        with tempfile.TemporaryDirectory(prefix="sp-", dir="/private/tmp") as folder:
+        with tempfile.TemporaryDirectory(prefix="sp-", dir=Path("/tmp").resolve()) as folder:
             with patch("socket.socket", side_effect=AssertionError("socket")), patch("subprocess.Popen", side_effect=AssertionError("process")), patch("threading.Thread.start", side_effect=AssertionError("thread")):
                 runtime = make_runtime(Path(folder) / "home", service_portal=portal)
                 self.assertIs(runtime.service_portal, portal)

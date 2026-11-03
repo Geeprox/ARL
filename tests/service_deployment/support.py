@@ -4,6 +4,7 @@ import json
 
 from arl.contracts import AppPolicy
 from arl.control import AppRegistry
+from arl.app_connections import AppConnections
 from arl.diagnostics import Diagnostics
 from arl.service_deployment import (DeploymentObservation, EvidenceSource, HealthObservation,
                                     RegistrationBinding, parse_configuration, parse_manifest)
@@ -36,5 +37,16 @@ def evidence(manifest, config, *, source=EvidenceSource.HOST, installed=True, he
     policies = {manifest.service_id: AppPolicy(frozenset(), methods=frozenset(), max_calls=0)}
     registry = AppRegistry(policies, Diagnostics(policies, clock=lambda: stamp), clock=lambda: stamp)
     registry.register(manifest.descriptor)
-    registry.observe_verified(manifest.service_id)
+    # A one-way verified observation no longer establishes a connected app.
+    # Use the actual open/confirm state machine with a synthetic trusted peer;
+    # this is test construction, not real host/transport acceptance.
+    connections = AppConnections(registry)
+    descriptor = manifest.descriptor
+    peer_binding = ('synthetic-service-registration', lambda: True)
+    opened = connections.dispatch(manifest.service_id, 'connection.open', {
+        'client_nonce': 'a'*64, 'name': descriptor.name, 'icon_ref': descriptor.icon_ref,
+        'version': descriptor.version, 'capabilities': list(descriptor.capabilities)},
+        peer_binding, policies[manifest.service_id])
+    connections.dispatch(manifest.service_id, 'connection.confirm',
+        {k: opened[k] for k in ('session_id', 'challenge')}, peer_binding, policies[manifest.service_id])
     return binding, observation, tuple(deepcopy(registry.snapshot(policies))), registry

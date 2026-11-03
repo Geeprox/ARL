@@ -21,7 +21,7 @@
     },
     {
       "path": "integrations/mio_apple/MioReadOwnerAdapter.swift",
-      "sha256": "7a14140ea1bfab60168c533b8d3328b5cd8e22669a9f9c615c2705fdee9d3008"
+      "sha256": "612eab39a4d18f35cb2dcf1f467cfed05e4b383196ad167e17c7d75565fab5fe"
     },
     {
       "path": "integrations/mio_apple/NativeSetupReview.swift",
@@ -81,11 +81,11 @@
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadTransport.swift",
-      "sha256": "909652be48c6ff8f26283ac001080437afdd6ff9c9bd349f59b7a361940ea683"
+      "sha256": "b30c07728fcbfe7d2682f1a82e8e0fe0514066f57243cf8837a82d3c265cb777"
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadWire.swift",
-      "sha256": "96928e80b4b13494f69ba96901adb268f08fa66cf87c53f544939d63016a62c6"
+      "sha256": "981f1db5cb838077868f1f3c0211c7d2d3c3b34a5762911154d584cfd7d20961"
     },
     {
       "path": "integrations/credential_read_owner/AppleCapability.swift",
@@ -93,11 +93,11 @@
     },
     {
       "path": "integrations/credential_read_owner/NASCapability.swift",
-      "sha256": "0358096372ff24090decf178d4cbe6e32213709720f7544b44ec7fbd959669e6"
+      "sha256": "e23cbb2ac48686ded2b34efb0157df51b9079a39b003fcc7451d163eda596a75"
     },
     {
       "path": "integrations/credential_read_owner/AppleProductCapability.swift",
-      "sha256": "4aabd4a9aa4c767683234f064abe9ebd677d27526caeb9ccb97212efaeadf05b"
+      "sha256": "701a90dd745382d8e6ab461507ac76f8eb797b3d9c88914117fbd4439747698f"
     },
     {
       "path": "integrations/credential_read_owner/MusicPlaylistCoverCapability.swift",
@@ -118,6 +118,10 @@
     {
       "path": "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASDocumentContract.swift",
       "sha256": "5b791935ddeb0a78e01e93dbc56ad0bd515792fcf943c7770f8d1b53d546790b"
+    },
+    {
+      "path": "integrations/nas/native/NASDownloadWidget.swift",
+      "sha256": "9eb1684436d3ed56d784d33d4c9551adffaba0bb30a4da689158c9e0e0c65cd2"
     }
   ],
   "frameworks": [

@@ -117,7 +117,8 @@ class CodexCallerPeer:
         return hashlib.sha256((a+b).encode()).hexdigest(), lambda: current_a() and current_b()
 
 
-def compose_codex_service(home, *, service, peer_verifier, isolated=False, service_portal=None, formal_tisra_peer=None):
+def compose_codex_service(home, *, service, peer_verifier, isolated=False, service_portal=None, formal_tisra_peer=None,
+                          application_policy=None):
     """Trusted in-process seam. Production requires both existing peer verifiers.
 
     No default activation, grant loader or caller-selected configuration. The
@@ -139,6 +140,16 @@ def compose_codex_service(home, *, service, peer_verifier, isolated=False, servi
         formal_tisra_peer = available_formal_tisra_peer()
     if formal_tisra_peer is not None and type(formal_tisra_peer) is not FormalTisraPeer:
         raise Fault('app_identity_unverified')
+    if application_policy is not None:
+        from .codex_application import compose_codex_application
+        runtime = compose_codex_application(home, service=service, peer_verifier=peer_verifier,
+            policy=application_policy, isolated=isolated, service_portal=service_portal)
+        if formal_tisra_peer is not None:
+            from .control import AppDescriptor
+            runtime.policies['tisra'] = application_metadata_policy()
+            runtime.identity_verifier = PeerComposition((peer_verifier, formal_tisra_peer))
+            runtime.control.apps.register(AppDescriptor('tisra', 'Tisra', 'sf:text.book.closed'))
+        return runtime
     policies = metadata_policies()
     if formal_tisra_peer is not None:policies['tisra'] = application_metadata_policy()
     if service.caller in policies:raise Fault('codex_caller_conflict')
@@ -150,6 +161,8 @@ def compose_codex_service(home, *, service, peer_verifier, isolated=False, servi
         execute_jobs=True, codex_service=service, admission=service.admit,
         work_scope=frozenset({(service.caller, service.name)}), service_portal=service_portal,
         application_catalog=(lambda app: service.status().get('execution_catalog')) if formal_tisra_peer is not None else None)
+    from .codex_context import TRANSPORT_FRAME_BYTES
+    runtime.max_request_frame_bytes = TRANSPORT_FRAME_BYTES
     service.runtime = runtime
     from .control import AppDescriptor
     runtime.control.apps.register(AppDescriptor(service.caller, 'ARL Codex', 'sf:cpu',
@@ -266,19 +279,29 @@ def build_codex_activation(home):
             reasoning_effort=config['reasoning_effort'], service_tier=config['service_tier'],
             scope_generation=config['scope_generation'], max_calls=config['max_calls'],
             max_output_bytes=config['max_output_bytes'], authorization_current=current_scope, peer_current=lease.is_current,
-            allow_model_selection=True)
+            allow_model_selection=True, package_home=Path(home)/'CodexPackages')
         return service, CodexCallerPeer(config['caller'], registered, signed), 'configured'
     except Fault as error:return None, None, error.code
     except (OSError, ValueError, TypeError, KeyError, subprocess.SubprocessError):
         return None, None, 'codex_configuration_unavailable'
 
 def make_runtime(home, *, capture_attachment=None, service_portal=None, formal_tisra_peer=None,
-                 research_activation=None, codex_service=None, codex_peer=None, codex_isolated=False):
+                 research_activation=None, codex_service=None, codex_peer=None, codex_isolated=False,
+                 codex_application_policy=None, messages_receive_transport=None):
+    def local_receive(runtime):
+        if messages_receive_transport is not None:
+            from .messages_receive import MessagesReceive
+            runtime.messages_receive = MessagesReceive(runtime.control.apps, runtime.policies, messages_receive_transport)
+        return runtime
     if codex_service is not None:
         if capture_attachment is not None or research_activation is not None:
             raise Fault('codex_service_composition_conflict')
-        return compose_codex_service(home, service=codex_service, peer_verifier=codex_peer,
-            isolated=codex_isolated, service_portal=service_portal, formal_tisra_peer=formal_tisra_peer)
+        return local_receive(compose_codex_service(home, service=codex_service, peer_verifier=codex_peer,
+            isolated=codex_isolated, service_portal=service_portal, formal_tisra_peer=formal_tisra_peer,
+            application_policy=codex_application_policy))
+
+    if codex_application_policy is not None:
+        raise Fault('codex_service_not_admitted')
 
     if capture_attachment is not None:
         if service_portal is not None or formal_tisra_peer is not None or research_activation is not None:
@@ -286,12 +309,12 @@ def make_runtime(home, *, capture_attachment=None, service_portal=None, formal_t
         from .tisra_capture_host import CaptureHostAttachment
         if type(capture_attachment) is not CaptureHostAttachment:
             raise Fault('capture_host_unconfigured')
-        return capture_attachment.make_runtime(home)
+        return local_receive(capture_attachment.make_runtime(home))
     if research_activation is not None:
         if formal_tisra_peer is not None:
             raise Fault('research_host_composition_conflict')
         from .formal_research_host import compose_formal_research
-        return compose_formal_research(home, research_activation, service_portal=service_portal)
+        return local_receive(compose_formal_research(home, research_activation, service_portal=service_portal))
     # No replay/mutation of historical pending tasks in the metadata-only host.
     policies = metadata_policies()
     if formal_tisra_peer is not None:
@@ -310,12 +333,12 @@ def make_runtime(home, *, capture_attachment=None, service_portal=None, formal_t
     if formal_tisra_peer is not None:
         from .control import AppDescriptor
         runtime.control.apps.register(AppDescriptor('tisra', 'Tisra', 'sf:text.book.closed'))
-    return runtime
+    return local_receive(runtime)
 
 
 def run(home, *, capture_attachment=None, service_portal=None, formal_tisra_peer=None,
         research_activation=None, codex_service=None, codex_peer=None, codex_isolated=False,
-        codex_configuration_state='not_configured'):
+        codex_configuration_state='not_configured', codex_application_policy=None, messages_receive_transport=None):
     log = None
     runtime = None
     finished = threading.Event()
@@ -325,7 +348,9 @@ def run(home, *, capture_attachment=None, service_portal=None, formal_tisra_peer
         runtime = make_runtime(home, capture_attachment=capture_attachment, service_portal=service_portal,
                                formal_tisra_peer=formal_tisra_peer,
                                research_activation=research_activation, codex_service=codex_service,
-                               codex_peer=codex_peer, codex_isolated=codex_isolated)
+                               codex_peer=codex_peer, codex_isolated=codex_isolated,
+                               codex_application_policy=codex_application_policy,
+                               messages_receive_transport=messages_receive_transport)
         runtime.codex_configuration_state = codex_configuration_state
         log.event("starting")
         def stop(signum, frame):
@@ -400,11 +425,17 @@ def main():
     if args.home is not None and not args.isolated_test:
         parser.error("home override requires an explicit isolated test")
     home = args.home if args.isolated_test and args.home is not None else state_home()
+    from .messages_receive import build_native_receive_transport
+    messages_transport, _ = build_native_receive_transport(home) if not args.isolated_test else (None, 'isolated')
     codex_service, codex_peer, codex_state = build_codex_activation(home)
     if codex_state != 'not_configured':
         # An invalid independent scope never falls back to a different caller.
+        from .codex_application import scoped_application_policy
         return run(home, codex_service=codex_service, codex_peer=codex_peer,
-                   codex_configuration_state=codex_state)
+                   codex_configuration_state=codex_state,
+                   codex_application_policy=scoped_application_policy(codex_service, legacy_submit=True)
+                       if codex_service is not None else None,
+                   messages_receive_transport=messages_transport)
     from .tisra_capture_profiles import attachment_for_profiles
     from .formal_peer import available_formal_tisra_peer
     from .research_product import build_activation
@@ -416,7 +447,7 @@ def main():
     return run(home,
                capture_attachment=capture_attachment,
                formal_tisra_peer=available_formal_tisra_peer() if capture_attachment is None and activation is None else None,
-               research_activation=activation)
+               research_activation=activation,messages_receive_transport=messages_transport)
 
 
 if __name__ == "__main__":

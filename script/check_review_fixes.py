@@ -33,7 +33,7 @@ def main():
     sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
     base = ['xcrun', 'swiftc', '-sdk', sdk, '-swift-version', '6', '-j', '1', '-parse-as-library',
             '-module-cache-path', str(output/'ModuleCache'), '-I', str(native), '-L', str(native),
-            '-lARLCredentialHostCore', '-lz', '-Xcc', '-fmodule-map-file='+str(native/'FlyAICompression/module.modulemap')]
+            '-lARLCredentialHostCore', '-lz', '-lsqlite3', '-Xcc', '-fmodule-map-file='+str(native/'FlyAICompression/module.modulemap')]
     records = []
 
     def run(name, argv, timeout=180):
@@ -68,6 +68,12 @@ def main():
     run(name, [output/name, output/(name+'-fixture')], timeout=60)
     name = 'NASFileOperationsTests'
     run(name+'-compile', base+[ROOT/'macOS/ARLControl/Services/NASFileMutationContract.swift', ROOT/'tests'/(name+'.swift'), '-o', output/name])
+    run(name, [output/name])
+    name = 'NASAcceptanceContractTests'
+    run(name+'-compile', base+[ROOT/'tests'/(name+'.swift'), '-o', output/name])
+    run(name, [output/name])
+    name = 'MioNASWidgetTests'
+    run(name+'-compile', base+mio+[ROOT/'tests'/(name+'.swift'), '-o', output/name])
     run(name, [output/name])
     control = []
     for path in json.loads((ROOT/'script/release_recipe.json').read_text())['source_groups']['Control_complete_link']:

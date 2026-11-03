@@ -159,9 +159,29 @@ class PriorityV1Tests(unittest.TestCase):
         for _ in range(24):
             self.submit();self.submit('friday',self.request('friday'))
         counts=Counter()
-        for _ in range(24):
-            row=self.store.claim();counts[row['owner']]+=1;self.finish(row)
+        # This case measures equal estimated service at a 1:3 weight. Real
+        # SQLite/CPU contention can exceed the 5 ms estimate; release_lease must
+        # then charge actual elapsed service and legitimately change call counts.
+        # Freeze only the claim/finish business clock, after all work is queued.
+        with patch('arl.priority.time.time',return_value=time.time()):
+            for _ in range(24):
+                row=self.store.claim();counts[row['owner']]+=1;self.finish(row)
         self.assertEqual(counts,{'tisra':6,'friday':18})
+
+    def test_weighted_service_includes_actual_elapsed_over_the_estimate(self):
+        self.rebind(self.new_authority(profiles=dict(self.profiles,friday=replace(self.profiles['friday'],weight=3))))
+        self.submit('friday',self.request('friday'))
+        instant=time.time()
+        with patch('arl.priority.time.time',return_value=instant):
+            row=self.store.claim()
+        lease=self.store.db.execute('SELECT started_ms,estimate_ms FROM resource_leases WHERE job=?',(row['id'],)).fetchone()
+        finished=(lease['started_ms']+30)/1000
+        with patch('arl.priority.time.time',return_value=finished):
+            self.finish(row)
+        elapsed=int(finished*1000)-lease['started_ms']
+        self.assertGreater(elapsed,lease['estimate_ms'])
+        actual=self.store.db.execute("SELECT service FROM priority_fair WHERE owner='friday'").fetchone()[0]
+        self.assertAlmostEqual(actual,elapsed/3)
     def test_aging_and_bounded_bypass_never_create_realtime_authority(self):
         low=self.submit(request=self.request(cls='background'))
         for _ in range(12):self.submit('friday',self.request('friday'))

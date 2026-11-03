@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from contract import MODEL,APPS,encode,normalize
+from model_context import TRANSPORT_FRAME_BYTES
 
 def atomic(path, value):
     raw=encode(value); temporary=path.with_name('.'+path.name+'.'+uuid.uuid4().hex)
@@ -23,7 +24,9 @@ def server(app, root, secret):
         protocol_version='HTTP/1.1'
         def log_message(self,*args):pass
         def reply(self,status,value):
-            raw=encode(value);self.send_response(status);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(raw)
+            raw=encode(value);self.send_response(status)
+            if isinstance(value.get('error'),dict) and value['error'].get('retryable') is False:self.send_header('x-should-retry','false')
+            self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(raw)
         def authorized(self):
             return hmac.compare_digest(self.headers.get('Authorization',''),'Bearer '+secret)
         def do_GET(self):
@@ -33,7 +36,8 @@ def server(app, root, secret):
                     from contract import time_stale
                     catalog=read_json(root/'catalog.json',131072)
                     if time_stale(catalog):return self.reply(503,{'error':{'code':'catalog_stale'}})
-                    return self.reply(200,{'object':'list','data':catalog['models'],'arl':{k:catalog[k] for k in ('schema_version','catalog_version','package_revision','quota_policy','local_lifetime_call_limit')}})
+                    models=[m for m in catalog['models'] if m['id'].startswith('arl/package/')] if app=='robin' else catalog['models']
+                    return self.reply(200,{'object':'list','data':models,'arl':{k:catalog[k] for k in ('schema_version','catalog_version','package_revision','quota_policy','local_lifetime_call_limit')}})
                 except (OSError,ValueError,KeyError):return self.reply(503,{'error':{'code':'catalog_unavailable'}})
             if self.path=='/health':return self.reply(200,{'ok':True,'app':app,'transport':'arl-file-queue','inference_verified':False})
             return self.reply(404,{'error':{'code':'not_found'}})
@@ -43,7 +47,7 @@ def server(app, root, secret):
             try:
                 self.connection.settimeout(10)
                 length=int(self.headers.get('Content-Length','0'))
-                if not 0<length<=6*8192+4096 or self.headers.get('Transfer-Encoding'):raise ValueError('invalid_frame')
+                if not 0<length<=TRANSPORT_FRAME_BYTES or self.headers.get('Transfer-Encoding'):raise ValueError('invalid_frame')
                 raw=self.rfile.read(length)
                 if len(raw)!=length:raise ValueError('invalid_frame')
                 value=json.loads(raw);catalog=read_json(root/'catalog.json',131072);request=normalize(app,value,catalog,request_id=self.headers.get('Idempotency-Key'))
@@ -52,20 +56,20 @@ def server(app, root, secret):
                 if not target.exists():
                     pending=[p for p in (root/'requests').glob('*.json') if not (root/'responses'/p.name).exists()]
                     if len(pending)>=128:return self.reply(503,{'error':{'code':'queue_capacity_reached'}})
-                    request['created_at']=time.time();request['expires_at']=time.time()+300
+                    request['created_at']=time.time();request['expires_at']=time.time()+(720 if app=='robin' else 300)
                     atomic(target,request)
-                original=read_json(target,6*8192+4096)
+                original=read_json(target,TRANSPORT_FRAME_BYTES)
                 if original.get('content_sha256')!=request['content_sha256'] or original.get('selector')!=request['selector']:
                     return self.reply(409,{'error':{'code':'request_id_conflict'}})
-                deadline=time.monotonic()+305
+                deadline=time.monotonic()+(725 if app=='robin' else 305)
                 while not response.exists():
                     if time.monotonic()>deadline:
                         atomic(root/'cancelled'/(request['id']+'.json'),{'id':request['id']})
-                        return self.reply(503,{'error':{'code':'arl_task_pending_or_cancelled','message':'Inspect original task; no automatic replay.'}})
+                        return self.reply(422,{'error':{'retryable':False,'request_id':request['id'],'code':'arl_task_pending_or_cancelled','message':'Inspect original task; no automatic replay.'}})
                     time.sleep(.4)
                 result=read_json(response,131072)
                 if result.get('id')!=request['id'] or result.get('app')!=app:raise ValueError('response_mismatch')
-                if result.get('state')!='succeeded':return self.reply(503,{'error':{'code':result.get('error','arl_task_failed'),'message':'Original ARL task retained; no automatic new call.'}})
+                if result.get('state')!='succeeded':return self.reply(422,{'error':{'retryable':False,'request_id':request['id'],'job_id':result.get('job_id'),'provider_error':result.get('provider_error'),'code':result.get('error','arl_task_failed'),'message':'Original ARL task retained; no automatic new call.'}})
                 text=result['text'];now=int(time.time());identity='chatcmpl-'+request['id'];selected_model=value['model']
                 if result.get('schema')!=2 or result.get('selection_receipt',{}).get('content_sha256')!=request['content_sha256'] or result['selection_receipt']['selector']!=request['selector']:raise ValueError('response_mismatch')
                 if value.get('stream'):

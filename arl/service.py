@@ -13,6 +13,7 @@ from .contracts import AppPolicy, Cancelled, Fault, encode, object_schema, strin
 from .control import ControlPlane
 from .app_connections import AppConnections, METHODS as CONNECTION_METHODS
 from .application_models import ApplicationModels, METHODS as APPLICATION_METHODS
+from .messages_receive import MessagesReceive, METHODS as MESSAGES_RECEIVE_METHODS
 from .diagnostics import CODES, log_schema, log_v3_schema
 from .lifecycle import InstanceLock, peer_uid, private_home
 from .overview import overview
@@ -45,7 +46,7 @@ METHODS = {
     "poll_wakes": object_schema(), "stop": object_schema(),
 }
 METHODS.update(SERVICE_PORTAL_METHODS)
-METHODS.update({m:object_schema() for m in CONNECTION_METHODS | APPLICATION_METHODS})
+METHODS.update({m:object_schema() for m in CONNECTION_METHODS | APPLICATION_METHODS | MESSAGES_RECEIVE_METHODS})
 
 
 
@@ -70,7 +71,7 @@ class JobContext:
         priorities.check_running(self.runtime.store,self.row)
         route = self.runtime.codex_service
         if route is not None and self.row["tool"] == route.name:
-            route.admit(self.owner, self.row["tool"], json.loads(self.row["args"]))
+            route.check_running(self.owner, self.row["tool"], json.loads(self.row["args"]))
         if self.row['tool']==PLANNING_NAME and self.runtime.admission is not None:
             self.runtime.admission(self.owner,self.row['tool'],json.loads(self.row['args']))
         if self.runtime.stopping.is_set() or self.runtime.store.is_cancelled(self.row["id"]):
@@ -112,34 +113,44 @@ class Handler(socketserver.StreamRequestHandler):
     def handle(self):
         self.request.settimeout(5)
         runtime = self.server.runtime
+        # A reviewed host composition may add application execution methods.
+        # They need the same strict framing and kernel-bound session identity
+        # as discovery; this does not add methods to any default policy.
+        application_methods = APPLICATION_METHODS | frozenset(
+            getattr(runtime, 'application_execution_methods', ()))
+        session_methods = application_methods | MESSAGES_RECEIVE_METHODS
         try:
             if peer_uid(self.request) != os.geteuid():
                 raise Fault("peer_not_authorized")
+            frame_limit=getattr(runtime,"max_request_frame_bytes",MAX_FRAME)
             deadline, raw = time.monotonic()+5, bytearray()
             while b"\n" not in raw:
                 remaining = deadline-time.monotonic()
                 if remaining <= 0:
                     raise Fault("rpc_deadline_exceeded")
                 self.request.settimeout(remaining)
-                chunk = self.request.recv(min(4096, MAX_FRAME+1-len(raw)))
+                chunk = self.request.recv(min(4096, frame_limit+1-len(raw)))
                 if not chunk:
                     raise Fault("invalid_frame")
                 raw.extend(chunk)
-                if len(raw) > MAX_FRAME:
+                if len(raw) > frame_limit:
                     raise Fault("invalid_frame")
             if not raw.endswith(b"\n") or raw.count(b"\n") != 1:
                 raise Fault("invalid_frame")
             request = json.loads(raw)
-            if type(request) is dict and request.get('method') in set(SERVICE_PORTAL_METHODS) | CONNECTION_METHODS | APPLICATION_METHODS | {'settings.app_icon.v1'}:
+            if type(request) is dict and request.get('method') in set(SERVICE_PORTAL_METHODS) | CONNECTION_METHODS | session_methods | {'settings.app_icon.v1'}:
                 from .service_deployment.validation import strict_json as service_portal_json
-                request = service_portal_json(bytes(raw))
+                if request.get('method') in getattr(runtime,'application_execution_methods',()):
+                    from .wire import strict_json
+                    request = strict_json(bytes(raw))
+                else:request = service_portal_json(bytes(raw))
             if type(request) is dict and request.get('method') in RESEARCH_METHODS | CAPTURE_METHODS:
                 from .wire import strict_json
                 request = strict_json(bytes(raw))
             runtime = self.server.runtime
             verified = runtime.identity_verifier(self.request, request.get("app")) if runtime.identity_verifier and type(request) is dict else None
             binding = None
-            if verified is not None and request.get('method') in CONNECTION_METHODS | APPLICATION_METHODS:
+            if verified is not None and request.get('method') in CONNECTION_METHODS | session_methods:
                 binder = getattr(runtime.identity_verifier, 'session_binding', None)
                 if binder is None: raise Fault('app_identity_unverified')
                 binding = binder(self.request, verified)
@@ -165,7 +176,9 @@ class Handler(socketserver.StreamRequestHandler):
             # settings snapshots keep their existing transport behavior.
             if isinstance(locals().get('request'), dict) and request.get('method') in RESEARCH_METHODS and len(encoded) > 65536:
                 encoded = encode({'protocol':PROTOCOL,'ok':False,'error':{'code':'response_frame_too_large'}})+b'\n'
-            if isinstance(locals().get('request'), dict) and request.get('method') in CAPTURE_METHODS | APPLICATION_METHODS | {'settings.app_icon.v1'} and len(encoded) > MAX_FRAME:
+            if isinstance(locals().get('request'), dict) and request.get('method') in CAPTURE_METHODS | application_methods | {'settings.app_icon.v1'} and len(encoded) > MAX_FRAME:
+                encoded = encode({'protocol':PROTOCOL,'ok':False,'error':{'code':'response_frame_too_large'}})+b'\n'
+            if isinstance(locals().get('request'), dict) and request.get('method') in MESSAGES_RECEIVE_METHODS and len(encoded) > 131072:
                 encoded = encode({'protocol':PROTOCOL,'ok':False,'error':{'code':'response_frame_too_large'}})+b'\n'
             self.wfile.write(encoded)
         except OSError:
@@ -175,7 +188,7 @@ class Handler(socketserver.StreamRequestHandler):
 class Runtime:
     def __init__(self, home, *, start_delay=0, local_enabled=False, policies=None,
                  extra_tools=(), apple=None, travel=None, wake_callbacks=None, providers=None,
-                 identity_verifier=None, shutdown_grace=35, execute_jobs=True, resources=None, modules=None, admission=None, research=None, codex_research=None, capture=None, host_attachment=None, service_portal=None, priority_authority=None, codex_service=None, work_scope=None, application_catalog=None):
+                 identity_verifier=None, shutdown_grace=35, execute_jobs=True, resources=None, modules=None, admission=None, research=None, codex_research=None, capture=None, host_attachment=None, service_portal=None, priority_authority=None, codex_service=None, work_scope=None, application_catalog=None, messages_receive_transport=None):
         self.home = private_home(home)
         Store._scope_clause(work_scope)
         self.work_scope = work_scope
@@ -221,6 +234,8 @@ class Runtime:
         self.admission = admission
         self.control = ControlPlane(self,resources=resources)
         self.app_connections = AppConnections(self.control.apps)
+        self.messages_receive = (MessagesReceive(self.control.apps, self.policies, messages_receive_transport)
+                                 if messages_receive_transport is not None else None)
         if application_catalog is not None and not callable(application_catalog):
             raise Fault("invalid_application_models_composition")
         self.application_models = (ApplicationModels(self.control.apps, self.policies, application_catalog)
@@ -297,6 +312,12 @@ class Runtime:
             if self.application_models is None:
                 raise Fault('application_models_not_configured')
             return self.application_models.dispatch(owner, method, params, peer_binding)
+        if method in MESSAGES_RECEIVE_METHODS:
+            if verified_app != owner or self.identity_verifier is None or peer_binding is None:
+                raise Fault('app_identity_unverified')
+            if self.messages_receive is None:
+                raise Fault('messages_receive_not_configured')
+            return self.messages_receive.dispatch(owner, method, params, peer_binding, policy)
         if method in priorities.METHODS:
             if verified_app!=owner or self.identity_verifier is None:raise Fault('app_identity_unverified')
             if self.priority_authority is None or self.store is None:raise Fault('priority_not_configured')

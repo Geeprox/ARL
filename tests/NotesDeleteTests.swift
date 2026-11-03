@@ -29,6 +29,10 @@ import Darwin
         var attachments = 0, calls = 0, deleteAttempts = 0, deletes = 0, existsCalls = 0
         var exists = true, locked = false, shared = false, moved = false, cancelled = false
         var throwAfterDelete = false, keepAfterDelete = false, invalidExistsReply = false
+        var changedNoteContainer = false, invalidNoteContainer = false
+        var noteContainerReads = 0, bodyPropertyReads = 0
+        var createAttempts = 0, createPropertyCount = 0, createNameWasSupplied = false
+        var createHTML: String?
         lazy var backend = NotesDirectBackend(send: { event, params in try self.send(event, params) },
             check: { if self.cancelled { throw AppleDirectFault("cancelled") } })
         func scope() -> NotesDirectScope { .init(folder: folder, expires: Date().addingTimeInterval(500)) }
@@ -69,19 +73,36 @@ import Darwin
             guard event == 0x67657464, let property = params[0x2d2d2d2d],
                   let ref = property.forKeyword(0x66726f6d),
                   let code = property.forKeyword(0x73656c64)?.typeCodeValue else { throw Failure.assertion("nonpublic or forbidden event") }
+            if code == 0x49442020, ref.forKeyword(0x77616e74)?.typeCodeValue == 0x70726f70,
+               ref.forKeyword(0x73656c64)?.typeCodeValue == 0x636e7472,
+               let source = ref.forKeyword(0x66726f6d), kind(source) == 0x6e6f7465 {
+                // Real Notes rejects this nested ID-of-container request even
+                // while resolving the container itself succeeds.
+                throw AppleDirectFault("target_not_found", nativeStatus: -1728)
+            }
             let type = kind(ref)
             if type == 0x6e6f7465 && !exists { throw AppleDirectFault("target_not_found", nativeStatus: -1728) }
             switch code {
             case 0x49442020:
                 if type == 0x61636374 { return .init(string: folder.accountID) }
-                if type == 0x63666f6c { return .init(string: moved ? "x-coredata://ABCD/ICFolder/p99" : folder.id) }
+                if type == 0x63666f6c {
+                    let foreign = ref.forKeyword(0x73656c64)?.stringValue == "x-coredata://ABCD/ICFolder/p99"
+                    return .init(string: moved || foreign ? "x-coredata://ABCD/ICFolder/p99" : folder.id)
+                }
                 return .init(string: noteID)
+            case 0x636e7472:
+                guard type == 0x6e6f7465 else { throw Failure.assertion("only note container is materialized") }
+                noteContainerReads += 1
+                if invalidNoteContainer { return .init(string: "not an object specifier") }
+                let account = try AppleDirectDescriptor.object(0x61636374, id: folder.accountID)
+                return try AppleDirectDescriptor.object(0x63666f6c,
+                    id: changedNoteContainer ? "x-coredata://ABCD/ICFolder/p99" : folder.id, parent: account)
             case 0x706e616d: return .init(string: type == 0x61636374 ? folder.accountName : type == 0x63666f6c ? folder.name : title)
             case 0x73687264: return .init(boolean: type == 0x6e6f7465 && shared)
             case 0x70777072: return .init(boolean: locked)
             case 0x61736d6f: return .init(date: modified)
-            case 0x74657874: return .init(string: plaintext)
-            case 0x626f6479: return .init(string: html)
+            case 0x74657874: bodyPropertyReads += 1; return .init(string: plaintext)
+            case 0x626f6479: bodyPropertyReads += 1; return .init(string: html)
             default: throw Failure.assertion("unexpected property")
             }
         }
@@ -147,6 +168,99 @@ import Darwin
             _ = try NotesDirectHandler(home:h,backend:f.backend,selectedFolder:f.folder).handle(.delete(proposal:q,expectedDigest:q.digest))
             try expect(f.deletes==1,"confirmed exact-target deletion does not require editable plain text")
         }
+        func listingBackend(_ fixture: Fixture, total: Int32 = 1) -> NotesDirectBackend {
+            NotesDirectBackend(send: { event, params in
+                if event == 0x636e7465, params[0x6b6f636c]?.typeCodeValue == 0x6e6f7465 { return .init(int32: total) }
+                return try fixture.send(event, params)
+            }, check: { if fixture.cancelled { throw AppleDirectFault("cancelled") } })
+        }
+        let containerFixture = Fixture()
+        let account = try AppleDirectDescriptor.object(0x61636374, id: containerFixture.folder.accountID)
+        let selected = try AppleDirectDescriptor.object(0x63666f6c, id: containerFixture.folder.id, parent: account)
+        let stableNote = try AppleDirectDescriptor.object(0x6e6f7465, id: containerFixture.noteID, parent: selected)
+        let nestedOwner = try AppleDirectDescriptor.property(0x636e7472, of: stableNote)
+        let nestedID = try AppleDirectDescriptor.property(0x49442020, of: nestedOwner)
+        try rejects("target_not_found") { _ = try containerFixture.send(0x67657464, [0x2d2d2d2d: nestedID]) }
+        let listed = try listingBackend(containerFixture).search(containerFixture.scope(), query: "")
+        try expect(listed.notes.count == 1 && listed.notes[0].id == containerFixture.noteID,
+            "real source lists through a materialized container when nested ID resolution fails")
+        try expect(containerFixture.noteContainerReads > 0 && containerFixture.bodyPropertyReads == 0 && containerFixture.deletes == 0,
+            "listing rechecks exact container metadata without body reads or effects")
+        for invalidContainer in [false, true] {
+            let fixture = Fixture()
+            fixture.changedNoteContainer = !invalidContainer
+            fixture.invalidNoteContainer = invalidContainer
+            try rejects(invalidContainer ? "invalid_response" : "note_moved_locked_or_shared") {
+                _ = try listingBackend(fixture).search(fixture.scope(), query: "")
+            }
+            try expect(fixture.noteContainerReads == 1 && fixture.bodyPropertyReads == 0 && fixture.deletes == 0,
+                "wrong or malformed materialized containers fail before note bodies and effects")
+        }
+        let emptyFolder = Fixture()
+        let emptyList = try listingBackend(emptyFolder, total: 0).search(emptyFolder.scope(), query: "")
+        try expect(emptyList.notes.isEmpty && emptyList.total == 0 && emptyFolder.noteContainerReads == 0 && emptyFolder.bodyPropertyReads == 0,
+            "an actually empty folder succeeds without note property requests")
+
+        func creationBackend(_ fixture: Fixture, proposal: NotesDirectProposal, injectLegacyName: Bool = false) -> NotesDirectBackend {
+            NotesDirectBackend(send: { event, params in
+                guard event == 0x6372656c else { return try fixture.send(event, params) }
+                try expect(Set(params.keys) == [0x6b6f636c, 0x696e7368, 0x70726474], "create has only class, exact folder and initial properties")
+                try expect(params[0x6b6f636c]?.typeCodeValue == 0x6e6f7465
+                    && params[0x696e7368]?.forKeyword(0x73656c64)?.stringValue == fixture.folder.id
+                    && params[0x696e7368]?.forKeyword(0x66726f6d)?.forKeyword(0x73656c64)?.stringValue == fixture.folder.accountID,
+                    "create stays in the exact selected account and folder")
+                guard let properties = params[0x70726474], properties.descriptorType == typeAERecord,
+                      let html = properties.forKeyword(0x626f6479)?.stringValue else { throw Failure.assertion("complete HTML property required") }
+                if injectLegacyName { properties.setDescriptor(.init(string: proposal.title), forKeyword: 0x706e616d) }
+                let suppliedName = properties.forKeyword(0x706e616d)?.stringValue
+                fixture.createAttempts += 1; fixture.createPropertyCount = properties.numberOfItems
+                fixture.createNameWasSupplied = suppliedName != nil; fixture.createHTML = html
+                fixture.title = proposal.title; fixture.exists = true
+                let body = proposal.plaintext.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+                // Reproduce the observed Notes behavior: supplying name adds a
+                // title before the complete body. Without name the first HTML
+                // line is the title. No real provider or user data is used.
+                fixture.plaintext = suppliedName.map { $0 + "\n" } ?? ""
+                fixture.plaintext += proposal.title + "\n" + body + "\n"
+                fixture.html = suppliedName.map { "<div>" + NotesDirectContract.escape($0) + "</div>" } ?? ""
+                fixture.html += html
+                return try AppleDirectDescriptor.object(0x6e6f7465, id: fixture.noteID, parent: params[0x696e7368]!)
+            }, check: { if fixture.cancelled { throw AppleDirectFault("cancelled") } })
+        }
+        let createdPlain = Fixture()
+        let createProposal = NotesDirectProposal(id: UUID(), scope: createdPlain.scope(), title: "<Synthetic & \"title\">",
+            plaintext: "BODY_MARKER & <tag>\r\nsecond\tline 😀", expires: Date().addingTimeInterval(100))
+        let expectedCreateHTML = "<div><b>&lt;Synthetic &amp; &quot;title&quot;&gt;</b></div><div>BODY_MARKER &amp; &lt;tag&gt;<br>second&#9;line 😀</div>"
+        let createBackend = creationBackend(createdPlain, proposal: createProposal)
+        let createHandler = NotesDirectHandler(home: try home("body-only-create"), backend: createBackend, selectedFolder: createdPlain.folder)
+        let createReply = try createHandler.handle(.create(proposal: createProposal, expectedDigest: createProposal.digest))
+        guard case let .mutation(itemID, outcome) = createReply.result else { throw Failure.assertion("verified create result required") }
+        try expect(itemID == createdPlain.noteID && outcome == "verified_local" && createdPlain.createAttempts == 1,
+            "body-only create completes one verified effect")
+        try expect(createdPlain.createPropertyCount == 1 && !createdPlain.createNameWasSupplied && createdPlain.createHTML == expectedCreateHTML,
+            "real create wire contains only complete escaped HTML and no competing name")
+        let createdRead = try createBackend.read(createProposal.scope, row: createdPlain.row())
+        try expect(createdRead.editableText == "BODY_MARKER & <tag>\nsecond\tline 😀",
+            "unchanged strict parser accepts the single-title plain creation encoding")
+
+        let legacyCreate = Fixture()
+        let legacyProposal = NotesDirectProposal(id: UUID(), scope: legacyCreate.scope(), title: "Synthetic title",
+            plaintext: "BODY_MARKER\nSynthetic plain text", expires: Date().addingTimeInterval(100))
+        let legacyBackend = creationBackend(legacyCreate, proposal: legacyProposal, injectLegacyName: true)
+        let legacyHandler = NotesDirectHandler(home: try home("legacy-double-title"), backend: legacyBackend, selectedFolder: legacyCreate.folder)
+        try rejects("create_unconfirmed", consumed: true) {
+            _ = try legacyHandler.handle(.create(proposal: legacyProposal, expectedDigest: legacyProposal.digest))
+        }
+        try expect(legacyCreate.createAttempts == 1 && legacyCreate.plaintext.hasPrefix("Synthetic title\nSynthetic title\n"),
+            "legacy name-plus-body behavior is rejected after its one effect")
+        let legacyRead = try legacyBackend.read(legacyProposal.scope, row: legacyCreate.row())
+        try expect(legacyRead.editableText == nil && legacyRead.editRestriction == "rich_text_read_only",
+            "duplicated formatted title is not silently stripped or admitted to the editor")
+        try rejects("operation_consumed", consumed: true) {
+            _ = try legacyHandler.handle(.create(proposal: legacyProposal, expectedDigest: legacyProposal.digest))
+        }
+        try expect(legacyCreate.createAttempts == 1, "uncertain original create ID is never replayed")
+
         let long=Fixture();long.plaintext=String(repeating:"中😀",count:18000)
         var offset=0,reconstructed=""
         repeat {

@@ -17,7 +17,9 @@ import Observation
     private(set) var searchResult: NotesDirectSearch?
     private(set) var readResult: NotesDirectRead?
     private(set) var lastOperationID: String?
-    private(set) var busy = false
+    private var operationBusy = false
+    private(set) var focusing = false
+    var busy: Bool { operationBusy || focusing }
     private(set) var actionAdmissionHeld = false
     private(set) var message: String?
     private(set) var detail: String?
@@ -26,6 +28,9 @@ import Observation
     private(set) var completedDraftID: UUID?
     private var cancellation: AppleDirectCancellation?
     private var page = NotesDirectPageState()
+    @ObservationIgnored private var focusAttempt: NotesDirectFocusAttempt?
+    @ObservationIgnored private var focusTask: Task<Void, Never>?
+    private var focusIntentID: UUID?
     private var generation: UUID { page.epoch }
     init(home: URL, enabled: Bool, executor: AppleDirectExecutor,
          preferences: UserDefaults = .standard, startAutomatically: Bool = true,
@@ -62,13 +67,72 @@ import Observation
         guard enabled, !actionAdmissionHeld, !busy, NSApplication.shared.isActive else { return nil }
         return page.ticket(folder: scope?.folder)
     }
+    func requestUserActionTicket()->NotesDirectActionTicket? {
+        if let value=ticket(){return value}
+        if !enabled {message="当前连接尚未启用。";detail="action_disabled"}
+        else if actionAdmissionHeld {message="后台正在收尾，请稍后重试。";detail="action_exit_hold"}
+        else if busy {message="当前操作尚未结束，请稍后重试。";detail="action_busy"}
+        else if !NSApplication.shared.isActive {message="请先点选 ARL 窗口，再继续操作。";detail="action_app_inactive"}
+        else {message="请重新打开备忘录页面后继续。";detail="action_page_not_visible"}
+        return nil
+    }
+    /// The visible Button freezes its values before calling this entry. No
+    /// automatic refresh or external owner can use it to select a scope.
+    func performUserActionAfterClick(_ operation: @escaping @MainActor (NotesDirectActionTicket) async -> Void) {
+        guard enabled, !actionAdmissionHeld, !operationBusy, focusIntentID == nil,
+              let initial = page.ticket(folder: scope?.folder) else {
+            if focusIntentID != nil { message="正在准备上一项操作，请稍后。"; detail="action_busy" }
+            else { _ = requestUserActionTicket() }
+            return
+        }
+        let id = UUID(); focusIntentID = id; focusing = true
+        let attempt = NotesDirectFocusAttempt(object: NSApplication.shared,
+            isActive: { NSApplication.shared.isActive },
+            isCurrent: { [weak self] in self?.focusIntentIsCurrent(id, initial: initial) == true },
+            activate: { NSApplication.shared.activate() })
+        focusAttempt = attempt
+        // Register before requesting activation, while still inside the real
+        // Button action. Synchronous didBecomeActive cannot be missed.
+        attempt.startAfterClick()
+        focusTask = Task { @MainActor [weak self] in
+            guard let self else { attempt.close(); return }
+            var refreshAfterOperation = false
+            defer {
+                attempt.close()
+                if focusIntentID == id {
+                    focusing = false; focusIntentID = nil; focusAttempt = nil; focusTask = nil
+                    if refreshAfterOperation, !actionAdmissionHeld, page.visible {
+                        Task { @MainActor [weak self] in await self?.prepareForDisplay() }
+                    }
+                }
+            }
+            let outcome = await attempt.wait()
+            guard !Task.isCancelled, focusIntentIsCurrent(id, initial: initial) else {
+                message="页面或范围已变化，请重新操作。"; detail="action_focus_expired"; return
+            }
+            guard outcome == .confirmed, attempt.confirmationStillValid else {
+                message = outcome == .timedOut ? "未能激活 ARL，请切换到 ARL 后重试。" : outcome == .confirmed ? "焦点已变化或操作已过期，请重新操作。" : "本次操作已停止。"
+                detail = outcome == .timedOut ? "action_activation_timeout" : outcome == .confirmed ? "action_activation_changed" : "action_focus_cancelled"
+                return
+            }
+            focusing = false
+            guard let ticket = requestUserActionTicket(), ticket.epoch == initial.epoch, ticket.folder == initial.folder else { return }
+            detail = nil
+            refreshAfterOperation = true
+            await operation(ticket)
+        }
+    }
+    private func focusIntentIsCurrent(_ id: UUID, initial: NotesDirectActionTicket) -> Bool {
+        enabled && !actionAdmissionHeld && !operationBusy && focusIntentID == id &&
+            (try? page.validate(initial, currentFolder: scope?.folder)) != nil
+    }
     private func begin(_ ticket: NotesDirectActionTicket) throws -> (AppleDirectCancellation, UUID) {
         try page.validate(ticket, currentFolder: scope?.folder)
         guard enabled, !actionAdmissionHeld, !busy, NSApplication.shared.isActive else { throw AppleDirectFault("user_action_unavailable") }
-        let stop = AppleDirectCancellation(); cancellation = stop; busy = true
+        let stop = AppleDirectCancellation(); cancellation = stop; operationBusy = true
         return (stop, generation)
     }
-    private func end() { busy = false; cancellation = nil }
+    private func end() { operationBusy = false; cancellation = nil }
     func suspendForExit() { actionAdmissionHeld = true; invalidate(); connection.pause() }
     func resumeAfterCancelledExit() { actionAdmissionHeld = false; connection.resume() }
     func finishExit() { actionAdmissionHeld = true; connection.stop() }
@@ -98,19 +162,24 @@ import Observation
         }
     }
     func invalidate() {
+        focusAttempt?.cancel(); focusTask?.cancel()
         cancellation?.cancel(); page.cancel()
         searchResult = nil; readResult = nil; folders = []
     }
-    func appear() { page.appear() }
-    func disappear() { invalidate(); page.disappear() }
+    @discardableResult func appear()->UUID {focusAttempt?.cancel();focusTask?.cancel();return page.appear()}
+    func disappear(appearance:UUID?=nil) {
+        guard page.disappear(appearance:appearance) else{return}
+        invalidate()
+    }
     func cancel() {
         invalidate()
         message = "后续已停，已提交的创建无法撤回。"
     }
     func refreshStatus() async { await connection.refresh(force: true) }
     func prepareForDisplay() async {
+        guard focusIntentID == nil else { return }
         await connection.refresh()
-        guard permission == .authorized, scope == nil, folders.isEmpty,
+        guard focusIntentID == nil, permission == .authorized, scope == nil, folders.isEmpty,
               !NSRunningApplication.runningApplications(withBundleIdentifier: AppleDirectTarget.notes.identifier).isEmpty,
               let ticket = ticket() else { return }
         // Visible-page metadata only. A race with app termination must not launch it.

@@ -9,8 +9,22 @@ final class AppleDirectJournal {
     private let lock: Int32
     private let device: dev_t
     private let inode: ino_t
+    static func persistentAnchor(_ fd:Int32,path:URL)throws->String {
+        var before=stat(),after=stat()
+        guard fstat(fd,&before)==0,
+              let volume=try path.resourceValues(forKeys:[.volumeUUIDStringKey]).volumeUUIDString,
+              let uuid=UUID(uuidString:volume),lstat(path.path,&after)==0,
+              before.st_dev==after.st_dev,before.st_ino==after.st_ino,
+              after.st_mode&S_IFMT==S_IFDIR,after.st_uid==getuid(),after.st_mode&0o777==0o700 else {
+            throw AppleDirectFault("journal_missing_or_replaced")
+        }
+        return "v2\n\(uuid.uuidString.lowercased())\n\(before.st_ino)\n"
+    }
     fileprivate static func openHome(_ home: URL) throws -> Int32 {
-        guard home.path.hasPrefix("/"), home.standardizedFileURL.path == home.path else { throw AppleDirectFault("journal_unavailable") }
+        // Foundation may spell an existing /private/var URL as /var after
+        // standardization. Validate the supplied absolute path component by
+        // component with O_NOFOLLOW below instead of rewriting that path.
+        guard home.path.hasPrefix("/") else { throw AppleDirectFault("journal_unavailable") }
         var fd = open("/", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
         guard fd >= 0 else { throw AppleDirectFault("journal_unavailable") }
         do {
@@ -54,7 +68,8 @@ final class AppleDirectJournal {
         defer { if owned { close(child) } }
         var info = stat()
         guard fstat(child, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o777 == 0o700 else { throw AppleDirectFault("journal_unsafe") }
-        let text = "v1\n\(info.st_dev)\n\(info.st_ino)\n"
+        let legacy = "v1\n\(info.st_dev)\n\(info.st_ino)\n"
+        let text = try Self.persistentAnchor(child,path:home.appendingPathComponent(name))
         if !anchorExists {
             let marker = openat(parent, anchor, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
             guard marker >= 0 else { throw AppleDirectFault("journal_uncertain") }
@@ -67,7 +82,8 @@ final class AppleDirectJournal {
             try Self.checkedFile(marker)
             var bytes = [UInt8](repeating: 0, count: 128)
             let count = read(marker, &bytes, bytes.count)
-            guard count > 0, count < 128, String(bytes: bytes.prefix(count), encoding: .utf8) == text else {
+            let existing=String(bytes:bytes.prefix(max(0,count)),encoding:.utf8)
+            guard count > 0, count < 128, existing == text || existing == legacy else {
                 throw AppleDirectFault("journal_missing_or_replaced")
             }
         }

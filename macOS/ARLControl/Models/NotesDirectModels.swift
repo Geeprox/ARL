@@ -139,8 +139,14 @@ struct NotesDirectActionTicket: Sendable {
 struct NotesDirectPageState {
     private(set) var epoch = UUID()
     private(set) var visible = false
-    mutating func appear() { epoch = UUID(); visible = true }
-    mutating func disappear() { epoch = UUID(); visible = false }
+    private var appearance:UUID?
+    @discardableResult mutating func appear()->UUID {
+        let lease=UUID();appearance=lease;epoch=UUID();visible=true;return lease
+    }
+    @discardableResult mutating func disappear(appearance lease:UUID?=nil)->Bool {
+        if let lease,lease != appearance{return false}
+        epoch=UUID();visible=false;appearance=nil;return true
+    }
     mutating func cancel() { epoch = UUID() }
     func ticket(folder: NotesDirectFolder?) -> NotesDirectActionTicket? {
         visible ? .init(epoch: epoch, folder: folder) : nil

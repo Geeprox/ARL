@@ -200,11 +200,45 @@ struct RemindersNativeClient: Sendable {
         }
         if let raw=reply.result_json {
             guard raw.utf8.count<=60000,let result=reply.result,result.schema_version==3,result.status=="ok" else{throw RemindersTransportFault("invalid_response")}
-            if reply.outcome=="saved_local" {
-                guard result.persistence=="saved_local",result.cloud_sync=="not_checked",result.operation_id==reply.task?.operation_id else{throw RemindersTransportFault("invalid_response")}
+            if reply.outcome=="saved_local" || reply.task?.state=="saved_local" {
+                guard let task=reply.task,task.state=="saved_local",result.cloud_sync=="not_checked",result.operation_id==task.operation_id,
+                      let frozen=(try? JSONSerialization.jsonObject(with:Data(task.request_json.utf8))) as? [String:Any],
+                      let frozenTool=frozen["tool"] as? String else{throw RemindersTransportFault("invalid_response")}
+                var submitted:[String:Any]?
+                if frame.action == .submit {
+                    guard let raw=frame.request_json,let original=(try? JSONSerialization.jsonObject(with:Data(raw.utf8))) as? [String:Any]
+                    else{throw RemindersTransportFault("invalid_response")}
+                    submitted=original
+                }
+                let deleting=frozenTool=="apple.reminders.delete.v3" || submitted?["tool"] as? String=="apple.reminders.delete.v3" ||
+                    reply.code=="deleted_local" || task.code=="deleted_local"
+                if deleting {
+                    // The durable task uses saved_local for both saves and
+                    // deletions. Bind the receipt kind to its frozen intent on
+                    // initial submit and later status; never accept either kind
+                    // merely because a helper supplied a successful state.
+                    guard Set(frozen.keys)==["tool","args"],frozenTool=="apple.reminders.delete.v3",
+                          task.request_sha256==RemindersNativeIO.hash(Data(task.request_json.utf8)),
+                          let args=frozen["args"] as? [String:Any],Set(args.keys)==["operation_id","list_id","reminder_id","expected_revision"],
+                          args["operation_id"] as? String==task.operation_id,
+                          let list=args["list_id"] as? String,!list.isEmpty,let id=args["reminder_id"] as? String,!id.isEmpty,
+                          let revision=args["expected_revision"] as? String,RemindersTaskContract.hash(revision),
+                          task.target.list?.id==list,task.target.list?.source_id==task.target.source.id,
+                          reply.target==nil || reply.target==task.target,
+                          reply.code=="deleted_local",task.code=="deleted_local",result.persistence=="deleted_local",
+                          let deletion=result.deletion,deletion.id==id,deletion.list_id==list,deletion.expected_revision==revision,
+                          result.reminder==nil,result.reminders==nil,result.list==nil,result.lists==nil,result.sources==nil
+                    else{throw RemindersTransportFault("invalid_response")}
+                    if let submitted {
+                        guard (submitted as NSDictionary).isEqual(to:frozen) else{throw RemindersTransportFault("invalid_response")}
+                    }
+                } else {
+                    guard result.persistence=="saved_local",result.deletion==nil else{throw RemindersTransportFault("invalid_response")}
+                }
             }
         }
-        guard reply.outcome != "saved_local" || reply.task?.state=="saved_local" && reply.result != nil else{throw RemindersTransportFault("invalid_response")}
+        guard (reply.outcome != "saved_local" && reply.task?.state != "saved_local") ||
+              reply.task?.state=="saved_local" && reply.result != nil else{throw RemindersTransportFault("invalid_response")}
         return reply
     }
 

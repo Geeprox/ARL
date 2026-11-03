@@ -47,7 +47,7 @@ import Foundation
                     "cloud_sync":"not_checked", "deletion":["id":"synthetic-item", "list_id":"synthetic-list", "expected_revision":revision]]
                 reply.task = .init(task_id:id, operation_id:op, request_sha256:RemindersNativeIO.hash(Data(raw.utf8)),
                     request_json:raw, target:target, state:state, code:priorCode, result_json:nil)
-                reply.result_json = String(decoding:try json(receipt), as:UTF8.self)
+                if state == "saved_local" { reply.result_json = String(decoding:try json(receipt), as:UTF8.self) }
                 reply.code = priorCode
             } else { reply.code = statusCode }
         } else if frame.action == .read {
@@ -68,6 +68,7 @@ import Foundation
             let receipt: [String:Any] = ["schema_version":3, "status":"ok", "operation_id":op, "persistence":"deleted_local",
                 "cloud_sync":"not_checked", "deletion":["id":"synthetic-item", "list_id":"synthetic-list", "expected_revision":revision]]
             priorState = "saved_local"
+            reply.outcome = "saved_local"
             reply.task = .init(task_id:id, operation_id:op, request_sha256:RemindersNativeIO.hash(Data(raw.utf8)),
                 request_json:raw, target:target, state:"saved_local", code:"deleted_local", result_json:nil)
             reply.result_json = String(decoding:try json(receipt), as:UTF8.self)
@@ -78,7 +79,14 @@ import Foundation
     func owner(home: URL) -> AppleProductOwnerExecutor {
         let controller = RemindersProductController(port:.init(begin:{_ in true}, end:{_ in},
             ensureService:{self.ensures += 1;if self.failEnsure { throw RemindersTransportFault("needs_permission") }},
-            send:{try self.reply($0)}, record:{_,_,_,_ in self.records += 1}))
+            send:{frame in
+                let reply = try self.reply(frame)
+                let deployment = RemindersNativeDeployment(schema_version:1,helper_bundle_path:"/synthetic/ARLRemindersBridge.app",host_home:home.path,
+                    control_requirement:RemindersStablePeerIdentity.controlRequirement,helper_requirement:RemindersStablePeerIdentity.helperRequirement,
+                    helper_executable_sha256:self.identity.executable_sha256,helper_designated_requirement_sha256:self.identity.designated_requirement_sha256,
+                    closure_sha256:String(repeating:"f",count:64),policy_sha256:self.target.policy_sha256)
+                return try RemindersNativeClient.admitProductReply(JSONEncoder().encode(reply),for:frame,deployment:deployment)
+            }, record:{_,_,_,_ in self.records += 1}))
         let calendar = CalendarBusinessHandler(backend:OwnerDeleteUnusedCalendar(), port:.init(verify:{},
             lookup:{_ in nil},
             claim:{_ in preconditionFailure("no calendar claim")}, finish:{_ in preconditionFailure("no calendar finish")},

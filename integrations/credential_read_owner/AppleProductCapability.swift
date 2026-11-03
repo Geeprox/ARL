@@ -23,11 +23,63 @@ enum AppleProductCapability {
     /// the requested operation. Metadata cannot stand in for an effect receipt.
     static func admit(_ value:[String:Any],tool:String,arguments:[String:Any])throws->Bool {
         guard let state=value["state"] as? String else{throw OwnerReadFault.invalid}
-        if ["unavailable","outcome_unknown","unknown","pending","rejected","attempting","needs_review","unsupported"].contains(state){return false}
-        guard let result=value["result"] as? [String:Any] else{throw OwnerReadFault.invalid}
         func hash(_ data:Data)->String {SHA256.hash(data:data).map{String(format:"%02x",$0)}.joined()}
         func validHash(_ value:Any?)->Bool {(value as? String)?.range(of:"^[a-f0-9]{64}$",options:.regularExpression) != nil}
         func uuid(_ value:Any?)->String? {(value as? String).flatMap{UUID(uuidString:$0)?.uuidString.lowercased()}}
+        if tool=="mio_reminders_product_operation_status" &&
+            (!["unavailable","outcome_unknown","needs_review","unsupported"].contains(state) ||
+                value["code"] as? String=="operation_missing" || (value["result"] as? [String:Any])?["task"] != nil) {
+            // A status observation is never a new submission. Validate negative
+            // records before the generic error-state fast path so corrupted or
+            // unrelated task records cannot masquerade as recovery evidence.
+            guard Set(arguments.keys)==["task_id"],let taskID=arguments["task_id"] as? String,uuid(taskID)==taskID,
+                  OwnerReadWire.integer(value["schema_version"],1),value["capability"] as? String=="apple.product.v1",
+                  value["tool"] as? String==tool,value["task_id"] as? String==taskID,
+                  OwnerReadWire.falseBoolean(value["automatic_replay"]),OwnerReadWire.trueBoolean(value["business_log_available"]),
+                  let result=value["result"] as? [String:Any],OwnerReadWire.integer(result["schema_version"],3),
+                  result["capability_id"] as? String=="reminders.product.v1",result["action"] as? String=="status",
+                  let requestID=result["request_id"] as? String,uuid(requestID)==requestID,result["outcome"] as? String=="refreshed",
+                  OwnerReadWire.falseBoolean(result["automatic_replay"]),OwnerReadWire.trueBoolean(result["business_log_available"]),
+                  let code=result["code"] as? String,code==value["code"] as? String,
+                  code.range(of:"^[a-z0-9_]{1,96}$",options:.regularExpression) != nil,
+                  let identity=result["identity"] as? [String:Any],identity["helper_bundle_id"] as? String=="local.arl.remindersbridge",
+                  validHash(identity["executable_sha256"]),validHash(identity["designated_requirement_sha256"]),validHash(result["policy_sha256"]),
+                  result["catalog"]==nil,result["history"]==nil,result["next_offset"]==nil
+            else{throw OwnerReadFault.invalid}
+            if state=="operation_missing" {
+                guard code=="operation_missing",result["task"]==nil,result["result_json"]==nil,
+                      result["target"]==nil,result["default_target"]==nil,result["default_status"]==nil,
+                      result["read_scope"]==nil else{throw OwnerReadFault.invalid}
+                return false
+            }
+            guard let task=result["task"] as? [String:Any],task["task_id"] as? String==taskID,
+                  ["pending","saved_local","rejected","unknown"].contains(state),task["state"] as? String==state,
+                  let raw=task["request_json"] as? String,raw.utf8.count<=16384,
+                  task["request_sha256"] as? String==hash(Data(raw.utf8)),
+                  let operation=task["operation_id"] as? String,let taskCode=task["code"] as? String,
+                  code==(state=="pending" ? "outcome_unknown":taskCode),
+                  let target=task["target"] as? [String:Any],target["policy_sha256"] as? String==result["policy_sha256"] as? String,
+                  target["helper_requirement_sha256"] as? String==identity["designated_requirement_sha256"] as? String
+            else{throw OwnerReadFault.invalid}
+            let request=try OwnerReadJSON.object(Data(raw.utf8),limit:16384)
+            let operations:Set<String>=["list.create","create","update","complete","uncomplete","delete"]
+            guard Set(request.keys)==["tool","args"],let operationTool=request["tool"] as? String,
+                  operations.contains(where:{operationTool=="apple.reminders."+$0+".v3"}),
+                  let args=request["args"] as? [String:Any],args["operation_id"] as? String==operation
+            else{throw OwnerReadFault.invalid}
+            let h=Array(hash(Data(("arl.reminders.product.v1:"+taskID).utf8)).prefix(32))
+            let expected=String(h[0..<8])+"-"+String(h[8..<12])+"-"+String(h[12..<16])+"-"+String(h[16..<20])+"-"+String(h[20..<32])
+            guard operation==expected else{throw OwnerReadFault.invalid}
+            if state != "saved_local" {
+                guard task["result_json"]==nil,result["result_json"]==nil,
+                      state=="rejected" ? !["ok","saved_local","deleted_local","operation_missing","outcome_unknown"].contains(code):code=="outcome_unknown",
+                      state != "pending" || taskCode=="outcome_unknown" else{throw OwnerReadFault.invalid}
+                return false
+            }
+            guard code==(operationTool=="apple.reminders.delete.v3" ? "deleted_local":"saved_local") else{throw OwnerReadFault.invalid}
+        }
+        if ["unavailable","outcome_unknown","unknown","pending","rejected","attempting","needs_review","unsupported"].contains(state){return false}
+        guard let result=value["result"] as? [String:Any] else{throw OwnerReadFault.invalid}
         if calendar.contains(tool) {
             guard result["task_id"] as? String==arguments["task_id"] as? String else{throw OwnerReadFault.invalid}
             if mutations.contains(tool) || tool=="mio_calendar_operation_status" {

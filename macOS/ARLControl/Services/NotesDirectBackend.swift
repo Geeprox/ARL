@@ -82,7 +82,10 @@ final class NotesDirectBackend {
         try scope.validate(); try NotesDirectContract.identifier(noteID, entity: "ICNote")
         let folder = try folderRef(scope.folder)
         let ref = try AppleDirectDescriptor.object(note, id: noteID, parent: folder)
-        let parent = try AppleDirectDescriptor.property(container, of: ref)
+        // Notes can reject an ID lookup through a nested container property.
+        // Resolve the public container first, then verify its exact folder ID.
+        let parent = try get(container, ref)
+        guard parent.descriptorType == typeObjectSpecifier else { throw AppleDirectFault("invalid_response") }
         guard try text(id, ref) == noteID, try text(id, parent) == scope.folder.id,
               try !flag(0x70777072, ref), try !flag(0x73687264, ref) else { throw AppleDirectFault("note_moved_locked_or_shared") }
         return ref
@@ -188,7 +191,8 @@ final class NotesDirectBackend {
         try proposal.validate()
         let folder = try folderRef(proposal.scope.folder)
         let properties = NSAppleEventDescriptor.record()
-        properties.setDescriptor(.init(string: proposal.title), forKeyword: name)
+        // Notes derives name from the first body line. Setting both can insert
+        // a second title before the complete HTML already supplied here.
         properties.setDescriptor(.init(string: proposal.html), forKeyword: 0x626f6479)
         try check(); try proposal.validate(); try beforeEffect(); try check()
         // Exactly one effect call. Any failure after beforeEffect is consumed.

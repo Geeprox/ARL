@@ -115,6 +115,14 @@ import Darwin
     }
     func requestExit() { exitRequested = true }
     func cancelExit() { exitRequested = false }
+    #if !ARL_LIFECYCLE_TEST
+    func messagesReceivePeer(_ fd:Int32)throws->MessagesReceiveRelayPeer {
+        guard !exitRequested,activated,let process=children["core"],process.isRunning,
+              let executable=process.executableURL else{throw MessagesReceiveFault("receive_core_unavailable")}
+        return try MessagesReceiveRelayPeer(fd:fd,expectedPID:process.processIdentifier,
+            expectedExecutable:executable,expectedParentPID:getpid())
+    }
+    #endif
     private func acquire() async -> UUID? {
         let deadline = ProcessInfo.processInfo.systemUptime + 40
         while operation != nil && ProcessInfo.processInfo.systemUptime < deadline {

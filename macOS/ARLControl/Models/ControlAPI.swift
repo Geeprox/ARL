@@ -355,7 +355,8 @@ struct CodexServiceStatus: Decodable, Sendable {
         let dictionary = raw as? [String: Any]
         let absent = dictionary?["state"] as? String == "not_configured"
         let absentKeys = dictionary?["reason"] == nil ? base : base.union(["reason"])
-        let expected = absent ? absentKeys : base.union(configured).union(dictionary?["execution_catalog"] == nil ? [] : ["execution_catalog"])
+        let contextKeys = Set(["input_policy", "transport_max_frame_bytes"].filter { dictionary?[$0] != nil })
+        let expected = absent ? absentKeys : base.union(configured).union(contextKeys).union(dictionary?["execution_catalog"] == nil ? [] : ["execution_catalog"])
         let row = try WireSchema.object(raw, expected)
         if absent, row["reason"] != nil { _ = try WireSchema.string(row["reason"], maximum:80) }
         try WireSchema.constantInt(row["schema_version"], 1)
@@ -371,7 +372,10 @@ struct CodexServiceStatus: Decodable, Sendable {
             try WireSchema.nullableString(row["last_error_code"], maximum: 80)
             try WireSchema.constantInt(row["stale_after_ms"], 90000)
             try WireSchema.constantInt(row["max_pending"], 1)
-            try WireSchema.constantInt(row["max_input_bytes"], 8192)
+            if row["input_policy"] as? String == "provider_context_window" {
+                guard row["max_input_bytes"] is NSNull else { throw ARLError(code:"invalid_response") }
+                try WireSchema.constantInt(row["transport_max_frame_bytes"], 64 * 1024 * 1024)
+            } else { try WireSchema.constantInt(row["max_input_bytes"], 8192) }
             try WireSchema.constantInt(row["max_wall_ms"], 30000)
             let unlimited = row["max_calls"] is NSNull && row["remaining_calls"] is NSNull
             let calls = unlimited ? 1 : try WireSchema.integer(row["max_calls"])

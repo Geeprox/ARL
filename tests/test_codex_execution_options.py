@@ -11,7 +11,7 @@ from tests.test_runtime import RuntimeCase
 FIXTURE=Path(__file__).parent/'fixtures/CodexExecutionOptionsServer.py'
 class OptionsTests(RuntimeCase):
  def route(self, max_calls=32):
-  adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE)])
+  adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE)])
   service=CodexService(adapter,caller='options-fixture',model='synthetic-model',authorization_current=lambda:True,
    peer_current=lambda:True,max_calls=max_calls,allow_test_command=True,allow_model_selection=True)
   runtime=compose_codex_service(self.home/'host',service=service,peer_verifier=RegisteredPeerVerifier({'options-fixture'}),isolated=True)

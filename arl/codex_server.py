@@ -3,10 +3,12 @@ from __future__ import annotations
 import hashlib,json,os,re,selectors,subprocess,tempfile,time,uuid
 from pathlib import Path
 from .contracts import Fault,Cancelled,Tool,object_schema,string,validate,encode
+from .codex_context import TRANSPORT_FRAME_BYTES, INPUT_POLICY, context_error, token_receipt
+from .codex_diagnostics import Timing, rpc_error
 NAME='codex.text.plan.v1'
 ITEM_TYPES=frozenset({'userMessage','hookPrompt','agentMessage','functionCallOutput','plan','reasoning','commandExecution','fileChange','mcpToolCall','dynamicToolCall','collabAgentToolCall','subAgentActivity','webSearch','imageView','sleep','imageGeneration','enteredReviewMode','exitedReviewMode','contextCompaction'})
 DEFAULT_BINARY=Path('/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex')
-SCHEMA=object_schema({'model':string(200),'input':string(8192),'max_output_bytes':{'type':'integer','minimum':128,'maximum':32768}},['model','input','max_output_bytes'])
+SCHEMA=object_schema({'model':string(200),'input':string(TRANSPORT_FRAME_BYTES),'max_output_bytes':{'type':'integer','minimum':128,'maximum':32768}},['model','input','max_output_bytes'])
 CONFIG={'web_search':'disabled','mcp_servers':{},'plugins':{},'project_doc_max_bytes':0,'analytics.enabled':False,
  'features.shell_tool':False,'features.unified_exec':False,'features.apps':False,'features.enable_mcp_apps':False,
  'features.multi_agent':False,'features.multi_agent_v2':False,'features.hooks':False,'features.memories':False,
@@ -32,15 +34,22 @@ def thread_preferences(reasoning_effort=None, service_tier=None):
 
 def confirmed_preferences(thread, reasoning_effort=None, service_tier=None, *, synthetic=False):
  if not thread_preferences(reasoning_effort, service_tier):return None
- if not synthetic and (thread.get('reasoningEffort') != reasoning_effort or thread.get('serviceTier') != service_tier):
+ # Codex 0.166 acknowledges the advertised Fast choice as upstream priority.
+ # This is the provider's service tier, independent of ARL queue scheduling.
+ acknowledged_tier=thread.get('serviceTier')
+ tier_matches=acknowledged_tier==service_tier or service_tier=='fast' and acknowledged_tier=='priority'
+ if ((not synthetic or 'reasoningEffort' in thread) and thread.get('reasoningEffort') != reasoning_effort
+     or (not synthetic or 'serviceTier' in thread) and not tier_matches):
   raise Fault('provider_preferences_unverified')
  return {'reasoning_effort':reasoning_effort,'service_tier':service_tier,
-  'source':'test_double' if synthetic else 'thread_start_confirmed'}
+  'source':'test_double' if synthetic else 'thread_start_confirmed',
+  'provider_service_tier':acknowledged_tier if not synthetic else service_tier}
 
 PROVIDER_FRAME_BYTES = 36 * 32768 + 65536  # Two JSON encodings of the promised decoded text budget.
 
 class Session:
- def __init__(self,binary,workspace,*,timeout=30,context=None,test_command=None,diagnostic=False,overrides=None,observer=None,absolute_deadline=None):
+ def __init__(self,binary,workspace,*,timeout=30,context=None,test_command=None,diagnostic=False,overrides=None,observer=None,absolute_deadline=None,frame_bytes=PROVIDER_FRAME_BYTES):
+  self.frame_bytes=frame_bytes;self.requests={}
   self.context=context;self.deadline=min(time.monotonic()+timeout,absolute_deadline) if absolute_deadline is not None else time.monotonic()+timeout;self.seq=0;self.buffer=bytearray();self.messages=0;self.thread_id=self.turn_id=None;self.observer=observer
   if time.monotonic()>=self.deadline:raise Fault('provider_deadline_exceeded')
   if context:context.check_cancelled()
@@ -52,15 +61,16 @@ class Session:
  def write(self,message):
   if time.monotonic()>=self.deadline:raise Fault('provider_deadline_exceeded')
   raw=encode(message)+b'\n'
-  if len(raw)>32768:raise Fault('invalid_frame')
-  end=time.monotonic()+min(1,max(.001,self.deadline-time.monotonic()));sent=0
+  if len(raw)>self.frame_bytes:raise Fault('transport_frame_too_large')
+  end=self.deadline;sent=0
   while sent<len(raw):
    try:sent+=os.write(self.process.stdin.fileno(),raw[sent:])
    except BlockingIOError:
     if time.monotonic()>=end:raise Fault('provider_deadline_exceeded')
     time.sleep(.005)
  def send(self,method,params):
-  self.seq+=1;self.write({'id':self.seq,'method':method,'params':params});return self.seq
+  self.seq+=1;self.requests[self.seq]=(method,params,time.monotonic())
+  self.write({'id':self.seq,'method':method,'params':params});return self.seq
  def interrupt(self):
   if self.thread_id and self.turn_id:
    try:return self.send('turn/interrupt',{'threadId':self.thread_id,'turnId':self.turn_id})
@@ -68,12 +78,11 @@ class Session:
  def receive(self,*,check_context=True):
   while True:
    try:
-    if check_context and self.context:self.context.check_cancelled()
     if time.monotonic()>=self.deadline:raise Fault('provider_deadline_exceeded')
    except (Cancelled,Fault):raise
    if b'\n' in self.buffer:
     raw,_,tail=self.buffer.partition(b'\n');self.buffer=bytearray(tail);self.messages+=1
-    if len(raw)>PROVIDER_FRAME_BYTES:raise Fault('invalid_provider_response')
+    if len(raw)>self.frame_bytes:raise Fault('invalid_provider_response')
     from .wire import strict_json
     try:d=strict_json(raw)
     except (ValueError,Fault):raise Fault('invalid_provider_response') from None
@@ -83,16 +92,35 @@ class Session:
      self.write({'id':d['id'],'error':{'code':-32601,'message':'ARL does not provide tools or approvals'}})
      raise Fault('provider_action_rejected')
     return d
+   if check_context and self.context:self.context.check_cancelled()
    if not self.selector.select(min(.05,max(.001,self.deadline-time.monotonic()))):continue
-   part=os.read(self.process.stdout.fileno(),4096)
+   part=os.read(self.process.stdout.fileno(),65536)
    if not part:raise Fault('provider_unavailable')
    self.buffer.extend(part)
-   if len(self.buffer)>PROVIDER_FRAME_BYTES+4096:raise Fault('invalid_provider_response')
+   if self.observer:self.observer('pipe_read',bytes=len(part))
+   if len(self.buffer)>self.frame_bytes+65536:raise Fault('invalid_provider_response')
  def response(self,id):
+  retries=0
   while True:
    d=self.receive()
    if d.get('id')==id:
-    if 'error' in d:raise Fault('provider_request_rejected')
+    method,params,started=self.requests.pop(id,('unknown',{},time.monotonic()))
+    if self.observer:self.observer('rpc_response',method=method,elapsed_ms=round((time.monotonic()-started)*1000,3),ok='error' not in d)
+    if 'error' in d:
+     diagnostic=rpc_error(method,d['error'])
+     if self.observer:self.observer('rpc_rejected',diagnostic=diagnostic)
+     # Retry only explicitly rejected, idempotent metadata reads. Never
+     # initialize twice, replay thread/turn creation or retry ambiguous I/O.
+     if diagnostic['safe_read_retry'] and retries<2:
+      retries+=1
+      if self.context:self.context.check_cancelled()
+      delay=.1*(2**(retries-1))
+      if time.monotonic()+delay>=self.deadline:raise Fault('provider_deadline_exceeded')
+      time.sleep(delay)
+      if self.observer:self.observer('rpc_read_retry',method=method,attempt=retries)
+      id=self.send(method,params);continue
+     error=Fault(context_error(d['error']) or 'provider_request_rejected');error.provider_error=diagnostic
+     raise error
     if type(d.get('result'))!=dict:raise Fault('invalid_provider_response')
     return d['result']
  def initialize(self):
@@ -174,6 +202,39 @@ class CodexTextAdapter:
   if self.observer:self.observer(dict(event=event,**fields))
  def verify(self):
   if self.pin is not None and hashlib.sha256(self.binary.read_bytes()).hexdigest()!=self.pin:raise Fault('provider_binary_changed')
+ def refresh_official_binary(self,*,allow_update=True):
+  """Accept an official update only at a host preflight boundary.
+
+  Ordinary admission/completion still verify the pinned bytes. Never re-pin a
+  custom executable, unsigned replacement, or binary changing during validation.
+  """
+  if self.test_command is not None:return
+  current=hashlib.sha256(self.binary.read_bytes()).hexdigest()
+  if current==self.pin:return
+  if not allow_update:raise Fault('provider_binary_changed')
+  self.verify_official_binary()
+  if hashlib.sha256(self.binary.read_bytes()).hexdigest()!=current:raise Fault('provider_binary_changed')
+  self.pin=current
+  self._execution_catalog_cache=None
+ def verify_official_binary(self):
+  if self.binary!=DEFAULT_BINARY.resolve(strict=True):raise Fault('provider_binary_changed')
+  requirement='anchor apple generic and identifier "codex" and certificate leaf[subject.OU] = "2DC432GLL2"'
+  try:
+   checked=subprocess.run(['/usr/bin/codesign','--verify','--strict','-R','='+requirement,str(self.binary)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=10)
+  except (OSError,subprocess.SubprocessError):raise Fault('provider_update_unverified') from None
+  if checked.returncode!=0:raise Fault('provider_update_unverified')
+ def refresh_catalog(self,context=None):
+  """Read current provider metadata without starting a thread or inference."""
+  self.verify()
+  from .codex_execution_options import read_catalog
+  with tempfile.TemporaryDirectory(prefix='arl-codex-catalog-') as workspace:
+   session=Session(self.binary,workspace,timeout=30,context=context,test_command=self.test_command,absolute_deadline=time.monotonic()+30)
+   try:
+    session.initialize()
+    catalog=read_catalog(session)
+    self.verify()
+    return catalog
+   finally:session.close()
  def metadata(self):
   # No process launch/catalog/auth/inference implicit in discovery.
   return {'name':'codex_app_server','availability':'adapter' if self.enabled else 'disabled','paid':True,
@@ -241,20 +302,23 @@ class CodexTextAdapter:
    reasoning_effort=reasoning_effort,service_tier=service_tier,selectable=selectable)
  def _run(self,args,context,*,output_schema=None,decode_output=None,thread_controls=None,format_name='codex.appserver.text.v1',reasoning_effort=None,service_tier=None,selectable=False):
   validate(args,SCHEMA)
-  if len(args['input'].encode())>8192:raise Fault('model_budget_exceeded')
+  if len(args['input'].encode())>TRANSPORT_FRAME_BYTES:raise Fault('transport_frame_too_large')
   if not self.enabled:raise Fault('paid_provider_disabled')
-  self.verify();context.check_cancelled()
+  timing=Timing();self.verify();context.check_cancelled();timing.mark('integrity_checked')
   absolute_deadline=time.monotonic()+(context.remaining(30) if hasattr(context,'remaining') else 30)
   readiness=self._priority_readiness;attempt=None
   native=getattr(context,'native_observer',lambda *a,**kw:None)
   def observe(event,**fields):
    self.observe(event,**fields);native(event,**fields)
+   if event in {'rpc_response','pipe_read','rpc_read_retry'}:timing.count(event)
+   elif event=='rpc_rejected':native('native_rpc_error',diagnostic=fields['diagnostic'])
+  input_frame_bytes=len(json.dumps(args['input'],ensure_ascii=True).encode())+PROVIDER_FRAME_BYTES
   with tempfile.TemporaryDirectory(prefix='arl-codex-text-') as workspace:
-   session=Session(self.binary,workspace,timeout=30,context=context,test_command=self.test_command,observer=observe,absolute_deadline=absolute_deadline)
+   session=Session(self.binary,workspace,timeout=30,context=context,test_command=self.test_command,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
    completed=False
    try:
     attempt=readiness.begin_model_run(self,context,args['model'],format_name) if readiness is not None else None
-    session.initialize()
+    session.initialize();timing.mark('initialized')
     if self.test_command is None:
      cfg=session.response(session.send('config/read',{'includeLayers':False}))['config']
      servers=cfg.get('mcp_servers',{})
@@ -262,7 +326,7 @@ class CodexTextAdapter:
      overrides={'mcp_servers.'+k+'.enabled':False for k in servers}
      session.close()
      context.check_cancelled();self.verify()
-     session=Session(self.binary,workspace,timeout=30,context=context,overrides=overrides,observer=observe,absolute_deadline=absolute_deadline)
+     session=Session(self.binary,workspace,timeout=30,context=context,overrides=overrides,observer=observe,absolute_deadline=absolute_deadline,frame_bytes=input_frame_bytes)
      session.initialize()
      configured_model=session.text_controls()
      account=session.response(session.send('account/read',{'refreshToken':False}))
@@ -272,33 +336,43 @@ class CodexTextAdapter:
      from .codex_execution_options import read_catalog,selection
      selection(read_catalog(session),args['model'],reasoning_effort,service_tier)
     if self.test_command is None:self.observe('controls_verified',mcp_disabled_count=len(servers),existing_account='chatgpt',model=configured_model)
+    timing.mark('metadata_ready')
     thread=session.response(session.send('thread/start',dict(thread_controls or THREAD_CONTROLS,cwd=workspace,model=args['model'],**thread_preferences(reasoning_effort,service_tier))))
     if thread.get('model')!=args['model'] or thread.get('thread',{}).get('ephemeral') is not True:raise Fault('provider_contract_mismatch')
     if self.test_command is None and (thread.get('modelProvider')!='openai' or thread.get('approvalPolicy')!='never' or thread.get('sandbox',{}).get('type')!='readOnly' or thread.get('sandbox',{}).get('networkAccess',False) is not False or thread.get('instructionSources')):raise Fault('provider_controls_unverified')
-    if selectable and (thread.get('reasoningEffort')!=reasoning_effort or thread.get('serviceTier')!=service_tier):raise Fault('provider_preferences_unverified')
     preferences=confirmed_preferences(thread,reasoning_effort,service_tier,synthetic=self.test_command is not None)
     if preferences is not None:
      self.observe('execution_preferences_verified',**preferences)
-     native('native_preferences_ack',**preferences)
+     # Keep the versioned execution receipt's original three-field shape.
+     native('native_preferences_ack',**{key:preferences[key] for key in ('reasoning_effort','service_tier','source')})
     self.observe('thread_started',ephemeral=True,read_only=True)
     session.thread_id=thread['thread']['id']
     if type(session.thread_id)!=str or not 1<=len(session.thread_id)<=100:raise Fault('invalid_provider_response')
+    timing.mark('thread_ready')
     native('native_thread_ack',thread_id=session.thread_id,confirmed_identifier=thread['model'])
     context.check_cancelled()
     if readiness is not None:readiness.confirm_model_run(self,attempt,context,thread['model'],format_name)
-    native('native_turn_sent')
+    timing.mark('turn_sent');native('native_turn_sent')
     turn_request=session.send('turn/start',{'threadId':session.thread_id,'model':args['model'],'input':[{'type':'text','text':args['input']}],
       **TURN_CONTROLS,**({'effort':reasoning_effort,'serviceTierForTurn':service_tier} if preferences is not None else {}),'outputSchema':output_schema if output_schema is not None else object_schema({'text':dict(string(args['max_output_bytes']))},['text'])})
-    text=None;structured=None
+    text=None;structured=None;usage_receipt=None;provider_failure=None
     while True:
-     d=session.receive();params=d.get('params',{})
+     d=session.receive();params=d.get('params',{});timing.count('stream_messages')
+     if d.get('method')=='item/agentMessage/delta' and params.get('threadId')==session.thread_id:
+      timing.mark('first_output')
+     if d.get('method')=='thread/tokenUsage/updated':
+      observed=token_receipt(params,session.thread_id,session.turn_id)
+      if observed is not None:usage_receipt=observed
+     if d.get('method')=='error':provider_failure=context_error(params.get('error'))
      if d.get('id')==turn_request:
-      if 'error' in d:raise Fault('provider_request_rejected')
+      if 'error' in d:
+       native('native_rpc_error',diagnostic=rpc_error('turn/start',d['error']))
+       raise Fault(context_error(d['error']) or 'provider_request_rejected')
       tid=d.get('result',{}).get('turn',{}).get('id')
       if type(tid)!=str or not 1<=len(tid)<=100:raise Fault('invalid_provider_response')
       if session.turn_id and session.turn_id!=tid:raise Fault('provider_contract_mismatch')
       session.turn_id=tid
-      native('native_turn_ack',turn_id=tid)
+      timing.mark('turn_ack');native('native_turn_ack',turn_id=tid)
       status=d.get('result',{}).get('turn',{}).get('status')
       self.observe('turn_started',source='response',status=status if status in {'inProgress','completed','interrupted','failed'} else 'unknown')
      if d.get('method')=='turn/started':
@@ -339,19 +413,29 @@ class CodexTextAdapter:
       if params.get('threadId')!=session.thread_id or turn.get('id')!=session.turn_id:raise Fault('provider_contract_mismatch')
       status=turn.get('status')
       if status not in {'completed','interrupted','failed'}:raise Fault('invalid_provider_response')
+      timing.mark('turn_completed')
       completed=True  # A genuine terminal turn never needs another interrupt.
       native('native_terminal',terminal=status)
-      if status!='completed' or text is None:raise Fault('provider_turn_incomplete')
-      context.check_cancelled()
+      if status!='completed' or text is None:raise Fault(provider_failure or context_error(turn.get('error')) or 'provider_turn_incomplete')
+      context.check_cancelled();self.verify();timing.mark('completion_integrity_checked')
       completed=True
       self.observe('turn_completed',status='completed',output_bytes=len(text.encode()))
       result={'schema_version':1,'provider':'codex_app_server','model':args['model'],'format':format_name,
        'thread_id':session.thread_id,'turn_id':session.turn_id,'text':text,'request_sha256':hashlib.sha256(args['input'].encode()).hexdigest(),
        'output_sha256':hashlib.sha256(text.encode()).hexdigest(),'usage':{'tokens':None,'cost':None},'token_hard_cap_supported':False,'external_stop':'not_requested','simulated':self.test_command is not None}
+      result['timing']=timing.receipt()
+      result['context_policy']=INPUT_POLICY
+      if usage_receipt is not None:
+       result['context_receipt']=usage_receipt
+       result['usage']['tokens']=usage_receipt['last']
       if preferences is not None:result['execution_preferences']=preferences
       if structured is not None:result['structured_output']=structured
       return result
+   except Fault as error:
+    if getattr(error,'provider_error',None):native('native_rpc_error',diagnostic=error.provider_error)
+    raise
    finally:
+    native('native_timing',timing=timing.receipt())
     if readiness is not None:readiness.abandon_model_run(attempt)
     if session.turn_id and not completed:
      session.cancel_turn()
@@ -368,12 +452,13 @@ class CodexService:
  name = NAME
 
  def __init__(self, adapter, *, caller, model, authorization_current, peer_current,
-              max_calls=32, max_output_bytes=32768, reasoning_effort='xhigh', service_tier='default', scope_generation=None, allow_test_command=False, allow_model_selection=False):
+              max_calls=32, max_output_bytes=32768, reasoning_effort='xhigh', service_tier='default', scope_generation=None, allow_test_command=False, allow_model_selection=False, package_home=None):
   import threading
   if not thread_preferences(reasoning_effort, service_tier):raise Fault('provider_preferences_invalid')
   self.reasoning_effort, self.service_tier = reasoning_effort, service_tier
   self.allow_model_selection = allow_model_selection is True
   self.catalog = []
+  self.package_home = package_home
   self.schema = dict(SCHEMA, properties=dict(SCHEMA['properties'], **({'reasoning_effort':string(40),'service_tier':string(20)} if self.allow_model_selection else {})))
   try:
    self.scope_generation = str(uuid.uuid4()) if scope_generation is None else str(uuid.UUID(scope_generation))
@@ -419,6 +504,24 @@ class CodexService:
   if not self.preflight_running.acquire(blocking=False):raise Fault('codex_preflight_in_progress')
   self.preflight_done.clear()
   try:
+   # Keep a valid unchanged-binary proof while refreshing metadata. A running
+   # turn keeps its frozen admission, but must still verify the exact binary.
+   def refresh_pin(active):
+    with self.lock:
+     previous_pin = self.adapter.pin
+     self.adapter.refresh_official_binary(allow_update=not active)
+     if self.adapter.pin != previous_pin:self.checked_mono = None
+   if self.runtime is not None and self.runtime.store is not None:
+    # Serialize the active-turn check and pin transition with worker claims.
+    # Otherwise a queued turn could start between the count and the update.
+    with self.runtime.store.lock:
+     active = bool(self.runtime.store.db.execute("SELECT COUNT(*) FROM jobs WHERE tool=? AND state='running'", (self.name,)).fetchone()[0])
+     refresh_pin(active)
+   else:refresh_pin(False)
+   if self.package_home is not None:
+    from .codex_packages import PackageRegistry
+    catalog=self.adapter.refresh_catalog(context=self)
+    PackageRegistry(self.package_home).publish(catalog,{'model':self.model,'reasoning_effort':self.reasoning_effort,'service_tier':self.service_tier})
    proof = self.adapter.preflight_model(self.model, context=self,
        reasoning_effort=self.reasoning_effort, service_tier=self.service_tier, selectable=self.allow_model_selection)
    if not self.current():raise Fault('codex_scope_unavailable')
@@ -459,7 +562,7 @@ class CodexService:
     'checked_at_ms':self.checked_at_ms, 'stale_after_ms':90000, 'last_error_code':self.error,
     'last_inference_at_ms':self.last_inference_at_ms,
     'inference_verified':self.last_inference_at_ms is not None and self.adapter.test_command is None,
-    'max_pending':1, 'max_calls':self.max_calls, 'max_input_bytes':8192,
+    'max_pending':1, 'max_calls':self.max_calls, 'max_input_bytes':None, 'input_policy':INPUT_POLICY, 'transport_max_frame_bytes':TRANSPORT_FRAME_BYTES,
     'max_output_bytes':self.max_output_bytes, 'max_wall_ms':30000,
     'token_hard_cap_supported':False, 'cost_hard_cap_supported':False,
     'simulated':self.adapter.test_command is not None,
@@ -482,20 +585,21 @@ class CodexService:
    'inference_policy':'explicit_route_only' if status['route_enabled'] else 'disabled',
    'allowed_apps':[self.caller] if status['route_enabled'] else []}
 
- def admit(self, owner, tool, args):
+ def admit(self, owner, tool, args, *, completion=False):
   if tool != self.name:return
   if owner != self.caller or not self.current():raise Fault('codex_scope_unavailable')
   validate(args, self.schema)
-  if self.allow_model_selection:
+  if self.allow_model_selection and not completion:
    from .codex_execution_options import selection
    selection(self.catalog,args['model'],args.get('reasoning_effort',self.reasoning_effort),args.get('service_tier',self.service_tier))
-  elif args['model'] != self.model:raise Fault('provider_model_change_not_authorized')
+  elif not self.allow_model_selection and args['model'] != self.model:raise Fault('provider_model_change_not_authorized')
   try:size = len(args['input'].encode('utf-8'))
   except UnicodeError:raise Fault('invalid_arguments') from None
-  if size > 8192 or args['max_output_bytes'] > self.max_output_bytes:
+  if size > TRANSPORT_FRAME_BYTES:raise Fault('transport_frame_too_large')
+  if args['max_output_bytes'] > self.max_output_bytes:
    raise Fault('model_budget_exceeded')
   with self.lock:
-   if self.checked_mono is None or not 0 <= time.monotonic()-self.checked_mono <= 90:
+   if not completion and (self.checked_mono is None or not 0 <= time.monotonic()-self.checked_mono <= 90):
     raise Fault('codex_preflight_required')
   try:self.adapter.verify()
   except Fault as error:
@@ -504,13 +608,19 @@ class CodexService:
     self.error = error.code
    raise
 
+ def check_running(self, owner, tool, args):
+  # Authorization and byte integrity remain live; catalog/TTL are admission only.
+  return self.admit(owner, tool, args, completion=True)
+
  def observe(self, job, event, **fields):
   # Finite phases/native acknowledgements only. Never text, reasoning or raw events.
   with self.lock:
    entry = self.progress_records.setdefault(job, {'phase':'controls_check', 'turn_sent':False,
     'native':{'thread_id':None, 'turn_id':None, 'terminal':'not_started', 'interrupt':'not_requested'}})
    native = entry['native']
-   if event == 'native_preferences_ack':
+   if event == 'native_rpc_error':entry['provider_error']=fields['diagnostic']
+   elif event == 'native_timing':entry['timing']=fields['timing']
+   elif event == 'native_preferences_ack':
     entry['execution_preferences'] = {key:fields[key] for key in ('reasoning_effort','service_tier','source')}
    elif event == 'native_thread_ack':
     native['thread_id'] = fields['thread_id'];entry['phase'] = 'thread_ack'
@@ -546,7 +656,7 @@ class CodexService:
    service_tier=args.get('service_tier',self.service_tier),selectable=self.allow_model_selection)
 
  def fence(self, result, context):
-  self.admit(context.owner, self.name, json.loads(context.row['args']))
+  self.check_running(context.owner, self.name, json.loads(context.row['args']))
   context.check_cancelled()
   self.adapter.verify()
   args=json.loads(context.row['args'])
@@ -567,7 +677,7 @@ class CodexService:
            else 'failed' if not sent or native['terminal']=='failed' else 'needs_review')
   if type(code) is not str or re.fullmatch(r'[a-z_]{1,80}', code) is None:code = 'provider_error'
   store.finish(row, state, {'schema_version':1, 'provider':'codex_app_server', 'model':json.loads(row['args'])['model'],
-   'native':native, 'upstream_stop':'verified_interrupted' if native['terminal']=='interrupted' else 'not_claimed',
+   'native':native,'timing':progress.get('timing'),'provider_error':progress.get('provider_error'), 'upstream_stop':'verified_interrupted' if native['terminal']=='interrupted' else 'not_claimed',
    'simulated':self.adapter.test_command is not None}, error=code)
 
  def tool(self):

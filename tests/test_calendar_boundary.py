@@ -59,10 +59,10 @@ class CalendarBoundaryTests(unittest.TestCase):
   files={str(p.relative_to(self.home/'code')):hashlib.sha256(p.read_bytes()).hexdigest() for p in code.iterdir()}
   launcher=self.home/'launch_calendar.py';launcher.write_text(render(files,self.home));launcher.chmod(0o600)
   hostile=self.home/'hostile';(hostile/'arl').mkdir(parents=True);(hostile/'arl/__init__.py').write_text('raise RuntimeError("cwd shadow")')
-  env=dict(os.environ,PYTHONPATH=str(hostile));r=subprocess.run(['/usr/bin/python3','-I',str(launcher)],cwd=hostile,env=env,capture_output=True,timeout=3)
+  env=dict(os.environ,PYTHONPATH=str(hostile));r=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher)],cwd=hostile,env=env,capture_output=True,timeout=3)
   self.assertEqual(r.returncode,0);self.assertEqual(json.loads(r.stdout),{'source':'sealed'})
   (code/'calendar_review.py').write_text('raise RuntimeError("mutated source")')
-  r=subprocess.run(['/usr/bin/python3','-I',str(launcher)],cwd=hostile,env=env,capture_output=True,timeout=3)
+  r=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher)],cwd=hostile,env=env,capture_output=True,timeout=3)
   self.assertEqual(r.returncode,1);self.assertEqual(json.loads(r.stdout),{'status':'sealed_source_changed'});self.assertFalse(r.stderr)
 
  def test_native_owned_isolated_host_real_registered_rpc_to_compiletime_effect(self):
@@ -82,7 +82,7 @@ class CalendarBoundaryTests(unittest.TestCase):
   files={str(p.relative_to(code)):hashlib.sha256(p.read_bytes()).hexdigest() for p in code.rglob('*') if p.is_file()}
   launcher=base/'launch_calendar.py';launcher.write_text(render(files,base));launcher.chmod(0o600)
   # Direct -I invocation lacks the native parent, before any job/effect/TCC.
-  direct=subprocess.run(['/usr/bin/python3','-I',str(launcher),'--native-broker','--approved-sha256',json.loads((SOURCE/'approval-proposal.json').read_text())['request_sha256']],capture_output=True,timeout=5)
+  direct=subprocess.run(['/usr/bin/python3', '-B','-I',str(launcher),'--native-broker','--approved-sha256',json.loads((SOURCE/'approval-proposal.json').read_text())['request_sha256']],capture_output=True,timeout=5)
   self.assertEqual(json.loads(direct.stdout)['broker_receipt']['error'],'native_broker_required');self.assertFalse((base/'state.sqlite').exists())
   result=subprocess.run([str(bundle/'Contents/MacOS/ARLCalendarBridge'),'--fixture-broker',str(base),str(launcher),hashlib.sha256(launcher.read_bytes()).hexdigest()],capture_output=True,timeout=15)
   receipt=json.loads(result.stdout);self.assertEqual(receipt['status'],'host_completed',receipt);self.assertEqual(receipt['receipt']['state'],'succeeded',receipt)

@@ -12,14 +12,15 @@ class Context:
   if self.cancel_at and time.monotonic()>=self.cancel_at:raise Cancelled()
  def remaining(self,maximum=30):return min(maximum,max(.01,self.end-time.monotonic()))
 class CodexTests(RuntimeCase):
- def adapter(self,mode='ok',enabled=True):return CodexTextAdapter(enabled=enabled,test_command=[sys.executable,'-I',str(FIXTURE),mode])
+ def adapter(self,mode='ok',enabled=True):return CodexTextAdapter(enabled=enabled,test_command=[sys.executable, '-B','-I',str(FIXTURE),mode])
  def test_default_disabled_without_process_or_paid_fallback(self):
   self.assert_fault('paid_provider_disabled',lambda:self.adapter(enabled=False).run(ARGS,Context()))
  def test_real_fixture_process_typed_response_hash_and_format(self):
   d=self.adapter().run(ARGS,Context());self.assertEqual(d['text'],'synthetic plan');self.assertEqual(d['request_sha256'],hashlib.sha256(ARGS['input'].encode()).hexdigest());self.assertTrue(d['simulated']);self.assertFalse(d['token_hard_cap_supported']);self.assertEqual(d['format'],'codex.appserver.text.v1');self.assertIsNone(d['usage']['tokens'])
  def test_unknown_fields_raw_responses_envelope_overflow_and_action_rejected(self):
   self.assert_fault('invalid_arguments',lambda:self.adapter().run(dict(ARGS,request_format='openai.responses.v1'),Context()))
-  self.assert_fault('model_budget_exceeded',lambda:self.adapter().run(dict(ARGS,input='中'*3000),Context()))
+  text='中'*3000;result=self.adapter().run(dict(ARGS,input=text),Context())
+  self.assertEqual(result['request_sha256'],hashlib.sha256(text.encode()).hexdigest())
   for mode,code in [('mismatch','provider_contract_mismatch'),('large','invalid_provider_response'),('extra','invalid_provider_response'),('action','provider_action_rejected')]:
    self.assert_fault(code,lambda:self.adapter(mode).run(ARGS,Context()))
  def test_deadline_and_cancel_bound_nonpreemptible_upstream_no_replay_claim(self):
@@ -35,13 +36,13 @@ class CodexTests(RuntimeCase):
   self.assertEqual(self.adapter('user_receipt').run(ARGS,Context())['text'],'synthetic plan')
   self.assert_fault('provider_contract_mismatch',lambda:self.adapter('bad_user_receipt').run(ARGS,Context()))
  def test_rejection_diagnostics_are_finite_and_cancel_is_sent(self):
-  events=[];adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE),'action'],observer=lambda e:events.append(e))
+  events=[];adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE),'action'],observer=lambda e:events.append(e))
   self.assert_fault('provider_action_rejected',lambda:adapter.run(ARGS,Context()))
   self.assertIn({'event':'server_request_rejected','category':'approval'},events)
   self.assertTrue(any(e['event']=='interrupt_sent' and e['request_sent'] for e in events))
   self.assertFalse(any('params' in e or 'input' in e or 'text' in e for e in events))
  def test_success_has_no_interrupt(self):
-  events=[];a=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE),'ok'],observer=events.append)
+  events=[];a=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE),'ok'],observer=events.append)
   self.assertEqual(a.run(ARGS,Context())['text'],'synthetic plan')
   self.assertFalse(any(e['event'].startswith('interrupt') for e in events))
  def test_active_cancel_ack_and_terminal_are_separate_and_strict(self):
@@ -50,7 +51,7 @@ class CodexTests(RuntimeCase):
    def observe(event):
     events.append(event)
     if event['event']=='turn_started':context.cancel_at=time.monotonic()-.001
-   a=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE),mode],observer=observe)
+   a=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE),mode],observer=observe)
    self.assert_fault('cancelled',lambda:a.run(ARGS,context))
    self.assertEqual(sum(e['event']=='interrupt_sent' for e in events),1)
    self.assertTrue(any(e['event']=='interrupt_ack' for e in events))
@@ -63,7 +64,7 @@ class ScopedCodexServiceTests(RuntimeCase):
   from arl.compat_host import compose_codex_service
   from arl.identity import RegisteredPeerVerifier
   from arl.storage import Store
-  adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(FIXTURE),mode],observer=observer)
+  adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE),mode],observer=observer)
   service=CodexService(adapter,caller='independent-codex',model=ARGS['model'],max_calls=calls,
       authorization_current=lambda:True,peer_current=lambda:True,allow_test_command=True)
   peer=RegisteredPeerVerifier({service.caller})

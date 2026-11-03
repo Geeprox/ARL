@@ -44,7 +44,7 @@ class NativeResearchTests(RuntimeCase):
         self.configure()
 
     def configure(self, mode='ok'):
-        self.text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-I', str(FIXTURE), mode])
+        self.text = CodexTextAdapter(enabled=True, test_command=[sys.executable, '-B', '-I', str(FIXTURE), mode])
         self.adapter = NativeCodexAdapter([MODEL], text_adapter=self.text)
         self.grant = CodexResearchGrant('codex_app_server', frozenset({MODEL}), 'original-auth-epoch', CONTRACT_SHA256)
         self.engine = CodexResearchEngine({'tisra': self.grant}, {'codex_app_server': self.adapter})
@@ -74,7 +74,7 @@ class NativeResearchTests(RuntimeCase):
         self.rpc('codex.payload.seal.v1', ref)
         return ref
 
-    def submit(self, raw=None, *, deadline_ms=800, meta_mutation=None):
+    def submit(self, raw=None, *, deadline_ms=5000, meta_mutation=None):
         raw = request() if raw is None else raw; run = str(uuid.uuid4()); meta = descriptor(raw, run)
         if meta_mutation: meta_mutation(meta)
         args = {'schema_version': 1, 'run_id': run, 'epoch': 0,
@@ -183,7 +183,9 @@ class NativeResearchTests(RuntimeCase):
         self.assertIsNone(self.runtime.store.claim())
 
     def test_interrupt_ack_without_terminal_is_not_external_stop(self):
-        self.switch_mode('wait_ack_only'); receipt, _ = self.submit(deadline_ms=300)
+        # This checks interrupt ACK versus terminal evidence, not scheduler or
+        # interpreter startup latency. Dedicated deadline tests keep short caps.
+        self.switch_mode('wait_ack_only'); receipt, _ = self.submit(deadline_ms=3000)
         self.text.observer = lambda event: self.cancel(receipt) if event['event']=='turn_started' else None
         self.execute(); current = self.status(receipt)
         self.assertEqual(current['native']['interrupt'], 'acknowledged')
@@ -220,7 +222,7 @@ class NativeResearchTests(RuntimeCase):
 
     def test_tools_failed_terminal_and_wrong_turn_fail_closed(self):
         for mode in ('action','failed_turn','mismatch','wait_wrong_terminal'):
-            self.switch_mode(mode);receipt,_=self.submit(deadline_ms=250)
+            self.switch_mode(mode);receipt,_=self.submit(deadline_ms=3000)
             if mode=='wait_wrong_terminal':
                 self.text.observer=lambda event:self.cancel(receipt) if event['event']=='turn_started' else None
             self.execute();current=self.status(receipt)

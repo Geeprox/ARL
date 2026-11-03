@@ -5,16 +5,24 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+SUITES = ['CalendarBusinessTests', 'CalendarBusinessIntentFlowTests', 'CalendarBusinessTaskStoreTests',
+          'AppleCalendarRecoveryTests', 'AppleOwnerDeleteFlowTests', 'AppleOwnerDefaultFlowTests',
+          'AppleOwnerStatusFlowTests', 'RemindersProductBoundaryTests', 'NotesDirectTests', 'NotesDeleteTests']
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--native-build', required=True, type=Path,
                         help='SDK modules produced by check_native_source.py')
+    parser.add_argument('--suite', action='append', choices=SUITES,
+                        help='Run only the named synthetic suites; repeatable')
+    parser.add_argument('--control-build', type=Path,
+                        help='Explicitly reuse a prior test Control module only when all original source hashes still match')
     args = parser.parse_args()
     native = args.native_build.resolve()
     receipt = json.loads((native / 'results.json').read_text())
@@ -32,7 +40,7 @@ def main():
     sdk = subprocess.check_output(['xcrun', '--show-sdk-path'], text=True).strip()
     common = ['xcrun', 'swiftc', '-sdk', sdk, '-swift-version', '6', '-j', '1', '-parse-as-library',
               '-module-cache-path', str(output / 'ModuleCache'), '-I', str(native), '-I', str(output)]
-    link = ['-L', str(native), '-lARLCredentialHostCore', '-lz', '-Xcc',
+    link = ['-L', str(native), '-lARLCredentialHostCore', '-lz', '-lsqlite3', '-Xcc',
             '-fmodule-map-file=' + str(native / 'FlyAICompression/module.modulemap')]
     records = []
 
@@ -55,31 +63,56 @@ def main():
     declarations = output / 'ControlDeclarations.swift'
     declarations.write_text(entry.read_text().replace('@main enum ARLEntry', 'enum ARLEntry'))
     compiled_sources = [declarations if p == entry else p for p in sources]
-    run('ControlModule', common + link + ['-enable-testing', '-whole-module-optimization', '-emit-module',
-        '-emit-object', '-module-name', 'ARLControlVerification', '-emit-module-path', output / 'ARLControlVerification.swiftmodule',
-        *compiled_sources, '-o', output / 'Control.o'], sources)
+    if args.control_build:
+        previous = args.control_build.resolve()
+        if not previous.is_relative_to(ROOT / 'build'):
+            raise ValueError('control_test_cache_outside_build')
+        prior = json.loads((previous / 'results.json').read_text())
+        module = next(step for step in prior['steps'] if step['step'] == 'ControlModule')
+        expected = {str(path.relative_to(ROOT)) for path in sources}
+        if (module['exit_code'] or not module['inputs_stable'] or set(module['source_inputs']) != expected
+                or any(hashlib.sha256((ROOT / path).read_bytes()).hexdigest() != digest
+                    for path, digest in module['source_inputs'].items())):
+            raise ValueError('control_test_cache_source_changed')
+        artifacts = {}
+        for name in ('Control.o', 'ARLControlVerification.swiftmodule'):
+            shutil.copyfile(previous / name, output / name)
+            artifacts[name] = hashlib.sha256((output / name).read_bytes()).hexdigest()
+        records.append(dict(step='ControlModule', exit_code=0, inputs_stable=True,
+            source_inputs=module['source_inputs'], reused_from=str(previous), artifact_sha256=artifacts))
+        print('ControlModule reused with exact source hashes', flush=True)
+    else:
+        run('ControlModule', common + link + ['-enable-testing', '-whole-module-optimization', '-emit-module',
+            '-emit-object', '-module-name', 'ARLControlVerification', '-emit-module-path', output / 'ARLControlVerification.swiftmodule',
+            *compiled_sources, '-o', output / 'Control.o'], sources)
     spec = importlib.util.spec_from_file_location('reminders_static', ROOT / 'integrations/reminders_v3/build_static.py')
     reminders = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(reminders)
-    for name, paths in [('ARLRemindersCore', reminders.CORE), ('ARLRemindersEventKit', reminders.EVENTKIT)]:
+    modules = [('ARLRemindersCore', reminders.CORE)]
+    if not args.suite:
+        modules.append(('ARLRemindersEventKit', reminders.EVENTKIT))
+    for name, paths in modules:
         inputs = [ROOT / p for p in paths]
         run(name, common + ['-whole-module-optimization', '-emit-module', '-emit-object', '-module-name', name,
             '-emit-module-path', output / (name + '.swiftmodule'), *inputs, '-o', output / (name + '.o')], inputs)
-    inputs = [ROOT / p for p in reminders.HOST]
-    run('RemindersProductionHost', common + inputs + [output / 'ARLRemindersCore.o', output / 'ARLRemindersEventKit.o',
-        '-o', output / 'RemindersProductionHost'], inputs)
-    suites = ['CalendarBusinessTests', 'CalendarBusinessIntentFlowTests', 'CalendarBusinessTaskStoreTests',
-              'AppleCalendarRecoveryTests', 'AppleOwnerDeleteFlowTests', 'AppleOwnerDefaultFlowTests',
-              'NotesDirectTests', 'NotesDeleteTests']
+    if not args.suite:
+        inputs = [ROOT / p for p in reminders.HOST]
+        run('RemindersProductionHost', common + inputs + [output / 'ARLRemindersCore.o', output / 'ARLRemindersEventKit.o',
+            '-o', output / 'RemindersProductionHost'], inputs)
+    suites = args.suite or SUITES
     for name in suites:
         source = ROOT / 'tests' / (name + '.swift')
         code = '@testable import ARLControlVerification\n' + source.read_text()
         extras = []
-        if name == 'AppleOwnerDefaultFlowTests':
+        if name in ('AppleOwnerDefaultFlowTests', 'AppleOwnerStatusFlowTests', 'RemindersProductBoundaryTests'):
             extras = [ROOT / 'integrations/reminders_v3/adapter_source/Fixtures/FixtureRepository.swift',
                       ROOT / 'integrations/reminders_v3/RemindersProductHandler.swift',
                       ROOT / 'integrations/reminders_v3/RemindersProductRequest.swift']
             # Helper DTOs are the shared declarations already imported from Control.
+        if name in ('AppleOwnerStatusFlowTests', 'RemindersProductBoundaryTests'):
+            extras.extend(ROOT / p for p in ('integrations/mio_apple/MioReadOwnerAdapter.swift',
+                'integrations/mio_apple/MioReadCatalog.swift',
+                'tests/fixtures/OwnerStatusCatalogSupport.swift'))
         originals = extras
         extras = []
         for extra in originals:

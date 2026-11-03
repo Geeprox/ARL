@@ -4,7 +4,7 @@ import unittest
 
 from arl.contracts import Fault
 from arl.service_deployment import EvidenceSource, project_status
-from support import NOW, evidence, fixture, single
+from tests.service_deployment.support import NOW, evidence, fixture, single
 
 
 class ReadinessTests(unittest.TestCase):

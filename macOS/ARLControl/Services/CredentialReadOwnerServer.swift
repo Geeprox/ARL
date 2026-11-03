@@ -96,19 +96,22 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
         var result: Result<Data, OwnerReadFault>? { lock.withLock { value } }
     }
     private static func serve(fd: Int32, service: CredentialOnboarding, appleCall: AppleCall?, nasCall: NASCall?, authority: OwnerReadAuthority, stop: OwnerReadStop, lifecycle: OwnerReadLifecycle) throws {
-        let peer = try OwnerReadPeer(fd: fd, authority: authority)
+        let acceptedAt = OwnerReadSocket.now
+        let admission = OwnerReadAdmission(started: acceptedAt,
+            overallDeadline: acceptedAt + OwnerReadWire.admissionSeconds)
+        let peer = try admission.verifying(cancelled: { stop.cancelled }) { try OwnerReadPeer(fd: fd, authority: authority) }
         let generation = UUID().uuidString
-        let admissionDeadline = OwnerReadSocket.now + 2
         try OwnerReadSocket.writeFrame(OwnerReadWire.hello(generation), fd: fd, limit: 1024,
-                                       deadline: admissionDeadline, cancelled: { stop.cancelled })
+                                       deadline: admission.frameDeadline, cancelled: { stop.cancelled })
         let raw = try OwnerReadSocket.readFrame(fd, limit: OwnerReadWire.requestLimit,
-                                               deadline: admissionDeadline, cancelled: { stop.cancelled })
+            deadline: admission.deadline, firstByteFrameSeconds: OwnerReadWire.frameSeconds, cancelled: { stop.cancelled })
+        try admission.check(cancelled: { stop.cancelled })
         let request = try OwnerReadWire.request(raw, generation: generation)
         let logStarted=ProcessInfo.processInfo.systemUptime
         var logFields:[String:Any] = ["owner_call_id":request.callID,"tool_sha256":ARLConnectionLog.fingerprint(request.tool) ?? ""],logFailed=true
         ARLConnectionLog.production.record("owner","owner_request",logFields)
         defer { logFields["elapsed_ms"]=max(0,Int((ProcessInfo.processInfo.systemUptime-logStarted)*1000));logFields["failed"]=logFailed;ARLConnectionLog.production.record("owner","owner_finished",logFields) }
-        try peer.verify()
+        try admission.verifying(cancelled: { stop.cancelled }) { try peer.verify() }
         guard !stop.cancelled, !OwnerReadSocket.interrupted(fd) else { throw OwnerReadFault.cancelled }
         guard let operation = lifecycle.reserveOperation() else { throw OwnerReadFault.busy }
         let result = Outcome()
@@ -130,7 +133,9 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
         }
         lifecycle.retain(work, for: operation)
         defer { work.cancel() }
-        let deadline = OwnerReadSocket.now + OwnerReadWire.seconds(for: request.tool) - 2
+        // Admission consumes the original tool budget; it never grants a fresh
+        // execution interval after slow cold verification.
+        let deadline = acceptedAt + OwnerReadWire.seconds(for: request.tool) - 2
         var signatureDeadline = OwnerReadSocket.now
         var interrupted: OwnerReadFault?
         while result.result == nil || !lifecycle.operationEnded(operation) {

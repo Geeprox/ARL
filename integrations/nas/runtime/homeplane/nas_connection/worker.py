@@ -12,6 +12,18 @@ if __package__ in {None, ""}:
 from homeplane.nas_connection.adapters import SFTPReader, SMBReader
 from homeplane.nas_connection.contracts import NASConnectionConfig, NASConnectionError, NASCredentials
 
+
+def record_failure(error, operation):
+    # Diagnostics must never change the business result. The fixed recorder
+    # retains finite error types/codes/callsites, never payload or error text.
+    if operation not in {'connect', 'health', 'list', 'stat', 'read'}:
+        return
+    try:
+        from nas_diagnostic import failure_record
+        failure_record(error, 'file_' + operation)
+    except Exception:
+        pass
+
 MAX_INPUT = 32768
 MAX_OUTPUT = 2 * 1024 * 1024
 
@@ -62,6 +74,7 @@ def main(factory=None):
             if not line:
                 return
             identity = None
+            operation = None
             try:
                 if len(line) > MAX_INPUT or not line.endswith(b"\n"):
                     raise NASConnectionError("nas_budget_exceeded")
@@ -91,6 +104,7 @@ def main(factory=None):
                     raise NASConnectionError("nas_invalid_request")
                 reply = {"id": identity, "result": result}
             except Exception as exc:
+                record_failure(exc, operation)
                 reply = {"id": identity, "error": error_code(exc)}
             # Drop the serialized password/config before accepting another frame.
             line = message = payload = None

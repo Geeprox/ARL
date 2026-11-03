@@ -2,7 +2,7 @@
 import hashlib, os, sys, tempfile, time, unittest, uuid
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock,patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/"integrations/nas/runtime"),str(ROOT)]
 import smb_upload_new as medium
@@ -161,4 +161,21 @@ class Tests(unittest.TestCase):
         result=self.storage.upload(self.plan,self.source,self.owner)
         self.assertEqual((result.status,result.failure),("held","revoked"))
         self.assertEqual(self.server.opens,[]);self.assertEqual(self.consumed,0)
+    def test_real_handle_write_refuses_expiry_or_close_during_its_last_verification(self):
+        for changed in ('deadline','closed'):
+            with self.subTest(changed=changed):
+                clock=[0.0];checks=[]
+                def verify(stage):
+                    checks.append(stage)
+                    # This is the final check immediately before raw.write.
+                    if len(checks)==3:
+                        if changed=='deadline':clock[0]=2.0
+                        else:target.closed=True
+                target=medium.SMBUploadNewMedium(reader=self.server,plan=self.plan,verify=verify,deadline=1.0,clock=lambda:clock[0])
+                handle=object.__new__(medium.SMBUploadHandle)
+                handle.medium=target;handle.raw=SimpleNamespace(connected=True,write=Mock(return_value=1))
+                handle.writable=True;handle.published=handle.closed=False
+                with self.assertRaises(UploadFault) as failure:handle.write(0,b'x',effect_check=lambda:None)
+                self.assertEqual(failure.exception.code,'expired');self.assertEqual(len(checks),3)
+                handle.raw.write.assert_not_called();self.assertEqual(self.server.writes,[])
 if __name__=="__main__":unittest.main()

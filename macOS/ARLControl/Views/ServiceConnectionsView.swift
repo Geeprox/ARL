@@ -173,6 +173,7 @@ private struct ConnectionDestinationStyle: ButtonStyle {
 
 private struct TaskNotesConnectionView: View {
     let controller: NotesDirectController
+    @State private var appearance:UUID?
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             AppleConnectionActionsView(target: .notes, permission: controller.permission, enabled: controller.enabled,
@@ -185,7 +186,7 @@ private struct TaskNotesConnectionView: View {
                         Menu {
                             ForEach(controller.folders) { folder in
                                 Button(folder.label) {
-                                    if let ticket = controller.ticket() { Task { await controller.select(folder, ticket: ticket) } }
+                                    controller.performUserActionAfterClick { ticket in await controller.select(folder, ticket: ticket) }
                                 }
                             }
                         } label: { Text(controller.scope?.folder.label ?? "选择文件夹") }
@@ -195,18 +196,19 @@ private struct TaskNotesConnectionView: View {
                         if let folder = controller.scope?.folder { Text(folder.label).font(.callout).foregroundStyle(.secondary) }
                     }
                     Button(controller.folders.isEmpty ? "选择文件夹" : "刷新文件夹") {
-                        if let ticket = controller.ticket() { Task { await controller.loadFolders(ticket: ticket) } }
+                        controller.performUserActionAfterClick { ticket in await controller.loadFolders(ticket: ticket) }
                     }.disabled(controller.busy)
-                    if let detail = controller.detail { Text(detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled) }
+                    if let message=controller.message {Text(message).font(.callout).foregroundStyle(.secondary)}
+                    if let detail = controller.detail {
+                        DisclosureGroup("连接详情") {Text(detail).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)}
+                    }
                 }
             }
-        }.task { controller.appear(); await controller.prepareForDisplay() }
-            .onDisappear { controller.disappear() }
+        }.task { appearance=controller.appear(); await controller.prepareForDisplay() }
+            .onDisappear { if let appearance {controller.disappear(appearance:appearance)};appearance=nil }
     }
     private func request() {
-        if let ticket = controller.ticket() {
-            Task { await controller.checkPermission(ticket: ticket, request: true); await controller.prepareForDisplay() }
-        }
+        controller.performUserActionAfterClick { ticket in await controller.checkPermission(ticket: ticket, request: true); await controller.prepareForDisplay() }
     }
 }
 

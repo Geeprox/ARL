@@ -17,10 +17,13 @@ final class CalendarBusinessTaskStore {
         if !hasDir {
             guard create else{return false}
             guard mkdir(root.path,0o700)==0,lstat(root.path,&dir)==0 else{throw CalendarBusinessFault("journal_unavailable")}
-            try RemindersNativeIO.writeNew(Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n").utf8),to:anchor.path)
+            try RemindersNativeIO.writeNew(try RemindersNativeIO.directoryBinding([root.path]),to:anchor.path)
         }
         try RemindersNativeIO.privateDirectory(root.path)
-        guard lstat(root.path,&dir)==0,try RemindersNativeIO.privateFile(anchor.path)==Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n").utf8) else{throw CalendarBusinessFault("journal_missing_or_replaced")}
+        guard lstat(root.path,&dir)==0 else{throw CalendarBusinessFault("journal_missing_or_replaced")}
+        let bytes=try RemindersNativeIO.privateFile(anchor.path)
+        let legacy=Data(("v1\n"+String(dir.st_dev)+"\n"+String(dir.st_ino)+"\n").utf8)
+        guard bytes == (try RemindersNativeIO.directoryBinding([root.path])) || bytes == legacy else{throw CalendarBusinessFault("journal_missing_or_replaced")}
         return true
     }
     private func file(_ id:String,_ suffix:String)throws->String {

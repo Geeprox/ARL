@@ -92,7 +92,9 @@ import AppKit
             }
             mutationEntered=frame.action == .submit
             let reply=try await reminders.execute(frame,tool:tool,argumentsJSON:argumentsJSON)
-            return try envelope(tool:tool,taskID:frame.task_id,state:reply.task?.state ?? reply.outcome,code:reply.code,result:reply,businessLogAvailable:reply.business_log_available)
+            let state = frame.action == .status && reply.task == nil && reply.outcome == "refreshed" && reply.code == "operation_missing"
+                ? "operation_missing" : reply.task?.state ?? reply.outcome
+            return try envelope(tool:tool,taskID:frame.task_id,state:state,code:reply.code,result:reply,businessLogAvailable:reply.business_log_available)
         }
         guard port.begin(callID) else{throw OwnerReadFault.busy}
         defer{port.end(callID)}

@@ -4,10 +4,11 @@ from pathlib import Path
 from .codex_server import CodexService
 from .codex_packages import PackageRegistry,canonical,digest,validate_packages
 from .codex_execution_options import selection
+from .codex_context import TRANSPORT_FRAME_BYTES,INPUT_POLICY,context_rows
 from .contracts import Fault,object_schema,string,validate
 NAME='codex.text.generate.v2'
 METHODS=frozenset({'application.models.discover.v2','application.models.request.v2','codex.requests.lookup.v2','codex.account.usage.v2'})
-MESSAGES={'type':'array','minItems':1,'items':object_schema({'role':{'type':'string','enum':['system','developer','user','assistant']},'content':string(8192)},['role','content'])}
+MESSAGES={'type':'array','minItems':1,'items':object_schema({'role':{'type':'string','enum':['system','developer','user','assistant']},'content':string(TRANSPORT_FRAME_BYTES)},['role','content'])}
 SCHEMA=object_schema({'schema_version':{'type':'integer','enum':[2]},'resolution_id':string(64),'messages':MESSAGES},['schema_version','resolution_id','messages'])
 def decode_request(raw):
     value=json.loads(raw)
@@ -25,7 +26,7 @@ def checked_uuid(value):
 class CodexServiceV2(CodexService):
     name=NAME
     def __init__(self,*args,package_home,**kwargs):
-        super().__init__(*args,allow_model_selection=True,**kwargs)
+        super().__init__(*args,allow_model_selection=True,package_home=package_home,**kwargs)
         self.schema=SCHEMA;self.registry=PackageRegistry(package_home);self.gateway=None
     def preflight(self):
         proof=super().preflight()
@@ -48,7 +49,8 @@ class CodexServiceV2(CodexService):
         base_schema=dict(BASE_SCHEMA,properties=dict(BASE_SCHEMA['properties'],reasoning_effort=string(40),service_tier=string(20)))
         validate(base,base_schema)
         if not completion:selection(self.catalog,base['model'],base['reasoning_effort'],base['service_tier'])
-        if len(base['input'].encode())>8192 or base['max_output_bytes']>self.max_output_bytes:raise Fault('model_budget_exceeded')
+        if len(base['input'].encode())>TRANSPORT_FRAME_BYTES:raise Fault('transport_frame_too_large')
+        if base['max_output_bytes']>self.max_output_bytes:raise Fault('model_budget_exceeded')
         if not completion and (self.checked_mono is None or not 0<=time.monotonic()-self.checked_mono<=90):raise Fault('codex_preflight_required')
         self.adapter.verify()
         return row,base
@@ -66,7 +68,7 @@ class CodexServiceV2(CodexService):
         p=self.progress({'id':row['id'],'state':'queued'});native=p['native']
         state='cancelled' if code=='cancelled' and (not p['turn_sent'] or native['terminal']=='interrupted') else 'failed' if not p['turn_sent'] or native['terminal']=='failed' else 'needs_review'
         r=self.gateway.resolution(json.loads(row['args'])['resolution_id'],row['owner'])
-        store.finish(row,state,{'schema_version':2,'provider':'codex_app_server','model':r['resolved']['model'],'selection_receipt':r,'native':native,'simulated':self.adapter.test_command is not None},error=code)
+        store.finish(row,state,{'schema_version':2,'provider':'codex_app_server','model':r['resolved']['model'],'selection_receipt':r,'native':native,'timing':p.get('timing'),'provider_error':p.get('provider_error'),'simulated':self.adapter.test_command is not None},error=code)
 class CodexGatewayV2:
     def __init__(self,runtime,service):
         self.runtime=runtime;self.service=service;service.gateway=self
@@ -93,14 +95,14 @@ class CodexGatewayV2:
         catalog=self.service.catalog
         version=self.service.registry.publish(catalog,{'model':self.service.model,'reasoning_effort':self.service.reasoning_effort,'service_tier':'default'})
         packages=self.service.registry.load()
-        rows=[]
+        rows=[];contexts=context_rows(catalog)
         for model in catalog:
-            rows.append({'id':model['model'],'object':'model','owned_by':'arl','reasoning_efforts':[e['id'] for e in model['efforts']],'default_effort':model['default_effort']})
+            rows.append({'id':model['model'],'object':'model','owned_by':'arl','reasoning_efforts':[e['id'] for e in model['efforts']],'default_effort':model['default_effort'],'fast_available':model['fast_available'],**contexts.get(model['model'],{'input_policy':INPUT_POLICY,'provider_enforced':True})})
         for key,row in packages['packages'].items():
-            try:selection(catalog,row['model'],row['reasoning_effort'],'default');available=True
+            try:selection(catalog,row['model'],row['reasoning_effort'],row.get('service_tier','default'));available=True
             except Fault:available=False
-            rows.append({'id':'arl/package/'+key,'object':'model','owned_by':'arl','display_name':row['display_name'],'available':available})
-        return {'schema_version':2,'catalog_version':version,'models':rows,'package_revision':packages['revision'],'quota_policy':'inherit_account','local_lifetime_call_limit':None,'admitted_requests_total':status['admitted_requests_total'],'limits':{'max_input_bytes':8192,'max_output_bytes':32768,'max_wall_ms':180000,'priority':['explicit'],'service_tiers':['default']},'token_hard_cap_supported':False}
+            rows.append({'id':'arl/package/'+key,'object':'model','owned_by':'arl','display_name':row['display_name'],'available':available,'resolved_model':row['model'],**contexts.get(row['model'],{'input_policy':INPUT_POLICY,'provider_enforced':True})})
+        return {'schema_version':2,'catalog_version':version,'models':rows,'package_revision':packages['revision'],'quota_policy':'inherit_account','local_lifetime_call_limit':None,'admitted_requests_total':status['admitted_requests_total'],'limits':{'max_input_bytes':None,'input_policy':INPUT_POLICY,'transport_max_frame_bytes':TRANSPORT_FRAME_BYTES,'max_output_bytes':32768,'max_wall_ms':getattr(self.service.adapter,'max_wall_seconds',180)*1000,'priority':['explicit'],'service_tiers':['default','fast']},'token_hard_cap_supported':False}
     def dispatch(self,owner,method,params,binding):
         if owner!=self.service.caller or type(params)!=dict:raise Fault('method_not_authorized')
         self.session(owner,params,binding)
@@ -123,7 +125,8 @@ class CodexGatewayV2:
         if set(params)!=fields or params['schema_version']!=2 or params['task_kind'] not in {'text.generate','text.translate','text.summarize'}:raise Fault('invalid_arguments')
         checked_uuid(params['request_id'])
         if type(params['content_sha256'])!=str or len(params['content_sha256'])!=64 or any(c not in '0123456789abcdef' for c in params['content_sha256']):raise Fault('invalid_content_hash')
-        if params['service_tier']!='default' or params['schedule']!={'priority':'explicit','execution_timeout_ms':180000,'queue_timeout_ms':0} or params['output']!={'max_bytes':32768}:raise Fault('unsupported_execution_options')
+        schedule=params['schedule']
+        if (params['service_tier'] not in {'default','fast'} or type(schedule)!=dict or set(schedule)!={'priority','execution_timeout_ms','queue_timeout_ms'} or schedule['priority']!='explicit' or schedule['queue_timeout_ms']!=0 or type(schedule['execution_timeout_ms']) is not int or not 1<=schedule['execution_timeout_ms']<=getattr(self.service.adapter,'max_wall_seconds',180)*1000 or params['output']!={'max_bytes':32768}):raise Fault('unsupported_execution_options')
         selector=params['selector']
         if type(selector)!=dict:raise Fault('invalid_selector')
         normalized={k:v for k,v in params.items() if k!='session_id'};request_digest=digest(normalized)
@@ -134,16 +137,16 @@ class CodexGatewayV2:
                 if old[1]!=request_digest:raise Fault('idempotency_conflict')
                 return self.public_resolution(json.loads(old[0]))
             if params['catalog_version']!=self.service.registry.version(self.service.catalog):raise Fault('catalog_changed')
-            config=self.service.registry.load();package_revision=package_digest=None
+            config=self.service.registry.load();package_revision=package_digest=None;tier=params['service_tier']
             if selector.get('kind')=='package' and set(selector)=={'kind','package_id'} and selector['package_id'] in config['packages']:
-                chosen=config['packages'][selector['package_id']];model=chosen['model'];effort=chosen['reasoning_effort'];package_revision=config['revision'];package_digest=digest(config)
+                chosen=config['packages'][selector['package_id']];model=chosen['model'];effort=chosen['reasoning_effort'];tier=chosen.get('service_tier','default');package_revision=config['revision'];package_digest=digest(config)
             elif selector.get('kind')=='model' and set(selector) in ({'kind','model'},{'kind','model','reasoning_effort'}):
                 model=selector['model'];row=next((m for m in self.service.catalog if m['model']==model),None)
                 if row is None:raise Fault('model_unavailable')
                 effort=selector.get('reasoning_effort',row['default_effort'])
             else:raise Fault('invalid_selector')
-            selection(self.service.catalog,model,effort,'default')
-            r=dict(normalized,resolution_id=secrets.token_hex(32),expires_at=time.time()+30,owner=owner,binding=binding[0],resolved={'model':model,'reasoning_effort':effort,'service_tier':'default'},package_revision=package_revision,package_config_digest=package_digest,job_id=None)
+            selection(self.service.catalog,model,effort,tier)
+            r=dict(normalized,resolution_id=secrets.token_hex(32),expires_at=time.time()+30,owner=owner,binding=binding[0],resolved={'model':model,'reasoning_effort':effort,'service_tier':tier},package_revision=package_revision,package_config_digest=package_digest,job_id=None)
             store.db.execute('INSERT INTO codex_resolutions_v2 VALUES (?,?,?,?,?)',(r['resolution_id'],owner,r['request_id'],request_digest,canonical(r).decode()))
             return self.public_resolution(r)
     @staticmethod
@@ -161,7 +164,7 @@ class CodexGatewayV2:
             # New admissions must resolve against current packages. Work already
             # admitted keeps its original revision and may finish after edits.
             if not r.get('job_id') and r['package_revision'] is not None and digest(self.service.registry.load())!=r['package_config_digest']:raise Fault('package_changed_before_admission')
-            job=store.submit(owner,params['key'],self.runtime.tools[NAME],params['args'],self.runtime.policies[owner],verified=True,in_transaction=True)
+            job=store.submit(owner,params['key'],self.runtime.tools[NAME],params['args'],self.runtime.policies[owner],verified=True,in_transaction=True,schedule={'priority':'explicit','deadline_ms':r['schedule']['execution_timeout_ms']})
             if r.get('job_id') and r['job_id']!=job['id']:raise Fault('idempotency_conflict')
             r['job_id']=job['id'];store.db.execute('UPDATE codex_resolutions_v2 SET value=? WHERE id=?',(canonical(r).decode(),r['resolution_id']))
         self.runtime.job_signal.set();return job

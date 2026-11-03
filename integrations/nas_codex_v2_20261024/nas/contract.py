@@ -1,6 +1,7 @@
 """Text-only OpenAI compatibility; explicit selection or package, never both."""
 import hashlib,json,uuid
-APPS=('pdf2zh','bilinote')
+from model_context import TRANSPORT_FRAME_BYTES,INPUT_POLICY
+APPS=('pdf2zh','bilinote','robin')
 MODEL='arl/package/medium'
 PREFIX='ARL application: '
 def encode(value):return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
@@ -35,10 +36,10 @@ def normalize(app,value,catalog,request_id=None):
             content='\n'.join(p['text'] for p in content)
         if type(content)!=str:raise ValueError('text_only')
         clean.append({'role':message['role'],'content':content})
-    if not 1<=len(encode(clean))<=8192:raise ValueError('input_exceeds_8192_bytes')
+    if not 1<=len(encode(clean))<=TRANSPORT_FRAME_BYTES-4096:raise ValueError('transport_frame_too_large')
     identity=str(uuid.uuid4()) if request_id is None else str(uuid.UUID(request_id))
     if request_id is not None and identity!=request_id:raise ValueError('invalid_request_id')
-    return {'schema':2,'app':app,'id':identity,'selector':selector,'messages':clean,'content_sha256':hashlib.sha256(encode({'messages':clean})).hexdigest(),'max_output_bytes':32768}
+    return {'schema':2,'app':app,'id':identity,'selector':selector,'messages':clean,'content_sha256':hashlib.sha256(encode({'messages':clean})).hexdigest(),'max_output_bytes':32768,'service_tier':row.get('service_tier','default')}
 def time_stale(catalog):
     import time
     return not isinstance(catalog,dict) or time.time()-catalog.get('published_at',0)>90

@@ -15,12 +15,13 @@ from dataclasses import asdict
 # -I permits only the signed, staged resource root, never cwd/PYTHONPATH/user site.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from homeplane.nas_connection import NASConnectionConfig, NASConnectionError
-from homeplane.nas_connection.worker import error_code
+from homeplane.nas_connection.worker import error_code, record_failure
 from homeplane.nas_connection.adapters import SMBReader
 from homeplane.nas_connection.state import StateStore
 from arl_nas_credential import Admission, CallerPins, CredentialFault, Failure, NASReadScope
 from arl_nas_credential.broker import PrivateCredential
 from arl_nas_credential.scope_bridge import make_scoped_nas_manager
+from nas_authorization_timing import ReadonlyAuthorizationTimings, readonly_operation
 
 MAX_INPUT = 2 * 1024 * 1024
 MAX_OUTPUT = 2 * 1024 * 1024
@@ -57,6 +58,7 @@ class PrivateWire:
         self.kernel_check = kernel_check
         self.sequence = 0
         self.nonce = None
+        self.authorization_timings = ReadonlyAuthorizationTimings()
         self.identities = [(os.fstat(n).st_dev, os.fstat(n).st_ino) for n in (0, 1)] if kernel_check else []
 
     def verify(self):
@@ -88,7 +90,26 @@ class PrivateWire:
         self.writer.write(data)
         await self.writer.drain()
 
-    async def authorize(self, stage, scope, caller, *, lease=False, upload_digest=None, consume=False):
+    async def authorize(self, stage, scope, caller, *, lease=False, upload_digest=None, consume=False,
+                        timeout_seconds=5):
+        observed=self.authorization_timings.active and upload_digest is None and stage in STAGES
+        started=time.monotonic_ns() if observed else None
+        outcome='wire_error'
+        try:
+            result=await self._authorize(stage,scope,caller,lease=lease,upload_digest=upload_digest,
+                consume=consume,timeout_seconds=timeout_seconds)
+            outcome='ok';return result
+        except TimeoutError:outcome='reply_timeout';raise
+        except asyncio.CancelledError:outcome='cancelled';raise
+        finally:
+            if started is not None:
+                try:self.authorization_timings.add(stage,time.monotonic_ns()-started,outcome)
+                except Exception:pass
+
+    async def _authorize(self, stage, scope, caller, *, lease=False, upload_digest=None, consume=False,
+                         timeout_seconds=5):
+        if type(timeout_seconds) not in (int, float) or not 0 < timeout_seconds <= 90:
+            raise CredentialFault(Failure.EXPIRED)
         self.sequence += 1
         sequence = self.sequence
         frame = {"kind": "lease" if lease else "authorize", "sequence": sequence,
@@ -98,7 +119,7 @@ class PrivateWire:
             frame["kind"] = "upload_consume" if consume else "upload_check"
             frame["plan_digest"] = upload_digest
         await self.send(frame)
-        result = await asyncio.wait_for(self.read(), timeout=5)
+        result = await asyncio.wait_for(self.read(), timeout=timeout_seconds)
         allowed = {"kind", "sequence", "nonce", "ok", "remaining_seconds"}
         if lease:
             allowed.add("credential")
@@ -172,6 +193,7 @@ class OwnedSMBTransport:
             self.reader = await asyncio.to_thread(SMBReader, config, credentials)
             return await self.request("health", {})
         except Exception as exc:
+            record_failure(exc,"connect")
             raise NASConnectionError(error_code(exc)) from None
 
     async def request(self, operation, payload):
@@ -190,7 +212,8 @@ class OwnedSMBTransport:
                 return await asyncio.to_thread(reader.read_range, payload["path"], payload["revision"],
                                                payload["offset"], payload["length"])
             raise CredentialFault(Failure.DISABLED)
-        except BaseException:
+        except BaseException as error:
+            record_failure(error,operation)
             # A timed-out thread must never be reused. Native parent owns process teardown.
             self.closed = True
             raise
@@ -325,6 +348,9 @@ class NativeRuntimeHost:
         if frame.get("kind") == "upload_new":
             from nas_upload_host import upload_new
             return await upload_new(self, frame)
+        if frame.get("kind") == "acceptance":
+            from nas_acceptance_host import execute
+            return await execute(self,frame)
         if frame.get("kind") == "directories":
             return await self.directories(frame)
         if set(frame) != {"kind", "id", "nonce"} or frame["nonce"] != self.wire.nonce or type(frame["id"]) is not int:
@@ -401,23 +427,32 @@ async def main():
         if frame.get("kind") == "server_connect":
             from nas_server_host import ServerBridge
             host = ServerBridge(wire)
+        wire.authorization_timings.begin(readonly_operation(frame))
         result = await host.connect(frame)
+        wire.authorization_timings.finish()
         await wire.send({"kind": "result", "id": 1, "nonce": wire.nonce, "ok": True, "value": result})
         while True:
             frame = await wire.read()
+            wire.authorization_timings.begin(readonly_operation(frame))
             try:
                 result = await host.command(frame)
+                wire.authorization_timings.finish()
                 await wire.send({"kind": "result", "id": frame["id"], "nonce": wire.nonce, "ok": True, "value": result})
                 if frame["kind"] == "stop":
                     return
             except Exception as exc:
+                wire.authorization_timings.finish()
                 await wire.send({"kind": "result", "id": frame.get("id"), "nonce": wire.nonce,
                                  "ok": False, "error": public_error(exc)})
+            finally:
+                wire.authorization_timings.finish()
     except (EOFError, BrokenPipeError):
         pass
     except Exception as exc:
+        wire.authorization_timings.finish()
         await wire.send({"kind": "result", "id": 1, "nonce": wire.nonce, "ok": False, "error": public_error(exc)})
     finally:
+        wire.authorization_timings.finish()
         await host.stop()
         writer.close()
 

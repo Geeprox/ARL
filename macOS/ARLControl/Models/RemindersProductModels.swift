@@ -143,6 +143,7 @@ enum RemindersProductCopy {
         case "ok": return "已读取。"
         case "target_required", "default_list_required": return "未指定新建清单，请先设置默认清单。"
         case "default_list_unavailable": return "默认清单已不可写，请重新设置；仍可显式指定其他清单。"
+        case "product_journal_missing_or_replaced": return "历史记录需要核对，提醒操作已暂停。"
         case "needs_permission": return "请先允许访问提醒事项。"
         case "revision_conflict": return "这条提醒已有变化，请重新打开后编辑。"
         case "operation_missing": return "尚无这条操作记录。"

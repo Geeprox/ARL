@@ -5,7 +5,7 @@ import unittest
 
 from arl.contracts import encode
 from arl.service_deployment import (ValidationFault, parse_configuration, parse_inventory, parse_manifest, strict_json)
-from support import fixture, single
+from tests.service_deployment.support import fixture, single
 
 
 class ValidationTests(unittest.TestCase):

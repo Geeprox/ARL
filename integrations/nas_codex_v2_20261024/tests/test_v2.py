@@ -16,6 +16,7 @@ class V2Tests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.home=Path(self.tmp.name)
         self.a=CodexTextAdapter(enabled=True,test_command=[sys.executable,'-I',str(Path(__file__).with_name('fake_v2_server.py')),'ok'])
+        self.a.max_wall_seconds=600
         self.s=CodexServiceV2(self.a,caller='v2-test',model='synthetic-model',reasoning_effort='xhigh',max_calls=None,package_home=self.home/'packages',authorization_current=lambda:True,peer_current=lambda:True,allow_test_command=True)
         self.r=compose_codex_service(self.home/'runtime',service=self.s,peer_verifier=RegisteredPeerVerifier({'v2-test'}),isolated=True)
         self.r.store=Store(self.home/'jobs.sqlite');self.r.codex_v2.initialize();self.r.ready.set()
@@ -74,7 +75,18 @@ class V2Tests(unittest.TestCase):
     def test_unsupported_mixed_fast_and_effort_rejected(self):
         self.fault('invalid_selector',lambda:self.resolve({'kind':'package','package_id':'medium','model':'synthetic-model'}))
         self.fault('provider_effort_unavailable',lambda:self.resolve({'kind':'model','model':'synthetic-model','reasoning_effort':'guessed'}))
-        self.fault('unsupported_execution_options',lambda:self.resolve(service_tier='fast'))
+        self.fault('provider_service_tier_unavailable',lambda:self.resolve({'kind':'model','model':'synthetic-model'},service_tier='fast'))
+    def test_fast_package_freezes_before_later_configuration_change(self):
+        self.s.catalog[0]['fast_available']=True
+        old=self.s.registry.load();old['packages']['medium']['service_tier']='fast'
+        self.s.registry.save({'schema_version':2,'base_revision':old['revision'],'catalog_version':self.s.registry.version(self.s.catalog),'packages':old['packages']},self.s.catalog)
+        r=self.resolve();self.assertEqual(r['resolved']['service_tier'],'fast')
+        self.submit(r)
+        old=self.s.registry.load();old['packages']['medium']['service_tier']='default'
+        self.s.registry.save({'schema_version':2,'base_revision':old['revision'],'catalog_version':self.s.registry.version(self.s.catalog),'packages':old['packages']},self.s.catalog)
+        _,base=self.s.admit('v2-test',NAME,{'schema_version':2,'resolution_id':r['resolution_id'],'messages':self.messages})
+        self.assertEqual(base['service_tier'],'fast')
+        self.assertEqual(self.resolve()['resolved']['service_tier'],'default')
     def test_catalog_change_rejected(self):self.fault('catalog_changed',lambda:self.resolve(catalog_version='0'*64))
     def test_no_lifetime_cap_and_no_inference_in_discovery(self):
         self.r.store.db.execute("INSERT INTO budget(owner,calls) VALUES('v2-test',99)")
@@ -86,6 +98,16 @@ class V2Tests(unittest.TestCase):
         v['model']='arl/package/medium';del v['reasoning_effort'];self.assertEqual(normalize('bilinote',v,c)['selector'],{'kind':'package','package_id':'medium'})
         v['reasoning_effort']='low'
         with self.assertRaisesRegex(ValueError,'mixed_selector'):normalize('pdf2zh',v,c)
+    def test_running_turn_survives_preflight_expiry_but_new_admission_is_blocked(self):
+        def observed(event):
+            if event['event']=='turn_started':
+                self.s.checked_mono=None
+                self.s.catalog=[]
+        self.a.observer=observed
+        self.test_end_to_end_fixture_fence_and_frozen_receipt()
+        self.assertIsNone(self.s.checked_mono)
+        self.assertFalse(self.s.status()['route_enabled'])
+
     def test_end_to_end_fixture_fence_and_frozen_receipt(self):
         import threading
         r=self.resolve({'kind':'model','model':'synthetic-model','reasoning_effort':'low'})
@@ -122,6 +144,55 @@ class V2Tests(unittest.TestCase):
         frames=[b'{"method":"submit","params":{"tool":"codex.text.generate.v2","tool":"codex.text.generate.v2"}}',b'{"method":"application.models.request.v2","params":{"x":NaN}}']
         for raw in frames:self.fault('invalid_payload',lambda:decode_request(raw))
         self.assertEqual(decode_request(b'{"method":"health","params":{}}')['method'],'health')
+    def test_full_default_research_payload_exceeds_old_limit_without_loss(self):
+        from contract import encode
+        c=self.r.codex_v2.discovery();c['published_at']=time.time()
+        content='\n'.join('SOURCE %d: '%i + ('public research evidence 中'*400) for i in range(10))
+        request=normalize('robin',{'model':'arl/package/medium','messages':[{'role':'user','content':content}]},c)
+        self.assertGreater(len(encode(request['messages'])),80000)
+        self.assertEqual(request['messages'][-1]['content'],content)
+        self.messages=request['messages'];resolved=self.resolve();job=self.submit(resolved)
+        proof,base=self.s.admit('v2-test',NAME,{'schema_version':2,'resolution_id':resolved['resolution_id'],'messages':self.messages})
+        self.assertEqual(json.loads(base['input'])[-1]['content'],content)
+        self.assertIsNone(c['limits']['max_input_bytes']);self.assertEqual(c['limits']['input_policy'],'provider_context_window')
+    def test_admitted_failure_prohibits_client_retries(self):
+        import threading,http.client
+        from local_api import server,atomic
+        root=self.home/'http-queue';root.mkdir()
+        for name in ('requests','responses','cancelled'):(root/name).mkdir()
+        catalog=self.r.codex_v2.discovery();catalog['published_at']=time.time();atomic(root/'catalog.json',catalog)
+        http=server('robin',root,'synthetic-secret');thread=threading.Thread(target=http.serve_forever);thread.start()
+        def worker():
+            end=time.monotonic()+4
+            while time.monotonic()<end:
+                requests=list((root/'requests').glob('*.json'))
+                if requests:
+                    request=json.loads(requests[0].read_text())
+                    atomic(root/'responses'/requests[0].name,{'id':request['id'],'app':'robin','state':'needs_review','error':'codex_preflight_required','job_id':'original-job'})
+                    return
+                time.sleep(.01)
+        task=threading.Thread(target=worker);task.start()
+        import http.client as http_client
+        connection=http_client.HTTPConnection('127.0.0.1',19421,timeout=5)
+        try:
+            connection.request('POST','/v1/chat/completions',json.dumps({'model':'arl/package/medium','messages':self.messages}),{'Authorization':'Bearer synthetic-secret','Content-Type':'application/json'})
+            response=connection.getresponse();body=json.loads(response.read())
+            self.assertEqual(response.status,422);self.assertEqual(response.getheader('x-should-retry'),'false')
+            self.assertFalse(body['error']['retryable']);self.assertEqual(body['error']['job_id'],'original-job')
+            self.assertEqual(len(list((root/'requests').glob('*.json'))),1)
+        finally:
+            connection.close();http.shutdown();http.server_close();thread.join(3);task.join(3)
+
+    def test_execution_schedule_is_frozen_and_applied_to_durable_deadline(self):
+        for timeout in (180000,600000):
+            resolved=self.resolve(schedule={'priority':'explicit','execution_timeout_ms':timeout,'queue_timeout_ms':0})
+            job=self.submit(resolved)
+            row=self.r.store.db.execute('SELECT created,deadline_at FROM jobs WHERE id=?',(job['id'],)).fetchone()
+            self.assertAlmostEqual(row[1]-row[0],timeout/1000,places=3)
+            self.assertEqual(resolved['schedule']['execution_timeout_ms'],timeout)
+            self.r.store.db.execute("UPDATE jobs SET state='cancelled' WHERE id=?",(job['id'],))
+        self.fault('unsupported_execution_options',lambda:self.resolve(schedule={'priority':'explicit','execution_timeout_ms':600001,'queue_timeout_ms':0}))
+
     def test_token_caps_remain_rejected(self):
         c=self.r.codex_v2.discovery();c['published_at']=time.time()
         with self.assertRaisesRegex(ValueError,'token_hard_cap_unsupported'):normalize('bilinote',{'model':'arl/package/medium','messages':self.messages,'max_tokens':1},c)

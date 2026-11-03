@@ -19,6 +19,24 @@ enum RemindersStablePeerIdentity {
 // neither PID text nor JSON flags authenticate a peer. No new general framework.
 enum RemindersNativeIO {
     static func hash(_ bytes:Data)->String {SHA256.hash(data:bytes).map{String(format:"%02x",$0)}.joined()}
+    // BSD device numbers may change when an APFS volume is mounted again.
+    // Persist its UUID and each directory's inode; retain dev/inode checks
+    // around the lookup so a live path replacement still fails closed.
+    static func directoryBinding(_ paths:[String])throws->Data {
+        guard !paths.isEmpty else{throw RemindersTransportFault("unsafe_home")}
+        var text="v2\n"
+        for path in paths {
+            try privateDirectory(path)
+            var before=stat(),after=stat()
+            guard lstat(path,&before)==0,
+                  let volume=try URL(fileURLWithPath:path,isDirectory:true).resourceValues(forKeys:[.volumeUUIDStringKey]).volumeUUIDString,
+                  let uuid=UUID(uuidString:volume),lstat(path,&after)==0,
+                  before.st_dev==after.st_dev,before.st_ino==after.st_ino,
+                  before.st_uid==after.st_uid,before.st_mode==after.st_mode else{throw RemindersTransportFault("unsafe_home")}
+            text+=uuid.uuidString.lowercased()+"\n"+String(before.st_ino)+"\n"
+        }
+        return Data(text.utf8)
+    }
     static func integer(_ value:Any?)->Int? {
         guard let n=value as? NSNumber,CFGetTypeID(n) != CFBooleanGetTypeID(),!["f","d"].contains(String(cString:n.objCType)) else{return nil};return n.intValue
     }

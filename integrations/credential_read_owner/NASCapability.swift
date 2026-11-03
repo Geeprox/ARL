@@ -134,6 +134,14 @@ enum NASDownloadCapability {
     static var descriptors:[[String:Any]] {
         names.sorted().map { tool in
             let download=tool=="mio_nas_download"
+            var metadata:[String:Any]=["arl/capability":"mio_nas","arl/version":1,"arl/risk":"low","arl/requiresConfirmation":false]
+            if download {
+                metadata["ui"]=["resourceUri":NASDownloadWidget.uri]
+                metadata["openai/outputTemplate"]=NASDownloadWidget.uri
+            } else {
+                metadata["ui"]=["visibility":["model","app"]]
+                metadata["openai/widgetAccessible"]=true
+            }
             var properties:[String:Any]=[
                 "operation_id":["type":"string","format":"uuid","pattern":"^[0-9a-f-]{36}$"],
                 "source_ref":["type":"string","pattern":"^[A-Za-z0-9_-]{1,96}$"],
@@ -155,7 +163,7 @@ enum NASDownloadCapability {
                 : "Use this to read a verified 32KiB byte chunk from the original NAS download transfer_ref. Preserve operation_id, scope/epoch, size and whole-file SHA256 from the manifest. The native owner rechecks current saved scope and credential identity. Expiry/revocation never reconnects or rebinds the file. Bytes are not a downloadable ChatGPT artifact.",
                 "inputSchema":["type":"object","additionalProperties":false,"properties":properties,"required":properties.keys.sorted()],
                 "annotations":["readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true],
-                "_meta":["arl/capability":"mio_nas","arl/version":1,"arl/risk":"low","arl/requiresConfirmation":false]]
+                "_meta":metadata]
         }
     }
     static func validate(tool:String,args:[String:Any])throws {

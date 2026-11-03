@@ -93,7 +93,7 @@ class RuntimeTests(RuntimeCase):
             self.assert_fault("invalid_arguments", lambda: client.submit("runtime.ping", {"path": "/tmp"}, "extra"))
 
     def test_ready_is_separate_from_live(self):
-        process = subprocess.Popen([sys.executable, "-m", "arl", "serve", "--home", str(self.home), "--start-delay", "0.6"],
+        process = subprocess.Popen([sys.executable, '-B', "-m", "arl", "serve", "--home", str(self.home), "--start-delay", "0.6"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         client = Client(self.home, "tisra")
         try:
@@ -126,7 +126,7 @@ class RuntimeTests(RuntimeCase):
                     child.wait(timeout=10)
 
     def test_user_stop_wins_during_startup(self):
-        process = subprocess.Popen([sys.executable, "-m", "arl", "serve", "--home", str(self.home), "--start-delay", "10"],
+        process = subprocess.Popen([sys.executable, '-B', "-m", "arl", "serve", "--home", str(self.home), "--start-delay", "10"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         client = Client(self.home, "tisra")
         try:
@@ -151,7 +151,7 @@ class RuntimeTests(RuntimeCase):
                 child.wait(timeout=10)
             self.assert_fault("user_disabled", lambda: client.connect())
             self.assertEqual(len(launcher.children), 1)
-            result = subprocess.run([sys.executable, "-m", "arl", "enable", "--home", str(self.home)], capture_output=True)
+            result = subprocess.run([sys.executable, '-B', "-m", "arl", "enable", "--home", str(self.home)], capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             client.connect()
             client.rpc("stop")
@@ -257,7 +257,7 @@ class RuntimeTests(RuntimeCase):
 
     def test_crash_recovery_does_not_replay_uncertain_write(self):
         def start():
-            return subprocess.Popen([sys.executable, "-m", "tests.worker_fixture", str(self.home)],
+            return subprocess.Popen([sys.executable, '-B', "-m", "tests.worker_fixture", str(self.home)],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         process = start()
         client = Client(self.home, "tisra")

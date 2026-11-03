@@ -5,6 +5,7 @@ import CryptoKit
 
 @MainActor @Observable final class MessagesDirectController {
     let enabled: Bool
+    let receiver: MessagesReceiveController
     private let home: URL
     private let executor: AppleDirectExecutor
     private var page = MessagesDirectPageState()
@@ -40,13 +41,15 @@ import CryptoKit
              try await AppleDirectAuthorization.prepareForUserAction(.messages, stop: $0)
          }) {
         self.home = home; self.enabled = enabled; self.executor = executor
+        receiver = MessagesReceiveController(home: home, enabled: enabled, executor: executor)
         self.preferences = preferences; self.permissionCheck = permissionCheck; self.prepareTarget = prepareTarget
         connection = AppleDirectStatus.make(target: .messages, enabled: enabled, executor: executor,
             preferences: preferences, startAutomatically: startAutomatically, check: permissionCheck)
     }
-    func appear() { page.appear() }
+    func appear() { page.appear(); receiver.appear() }
     func disappear() {
         cancellation?.cancel(); page.disappear()
+        receiver.disappear()
         clearCurrentAccounts()
     }
     func ticket() -> MessagesDirectTicket? {
@@ -67,11 +70,12 @@ import CryptoKit
         !actionAdmissionHeld && !consumedDraftIDs.contains(id) && accountScan != nil && selectedAccount != nil
     }
     func suspendForExit() {
+        receiver.suspendForExit()
         actionAdmissionHeld = true; cancellation?.cancel(); page.invalidate(); clearCurrentAccounts()
         connection.pause()
     }
-    func resumeAfterCancelledExit() { actionAdmissionHeld = false; connection.resume() }
-    func finishExit() { actionAdmissionHeld = true; connection.stop() }
+    func resumeAfterCancelledExit() { actionAdmissionHeld = false; connection.resume(); receiver.resumeAfterCancelledExit() }
+    func finishExit() { actionAdmissionHeld = true; connection.stop(); receiver.finishExit() }
     func targetEdited() { cancellation?.cancel(); page.invalidate(); recipient = nil }
     func select(_ value: MessagesDirectAccount) {
         guard let intent = ticket(), accounts.contains(value),
