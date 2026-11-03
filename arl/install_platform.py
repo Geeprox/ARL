@@ -23,6 +23,11 @@ CORE='local.arl.runtime'
 MIO='com.mio.readonly-travel-tunnel'
 _UNSPECIFIED_SERVICE=object()
 
+def guarded_runtime_agent(agent):
+    """Retain the verified launch identity/options and restore crash supervision."""
+    return {**agent, 'RunAtLoad': True, 'KeepAlive': {'SuccessfulExit': False},
+            'ThrottleInterval': 10, 'ExitTimeOut': 45}
+
 class MacPlatform:
     def __init__(self,layout,host,management_parent=None):
         self.layout=layout;self.host=Path(host).absolute();self.domain=f'gui/{os.geteuid()}'
@@ -621,7 +626,7 @@ def prepare_unified_update(layout,platform,app,authority,info,core):
     require(set(installation)==set(details)-{'old_version','old_services','old_apps'},'unsupported_unified_installation')
     if gui_owner is not None:details.update(old_gui_owner=gui_owner,old_core_job_inactive=True,old_source_sha256=old_info['ARLCoreRuntimeSourceSHA256'])
     details['readonly_preconditions']={'mio_activation':sha(activation_raw),'mio_profile':profile_pin}
-    payloads={'app':app,'authority':encode(authority),'core_agent':agent_raw,'mio_status':encode(next_status),'reminders_control':encode(next_control),'reminders_closure':encode(new_closure),'unified_marker':encode(next_marker),'maintenance':encode({'schema_version':1,'enabled':1}),'installation':encode({k:details[k] for k in installation})}
+    payloads={'app':app,'authority':encode(authority),'core_agent':plistlib.dumps(guarded_runtime_agent(agent)),'mio_status':encode(next_status),'reminders_control':encode(next_control),'reminders_closure':encode(new_closure),'unified_marker':encode(next_marker),'maintenance':encode({'schema_version':1,'enabled':1}),'installation':encode({k:details[k] for k in installation})}
     details['read_owner_transition'] = read_owner_transition
     if info.get('ARLCodexServicePolicyVersion') == 1:
         scope, previous_scope = platform.codex_scope_candidate(app)

@@ -237,6 +237,15 @@
       "reason": "Module default is standard-library synthetic source testing; native/private cases are explicitly partitioned",
       "requires": []
     },
+    "tests.test_bundled_runtime_watchdog": {
+      "kind": "unittest",
+      "profile": "native",
+      "reason": "Actual Swift process ownership, SIGKILL and automatic recovery in isolated fixtures",
+      "requires": [
+        "macos",
+        "swift"
+      ]
+    },
     "tests.test_bundled_startup_diagnostics": {
       "kind": "unittest",
       "profile": "portable",

@@ -122,7 +122,17 @@ class UnifiedUpdateTests(unittest.TestCase):
   before={p:inventory(p) for p in [*self.layout.targets.values(),self.root/'mio/profile.json'] if p is not None}
   payloads,details=prepare_payloads(self.layout,self.platform,self.package)
   self.assertEqual(set(payloads),{'app','authority','core_agent','mio_status','reminders_control','reminders_closure','unified_marker','maintenance','installation'})
-  self.assertEqual(payloads['core_agent'],self.layout.targets['core_agent'].read_bytes())
+  original_agent=plistlib.loads(self.layout.targets['core_agent'].read_bytes())
+  next_agent=plistlib.loads(payloads['core_agent'])
+  self.assertEqual(next_agent['Label'],original_agent['Label'])
+  self.assertEqual(next_agent['ProgramArguments'],original_agent['ProgramArguments'])
+  self.assertTrue(next_agent['RunAtLoad'])
+  self.assertEqual(next_agent['KeepAlive'],{'SuccessfulExit':False})
+  self.assertEqual(next_agent['ThrottleInterval'],10)
+  self.assertEqual(next_agent['ExitTimeOut'],45)
+  supervision={'RunAtLoad','KeepAlive','ThrottleInterval','ExitTimeOut'}
+  self.assertEqual({k:v for k,v in next_agent.items() if k not in supervision},
+                   {k:v for k,v in original_agent.items() if k not in supervision})
   self.assertEqual(json.loads(payloads['mio_status'])['grants'],['unchanged'])
   self.assertEqual(json.loads(payloads['reminders_control'])['grants'],['unchanged'])
   self.assertEqual(details['old_services'],{CORE:self.platform.owner,MIO:None});self.assertEqual(details['build'],'70')
