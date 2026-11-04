@@ -175,5 +175,5 @@ class ApplicationPlatform:
                 job=r.store.submit(owner,p['request_id'],r.tools[route.name],args,r.policies[owner],verified=True,
                     schedule={'priority':scenario['priority'],'deadline_ms':scenario['deadline_ms']},in_transaction=True)
                 r.store.db.execute('INSERT INTO application_task_intents VALUES(?,?,?,?,?,?,?)',(owner,p['request_id'],digest,job['id'],scenario['package_id'],scenario['id'],encode(resolved).decode()))
-            r.job_signal.set();r.control.diagnostics.emit('model_task_queued',app=owner)
+            r.job_signal.set();r.control.diagnostics.emit('model_task_queued',app=owner,context={'task_id':job['id'],'package_id':scenario['package_id'],'model':args['model'],'reasoning_effort':args['reasoning_effort']})
             return dict(job,package_id=scenario['package_id'],scenario_id=scenario['id'],resolved=resolved)

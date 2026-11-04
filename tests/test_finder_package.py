@@ -32,6 +32,7 @@ class FinderPackageTests(unittest.TestCase):
             info['NSExtension'][field] = value
             with self.assertRaises(b.BuildError): b.validate_finder_configuration(info, self.entitlements)
         for field, value in [('CFBundleIdentifier','different.identity'),
+                             ('CFBundleIconFile','Unexpected.icns'),
                              ('NSAppleEventsUsageDescription','unexpected automation')]:
             with self.assertRaises(b.BuildError):
                 b.validate_finder_configuration({**self.info, field:value}, self.entitlements)

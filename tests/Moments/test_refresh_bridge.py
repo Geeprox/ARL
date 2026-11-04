@@ -29,6 +29,14 @@ class RefreshTests(unittest.TestCase):
   identity=str(uuid.uuid4());atomic_json(self.home/'requests'/(identity+'.json'),{'id':identity,'created_at':now(),'kind':'images','asset_ids':['a:b']})
   with patch.object(self.s,'viewer'),patch.object(self.s.queue,'start') as start:self.s.tick();start.assert_not_called()
   self.assertTrue(self.s.queue._edit()['halted'])
+ def test_recovery_reply_reports_blocked_and_current_reason(self):
+  identity=str(uuid.uuid4());atomic_json(self.home/'requests'/(identity+'.json'),{'schema':1,'id':identity,'created_at':now(),'kind':'recover_images'})
+  with patch.object(self.s,'viewer'),patch.object(self.s.queue,'start') as start:self.s.tick();start.assert_not_called()
+  reply=json.loads((self.home/'responses'/(identity+'.json')).read_text())
+  self.assertTrue(reply['blocked']);self.assertEqual(reply['requeued'],0)
+  status=json.loads((self.home/'bridge-status.json').read_text())
+  self.assertEqual(status['download_block_reason'],'repeated_resource_http_errors')
+  self.assertIsNone(status['image_resume_confirmation'])
 if __name__=='__main__':unittest.main()
 
 class ResumeTests(unittest.TestCase):
@@ -93,6 +101,46 @@ class SafeRecoveryTests(unittest.TestCase):
   row=self.q._edit();self.assertFalse(row['halted']);self.assertIsNotNone(self.q._image_resume_grant())
   self.assertEqual(row['assets']['fixture']['status'],'failed')
   self.assertEqual(self.q.recover_failed(user_authorized=True)['requeued'],0)
+ def test_persistent_volume_survives_device_number_change_but_not_stop_replacement(self):
+  from async_media import _same_stop
+  old={'device':1,'inode':23,'mtime_ns':45,'bytes':0,'volume_uuid':'synthetic-volume'}
+  self.assertTrue(_same_stop(old,{**old,'device':2}))
+  self.assertFalse(_same_stop(old,{**old,'device':2,'volume_uuid':'different-volume'}))
+  self.assertFalse(_same_stop(old,{**old,'inode':24}))
+  self.assertFalse(_same_stop({k:v for k,v in old.items() if k!='volume_uuid'},{**old,'device':2}))
+ def test_reconfirmation_preserves_scope_stops_failures_and_requires_current_confirmation(self):
+  before_stop=(self.output/'.video-batch.stop').read_bytes()
+  fingerprint=self.q._stop_fingerprint()
+  grant=json.loads((self.output/'private/image-resume.json').read_text())
+  grant['stop_fingerprint']={**{k:v for k,v in fingerprint.items() if k!='volume_uuid'},'device':fingerprint['device']+1}
+  atomic_json(self.output/'private/image-resume.json',grant)
+  with patch('async_media._volume_uuid',return_value='synthetic-volume'),patch('async_media.fetch_once',side_effect=AssertionError('unexpected network')):
+   confirmation=self.q.image_resume_confirmation();self.assertIsNotNone(confirmation)
+   with self.assertRaises(ValueError):self.q.reconfirm_image_resume(confirmation['stop_fingerprint'])
+   with self.assertRaises(ValueError):self.q.reconfirm_image_resume({**confirmation['stop_fingerprint'],'inode':0},user_authorized=True)
+   self.assertEqual(self.q.reconfirm_image_resume(confirmation['stop_fingerprint'],user_authorized=True),{'reconfirmed':True})
+   current=self.q._image_resume_grant();self.assertEqual(current['scope'],grant['scope'])
+   self.assertEqual(current['stop_fingerprint']['volume_uuid'],'synthetic-volume')
+   self.assertFalse(current['account_operations_permitted']);self.assertFalse(current['failed_asset_retries_permitted'])
+   self.assertEqual(self.q._edit()['assets']['fixture']['status'],'failed')
+   self.assertIsNone(self.q.image_resume_confirmation())
+  self.assertEqual((self.output/'.video-batch.stop').read_bytes(),before_stop)
+ def test_reconfirmation_cannot_clear_a_new_stop_or_risk_halt(self):
+  fingerprint=self.q._stop_fingerprint();grant=json.loads((self.output/'private/image-resume.json').read_text())
+  grant['stop_fingerprint']={**{k:v for k,v in fingerprint.items() if k!='volume_uuid'},'device':fingerprint['device']+1}
+  atomic_json(self.output/'private/image-resume.json',grant)
+  with patch('async_media._volume_uuid',return_value='synthetic-volume'):
+   self.q._edit(lambda value:value.update(halted=True,risk_control_suspected=True))
+   self.assertIsNone(self.q.image_resume_confirmation())
+   self.q._edit(lambda value:value.update(halted=False,risk_control_suspected=False))
+   (self.output/'.video-batch.stop').touch()
+   self.assertIsNone(self.q.image_resume_confirmation())
+ def test_recovery_cannot_rebind_a_stop_changed_after_grant_check(self):
+  grant_path=self.output/'private/image-resume.json';before=grant_path.read_bytes()
+  grant=json.loads(before);changed={**self.q._stop_fingerprint(),'inode':0}
+  with patch.object(self.q,'_image_resume_grant',return_value=grant),patch.object(self.q,'_stop_fingerprint',return_value=changed):
+   self.assertTrue(self.q.recover_failed(user_authorized=True)['blocked'])
+  self.assertEqual(grant_path.read_bytes(),before)
 
 class ProjectionTests(unittest.TestCase):
  def test_offloaded_metadata_refresh_does_not_read_nas_payloads(self):

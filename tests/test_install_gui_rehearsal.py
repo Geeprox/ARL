@@ -76,6 +76,10 @@ class RehearsalPlatform(fixture.FixturePlatform):
                 self.helper_live=False;value={'terminated':True}
             else:raise AssertionError(args)
             return subprocess.CompletedProcess(args,0,json.dumps(value).encode(),b'')
+        if args[0]=='/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister':
+            assert args==[args[0],'-f',str(self.layout.targets['app'])] and self.live
+            self.events.append('registered_installed_app')
+            return subprocess.CompletedProcess(args,0,b'',b'')
         if args[0]=='/bin/launchctl':
             self.events.append('launchctl:'+action)
             if action=='print':
@@ -108,6 +112,7 @@ class GUITransactionRehearsal(unittest.TestCase):
         engine,plan=self.prepare();result=self.apply(engine,plan)
         self.assertEqual(result['phase'],'committed');self.assertEqual(result['result'],'applied')
         self.assertFalse(self.platform.helper_live);self.assertTrue(self.platform.loaded)
+        self.assertEqual(self.platform.events.count('registered_installed_app'),1)
         self.assertEqual(len(self.platform.app_state()),1);self.assertEqual(len(self.platform.live),3)
         self.assertEqual(self.platform.events.count('normal_owner_quit'),2)
         self.assertEqual(self.platform.events.count('normal_helper_quit'),1)

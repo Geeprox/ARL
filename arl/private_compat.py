@@ -18,7 +18,7 @@ def default_policies(local_enabled=False):
     mock = frozenset({"mock"})
     return {
         "settings": AppPolicy(frozenset(), frozenset(), max_tokens=0, max_pending=0, max_calls=0,
-                              methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot"}), public_metadata=True),
+                              methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot"}), public_metadata=True),
         "tisra": AppPolicy(common | {"apple.calendar.list", "apple.reminders.list"},
                            mock | ({"ollama"} if local_enabled else set())),
         "friday": AppPolicy(common, mock | ({"ollama"} if local_enabled else set())),

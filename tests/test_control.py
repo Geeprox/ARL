@@ -217,6 +217,44 @@ class DiagnosticTests(unittest.TestCase):
         next_page=self.logs.query({'level':'error','cursor':page['next_cursor']})
         self.assertEqual(len(next_page['records']),1)
 
+class RecentDiagnosticContextTests(unittest.TestCase):
+    def test_tail_is_current_retained_events_and_legacy_wire_stays_six_fields(self):
+        logs=Diagnostics({'example'},clock=lambda:100000000)
+        for i in range(140):logs.emit('runtime_ready')
+        logs.emit('model_task_failed',app='example',context={'task_id':'12345678-1234-1234-1234-123456789abc','reason':'provider_controls_unverified','model':'gpt-6.1-sol','reasoning_effort':'high','input':'private prompt','path':'/private/secret'})
+        tail=logs.recent({'limit':100})
+        self.assertEqual([r['sequence'] for r in tail['records']],list(range(42,142)))
+        self.assertTrue(tail['truncated']);self.assertEqual(tail['total'],141)
+        details=logs.details({'sequence':141,'session_id':tail['session_id']})
+        self.assertEqual(details['context']['reason'],'provider_controls_unverified')
+        self.assertNotIn('private',json.dumps(details))
+        for page in (logs.query({'limit':100}),logs.query_v3({'mode':'page','session_id':logs.boot,'limit':100}),tail):
+            self.assertTrue(all(set(r)=={'sequence','at_ms','level','event','code','app_id'} for r in page['records']))
+        self.assertNotIn('context',logs.query({},export=True)['content'])
+
+    def test_safe_context_survives_restart_and_rejects_old_session(self):
+        from script.local_build_area import build_area
+        with build_area('diagnostic-context',reproduce=['python3','-B','-m','unittest','tests.test_control.RecentDiagnosticContextTests']) as tmp:
+            path=tmp/'events.json'
+            first=Diagnostics({'example'},clock=lambda:100000000,path=path)
+            first.emit('model_task_queued',context={'package_id':'highest','duration_ms':True,'input':'secret'})
+            restored=Diagnostics({'example'},clock=lambda:100000001,path=path)
+            self.assertEqual(restored.details({'sequence':1,'session_id':restored.boot})['context'],{'package_id':'highest'})
+            with self.assertRaises(Fault):restored.details({'sequence':1,'session_id':first.boot})
+            self.assertFalse(restored.details({'sequence':2,'session_id':restored.boot})['available'])
+            restored.clock=lambda:200000000
+            self.assertFalse(restored.recent({})['records'])
+            self.assertFalse(restored.details({'sequence':1,'session_id':restored.boot})['available'])
+
+    def test_hostile_context_is_never_copied_and_tail_rejects_invalid_bounds(self):
+        from arl.diagnostics import diagnostic_context
+        for hostile in (None,False,[],{'method':[],'reason':{},'duration_ms':True,'task_id':'private text','model':'secret','package_id':{},'reasoning_effort':[]}):
+            self.assertEqual(diagnostic_context(hostile),{})
+        logs=Diagnostics(set())
+        for params in ({'limit':0},{'limit':501},{'limit':True},{'level':'secret'},{'path':'/private'}):
+            with self.assertRaises(Fault):logs.recent(params)
+
+
 class ResourceTests(unittest.TestCase):
     def test_interval_cpu_cache_shared_attribution_and_pid_reuse(self):
         clock=FixedClock(); birth=[1]; cpu=[0]; calls=[0]

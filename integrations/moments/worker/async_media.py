@@ -17,9 +17,45 @@ import threading
 import time
 import urllib.error
 import urllib.request
+import sys
+import uuid
 
 from media_backup import MAX_BYTES, existing_valid, image_format, locator_url
 from moments_backup import atomic_json, encoded, load_json, now
+
+
+def _volume_uuid(path):
+    """Darwin's persistent volume UUID, without invoking a tool or reading files.
+
+    sys/attr.h: ATTR_VOL_UUID | ATTR_VOL_INFO; the reply is length + uuid_t.
+    Device numbers are mount-local and are not a durable authorization identity.
+    Other platforms retain the existing exact-device comparison.
+    """
+    if sys.platform != 'darwin':return None
+    import ctypes
+    class Attributes(ctypes.Structure):
+        _fields_=[('count',ctypes.c_uint16),('reserved',ctypes.c_uint16),
+                  ('common',ctypes.c_uint32),('volume',ctypes.c_uint32),
+                  ('directory',ctypes.c_uint32),('file',ctypes.c_uint32),('fork',ctypes.c_uint32)]
+    attrs=Attributes(5,0,0,0x80040000,0,0,0)
+    reply=ctypes.create_string_buffer(20)
+    libc=ctypes.CDLL(None,use_errno=True)
+    function=libc.getattrlist
+    function.argtypes=[ctypes.c_char_p,ctypes.POINTER(Attributes),ctypes.c_void_p,ctypes.c_size_t,ctypes.c_ulong]
+    function.restype=ctypes.c_int
+    if function(os.fsencode(path),ctypes.byref(attrs),reply,len(reply),0)!=0:return None
+    if int.from_bytes(reply.raw[:4],sys.byteorder)!=20:return None
+    value=uuid.UUID(bytes=reply.raw[4:20])
+    return str(value) if value.int else None
+
+
+def _same_stop(expected,current):
+    if not isinstance(expected,dict) or not isinstance(current,dict):return False
+    keys=('inode','mtime_ns','bytes')
+    if any(expected.get(k)!=current.get(k) for k in keys):return False
+    if expected.get('volume_uuid'):
+        return expected['volume_uuid']==current.get('volume_uuid')
+    return expected.get('device')==current.get('device')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -194,17 +230,53 @@ class Queue:
         if path.is_symlink():return None
         try:
             stat=path.stat()
-            return {'device':stat.st_dev,'inode':stat.st_ino,'mtime_ns':stat.st_mtime_ns,'bytes':stat.st_size}
+            value={'device':stat.st_dev,'inode':stat.st_ino,'mtime_ns':stat.st_mtime_ns,'bytes':stat.st_size}
+            volume=_volume_uuid(path)
+            if volume:value['volume_uuid']=volume
+            return value
         except FileNotFoundError:return None
 
     def _image_resume_grant(self):
         grant=load_json(self.output / 'private/image-resume.json', {})
         risk=load_json(self.output.parent / 'risk-stop.json', {})
         if (grant.get('scope') in (['ordinary_images'],['ordinary_images','comment_emoji']) and risk.get('image_downloads_permitted') is True
-                and grant.get('stop_fingerprint')==self._stop_fingerprint()
+                and _same_stop(grant.get('stop_fingerprint'),self._stop_fingerprint())
                 and grant.get('stop_fingerprint') is not None):
             return grant
         return None
+
+    def image_resume_confirmation(self):
+        """Read-only eligibility for renewing a previously approved image scope."""
+        grant=load_json(self.output/'private/image-resume.json',{})
+        old=grant.get('stop_fingerprint',{});current=self._stop_fingerprint()
+        risk=load_json(self.output.parent/'risk-stop.json',{});queue=self._edit()
+        if (not current or not current.get('volume_uuid') or not isinstance(old,dict)
+            or old.get('volume_uuid') or old.get('device')==current['device']
+            or any(old.get(k)!=current[k] for k in ('inode','mtime_ns','bytes'))
+            or grant.get('scope') not in (['ordinary_images'],['ordinary_images','comment_emoji'])
+            or grant.get('account_operations_permitted') is not False
+            or grant.get('failed_asset_retries_permitted') is not False
+            or risk.get('image_downloads_permitted') is not True
+            or queue.get('halted') or queue.get('risk_control_suspected')
+            or (self.output/'.local-service.stop').exists()
+            or load_json(self.output/'video-batch.json',{}).get('halted')):
+            return None
+        return {'stop_fingerprint':current,'scope':grant['scope']}
+
+    def reconfirm_image_resume(self,expected_stop,*,user_authorized=False):
+        """Explicit UI confirmation only. No new scope, stop removal or 4xx retry."""
+        if user_authorized is not True:raise ValueError('explicit_image_resume_confirmation_required')
+        with (self.output/'.media.lock').open('a') as lease:
+            fcntl.flock(lease,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            confirmation=self.image_resume_confirmation()
+            if not confirmation or expected_stop!=confirmation['stop_fingerprint']:
+                raise ValueError('image_resume_confirmation_changed')
+            grant=load_json(self.output/'private/image-resume.json',{})
+            grant.update(stop_fingerprint=confirmation['stop_fingerprint'],reconfirmed_at=now())
+            atomic_json(self.output/'private/image-resume.json',grant)
+            self._edit(lambda value:value.update(next_request_at=max(value.get('next_request_at',0),time.time()+30)))
+        self._wake.set()
+        return {'reconfirmed':True}
 
     def authorize_comment_images(self, *, user_authorized=False):
         if user_authorized is not True:raise ValueError('explicit_comment_image_authorization_required')
@@ -304,7 +376,13 @@ class Queue:
             data=self._edit()
             if data.get('halted') or data.get('risk_control_suspected'):
                 return {**result,'blocked':True}
+            current_stop=self._stop_fingerprint()
+            if not _same_stop(grant.get('stop_fingerprint'),current_stop):
+                return {**result,'blocked':True}
             grant['safe_recovery']={'max_retries':3,'backoff_seconds':[60,300,1800]}
+            # Exact legacy device evidence is still current: pin its persistent
+            # volume now, before a future restart changes the device number.
+            grant['stop_fingerprint']=current_stop
             grant.setdefault('safe_recovery_authorized_at',now())
             atomic_json(self.output/'private/image-resume.json',grant)
             locators=load_json(self.output/'private/locators.json',{}).get('assets',{})

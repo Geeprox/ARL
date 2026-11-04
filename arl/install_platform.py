@@ -343,7 +343,12 @@ class MacPlatform:
         require(value['previous_sha256'] == current, 'codex_scope_preimage_changed')
         return raw, current
     def start_maintenance(self,plan):self.bootstrap()
-    def start_final(self,plan):self.bootstrap()
+    def start_final(self,plan):
+        self.bootstrap()
+        # The service starts directly under launchd, so LaunchServices never
+        # sees an ordinary app-open event. Explicitly refresh this exact app's
+        # embedded extension registration after a committed replacement.
+        self.command(['/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister','-f',self.layout.targets['app']])
     def quiesce_new(self,plan):
         if inventory(self.layout.targets['app'],legacy_nas=plan['details'].get('legacy_nas_preimage')) != plan['changes']['app']['after']:return
         current,inactive=self.core_entry()

@@ -43,6 +43,7 @@ import Darwin
     private var children: [String: Process] = [:]
     private(set) var failure: String?
     private(set) var activated = false
+    var watchdogRunning: Bool { watchdog != nil && wantsRunning && !exitRequested }
     static func start(home: URL, enabled: Bool) -> BundledRuntimeOwner? {
         guard enabled else { return nil }
         let owner = BundledRuntimeOwner()

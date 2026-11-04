@@ -21,6 +21,27 @@ CODES = ('identity_unverified', 'method_not_authorized', 'unknown_app', 'unknown
          'provider_unavailable', 'probe_failed')
 LEVELS = ('info', 'warning', 'error')
 MAX_AGE_MS = 86400000
+DETAIL_REASONS = frozenset((*CODES,'provider_controls_unverified','provider_deadline_exceeded','provider_timeout',
+    'provider_preflight_failed','model_unavailable','unsupported_model','unsupported_reasoning_effort',
+    'call_budget_exceeded','deadline_exceeded','cancelled','scope_expired','idempotency_conflict',
+    'task_execution_disabled','app_connection_required','app_session_expired','input_too_large','result_too_large'))
+DETAIL_METHODS = frozenset(('connection.open','connection.confirm','connection.heartbeat','connection.close',
+    'model.task.submit.v1','model.task.get.v1','model.task.cancel.v1','health','ready','runtime.describe',
+    'settings.snapshot','settings.logs','settings.logs.v3','settings.log_details.v1','settings.scheduler.v1'))
+
+def diagnostic_context(value):
+    """Finite task metadata only; never input, output, paths or provider messages."""
+    if type(value) is not dict:return {}
+    result={}
+    for key,item in value.items():
+        if key=='task_id' and type(item) is str and re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',item):result[key]=item
+        elif key=='package_id' and item in ('low','medium','high','very_high','highest'):result[key]=item
+        elif key=='model' and type(item) is str and re.fullmatch(r'(?:gpt|o[1-9])[a-z0-9._-]{0,60}',item):result[key]=item
+        elif key=='reasoning_effort' and item in ('none','minimal','low','medium','high','xhigh','max','ultra'):result[key]=item
+        elif key=='method' and type(item) is str and item in DETAIL_METHODS:result[key]=item
+        elif key=='reason' and type(item) is str and item in DETAIL_REASONS:result[key]=item
+        elif key=='duration_ms' and type(item) is int and 0<=item<=3600000:result[key]=item
+    return result
 
 def log_schema(export=False):
     return object_schema({'cursor': {**string(64), 'pattern': r'[a-f0-9]{32}:[0-9]{1,20}'},
@@ -70,12 +91,13 @@ class Diagnostics:
             raise Fault('unsafe_diagnostic_log')
         previous = 0
         for row in data['records']:
-            if (type(row) is not dict or set(row) != {'sequence','at_ms','level','event','code','app_id'} or
+            if (type(row) is not dict or set(row) not in ({'sequence','at_ms','level','event','code','app_id'},{'sequence','at_ms','level','event','code','app_id','context'}) or
                     type(row['sequence']) is not int or row['sequence'] <= previous or
                     type(row['at_ms']) is not int or row['at_ms'] < 0 or row['event'] not in EVENTS or
                     row['level'] not in LEVELS or row['code'] not in (*CODES,None) or
                     (row['app_id'] is not None and (type(row['app_id']) is not str or re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',row['app_id']) is None))):
                 raise Fault('unsafe_diagnostic_log')
+            if 'context' in row and (type(row['context']) is not dict or diagnostic_context(row['context'])!=row['context']):raise Fault('unsafe_diagnostic_log')
             previous = row['sequence']
             # Historical identities are labels, never restored registrations or grants.
             if self.clock()-MAX_AGE_MS <= row['at_ms'] <= self.clock()+60000:
@@ -114,7 +136,7 @@ class Diagnostics:
         finally:
             if os.path.exists(name): os.unlink(name)
 
-    def emit(self, event, *, code=None, app=None, level='info'):
+    def emit(self, event, *, code=None, app=None, level='info', context=None):
         # Reject/omit hostile strings rather than attempting regex redaction.
         if event not in EVENTS or level not in LEVELS:
             return
@@ -123,6 +145,8 @@ class Diagnostics:
             self.records.append({'sequence':self.sequence, 'at_ms':self.clock(),
                 'level':level, 'event':event, 'code':code if code in CODES else None,
                 'app_id':app if type(app) is str and app in self.app_ids else None})
+            safe=diagnostic_context(context)
+            if safe:self.records[-1]['context']=safe
             try:self._persist();self.persistence_error=False
             except OSError:self.persistence_error=True
 
@@ -158,12 +182,14 @@ class Diagnostics:
                 matches = (since <= row['at_ms'] <= until and
                     all(row[key] == params[key] for key in ('level','event') if key in params))
                 if matches:
-                    line = json.dumps(row, sort_keys=True, separators=(',',':'))+'\n'
+                    # Preserve the exact six-field legacy log wire contract.
+                    public={key:value for key,value in row.items() if key!='context'}
+                    line = json.dumps(public, sort_keys=True, separators=(',',':'))+'\n'
                     length = len(line.encode('utf-8'))
                     if len(selected) >= limit or (export and size+length > 65536):
                         more = True
                         break
-                    selected.append(dict(row)); lines.append(line); size += length
+                    selected.append(public); lines.append(line); size += length
                 scanned = row['sequence']
             response = {'schema_version':2, 'redaction_version':1,
                 'next_cursor':self.boot+':'+str(scanned), 'more':more, 'truncated':truncated}
@@ -173,6 +199,23 @@ class Diagnostics:
             else:
                 response['records'] = selected
             return response
+
+    def details(self,params):
+        validate(params,object_schema({'sequence':{'type':'integer','minimum':1,'maximum':1000000000000000},'session_id':{**string(32),'pattern':r'[a-f0-9]{32}'}},['sequence','session_id']))
+        with self.lock:
+            if params['session_id']!=self.boot:raise Fault('log_session_changed')
+            row=next((r for r in self.records if r['sequence']==params['sequence'] and r['at_ms']>=self.clock()-MAX_AGE_MS),None)
+            return {'schema_version':1,'session_id':self.boot,'sequence':params['sequence'],'available':row is not None,
+                    'context':dict(row.get('context',{})) if row else {}}
+
+    def recent(self,params):
+        validate(params,object_schema({'limit':{'type':'integer','minimum':1,'maximum':500},'level':{'type':'string','enum':list(LEVELS)}}))
+        with self.lock:
+            rows=[r for r in self.records if self.clock()-MAX_AGE_MS<=r['at_ms']<=self.clock() and
+                  ('level' not in params or r['level']==params['level'])]
+            limit=params.get('limit',500)
+            return {'schema_version':1,'session_id':self.boot,'limit':limit,'total':len(rows),'truncated':len(rows)>limit,
+                    'records':[{k:v for k,v in row.items() if k!='context'} for row in rows[-limit:]]}
 
     def query_v3(self, params):
         """Atomic read of this diagnostic lifetime, never an authority token.

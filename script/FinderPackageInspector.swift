@@ -32,12 +32,19 @@ import CryptoKit
                   flags.uint32Value & SecCodeSignatureFlags.runtime.rawValue != 0,
                   let bundle = Bundle(url: url), bundle.bundleIdentifier == identifier,
                   bundle.object(forInfoDictionaryKey: "CFBundlePackageType") as? String == "XPC!",
+                  bundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String == "ARL.icns",
+                  let icon = bundle.url(forResource: "ARL", withExtension: "icns"),
                   let specification = bundle.object(forInfoDictionaryKey: "NSExtension") as? [String: Any],
                   specification["NSExtensionPointIdentifier"] as? String == "com.apple.FinderSync",
                   specification["NSExtensionPrincipalClass"] as? String == "ARLFinderActions",
                   let executable = bundle.executableURL else { throw Failure.invalid }
+            let iconData = try Data(contentsOf: icon)
+            let app = url.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            guard !iconData.isEmpty,
+                  iconData == (try Data(contentsOf: app.appendingPathComponent("Contents/Resources/ARL.icns"))) else { throw Failure.invalid }
             let result: [String: Any] = ["status": "PASS", "identifier": identifier,
                 "entitlements": entitlements, "hardenedRuntime": true,
+                "appIconSHA256": SHA256.hash(data: iconData).map { String(format: "%02x", $0) }.joined(),
                 "executableSHA256": SHA256.hash(data: try Data(contentsOf: executable)).map { String(format: "%02x", $0) }.joined(),
                 "system_enable_performed": false]
             FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]))

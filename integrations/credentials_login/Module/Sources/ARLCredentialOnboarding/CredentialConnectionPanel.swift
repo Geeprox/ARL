@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 /// The SDK is the sole source of credential and connection state.
 @MainActor
@@ -45,75 +46,70 @@ public struct CredentialConnectionPanel: View {
     }
 
     public var body: some View {
-        GroupBox(purpose.title) {
-            VStack(alignment: .leading, spacing: 12) {
-                if loaded { Text(snapshot.state.title).font(.headline) }
-                else { ProgressView("读取中").controlSize(.small) }
-                if let result = snapshot.lastTest {
-                    Text("上次检查：\(result.checkedAt.formatted(date: .abbreviated, time: .shortened)) · \(result.state.title)")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if let message { Text(message).font(.caption).foregroundStyle(.secondary) }
-                if let loginMessage = musicLogin.phase.message {
-                    Text(loginMessage).font(.callout)
-                }
-                if snapshot.reference == nil { credentialActions }
-
-                if snapshot.reference != nil {
-                    connectionActions
-                }
-                if let activity {
-                    HStack {
-                        ProgressView(cancelling ? "正在取消"
-                                     : activity == .musicLogin && musicLogin.phase == .waitingForScan
-                                        ? "等待网易云音乐App扫码确认" : activity.title)
-                            .controlSize(.small)
-                        if activity.canCancel {
-                            Button("取消操作", action: cancelActivity).disabled(cancelling)
+        GroupBox {
+            VStack(alignment:.leading,spacing:14) {
+                if let message {Text(message).font(.caption).foregroundStyle(.secondary)}
+                HStack(alignment:.top,spacing:16) {
+                    VStack(alignment:.leading,spacing:6) {
+                        Text(summary).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                        if let result=snapshot.lastTest {
+                            Text("最近验证 \(result.checkedAt.formatted(date:.abbreviated,time:.shortened))").font(.caption).foregroundStyle(.secondary)
                         }
                     }
-                    if activity == .musicLogin, !cancelling {
-                        Text("关闭面板会取消等待，过期后刷新。")
-                            .font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    if snapshot.reference == nil {credentialActions}
+                    else if purpose == .neteaseMusic && [.loginRequired,.loginExpired,.invalidOrExpired].contains(snapshot.state) {
+                        Button("扫码登录") {start(.musicLogin)}.disabled(activity != nil)
+                    } else {managementActions}
+                }
+                if let loginMessage=musicLogin.phase.message {Text(loginMessage).font(.callout)}
+                if let activity {
+                    HStack(spacing:10) {
+                        ProgressView().controlSize(.small)
+                        Text(cancelling ? "正在取消…":activity == .musicLogin && musicLogin.phase == .waitingForScan ? "请在网易云音乐 App 中确认登录":activity.title).font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        if activity.canCancel {Button("取消",action:cancelActivity).disabled(cancelling)}
                     }
                 }
-                if let image = musicLogin.image, activity == .musicLogin, !cancelling {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("请用网易云音乐App扫描登录码").font(.headline)
-                        Image(decorative: image, scale: 1)
-                            .interpolation(.none)
-                            .resizable()
-                            .frame(width: CGFloat(image.width * max(1, 280 / image.width)),
-                                   height: CGFloat(image.height * max(1, 280 / image.height)))
-                            .accessibilityLabel("本次网易云登录二维码")
-                            .accessibilityHint(("使用手机上的网易云音乐 App 扫码，并在手机上确认登录"))
-                        Text("只在本人手机扫码，勿转发。")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+                if let image=musicLogin.image,activity == .musicLogin,!cancelling {
+                    HStack(spacing:20) {
+                        Image(decorative:image,scale:1).interpolation(.none).resizable().frame(width:220,height:220)
+                            .accessibilityLabel("网易云音乐登录二维码")
+                        VStack(alignment:.leading,spacing:8) {
+                            Text("扫码连接网易云音乐").font(.headline)
+                            Text("使用手机上的网易云音乐 App 扫描，并在手机确认。").font(.callout).foregroundStyle(.secondary)
+                            Text("关闭此页面会取消本次登录。").font(.caption).foregroundStyle(.secondary)
+                        }.frame(maxWidth:200,alignment:.leading)
+                    }.padding(.vertical,8)
                 }
-                if snapshot.reference != nil { managementActions }
-                DisclosureGroup("服务详情") {
-                    Text(snapshot.explanation)
-                    Text(operationExplanation)
-                    HStack {
-                        Link("设置说明", destination: purpose.setupURL)
-                        Link("官方后台", destination: purpose.consoleURL)
-                    }
+                if snapshot.reference == nil {
+                    HStack(spacing:16) {Link("获取服务密钥",destination:purpose.consoleURL);Link("配置说明",destination:purpose.setupURL)}.font(.caption)
                     if purpose != .neteaseMusic {
-                        LegacyTravelMigrationPanel(purpose: purpose, onboarding: onboarding) { result in
-                            presentationGeneration = UUID()
-                            snapshot = result.snapshot; loaded = true; message = result.message
+                        LegacyTravelMigrationPanel(purpose:purpose,onboarding:onboarding) {result in
+                            presentationGeneration=UUID();snapshot=result.snapshot;loaded=true;message=result.message
                         }.disabled(!loaded || activity != nil || showingEntry)
                     }
-                }.font(.caption).foregroundStyle(.secondary)
-            }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+                }
+            }.frame(maxWidth:.infinity,alignment:.leading).padding(.top,4)
+        } label: {
+            HStack(spacing:12) {
+                Image(systemName:serviceSymbol).font(.system(size:21,weight:.regular)).frame(width:30,height:30).foregroundStyle(.secondary)
+                Text(purpose.title).font(.headline)
+                Spacer()
+                HStack(spacing:6) {
+                    Circle().fill(statusColor).frame(width:7,height:7)
+                    Text(loaded ? statusTitle:"读取中").font(.caption).foregroundStyle(.secondary)
+                }.accessibilityElement(children:.combine)
+            }
         }
         .task {
-            guard activity == nil else { return }
-            let current = await onboarding.snapshot(purpose: purpose)
-            guard !Task.isCancelled, activity == nil else { return }
-            snapshot = current
-            loaded = true
+            while !Task.isCancelled {
+                if activity == nil {await refreshLocalSnapshot()}
+                do {try await Task.sleep(for:.seconds(5))}catch{return}
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for:NSApplication.didBecomeActiveNotification)) {_ in
+            Task {if activity == nil {await refreshLocalSnapshot()}}
         }
         .sheet(isPresented: $showingEntry, onDismiss: entryDismissed) {
             CredentialEntrySheet(purpose: purpose, onboarding: onboarding, replacing: snapshot.reference) { result in
@@ -154,23 +150,48 @@ public struct CredentialConnectionPanel: View {
         }
     }
 
-    private var connectionActions: some View {
-        HStack {
-            if purpose == .neteaseMusic {
-                Button(musicLogin.phase.loginButtonTitle) { start(.musicLogin) }.help(musicLogin.phase.loginButtonExplanation).disabled(activity != nil)
-            } else {
-                Button("测试连接") { start(.test) }.disabled(activity != nil)
-            }
+    private var managementActions:some View {
+        Menu("管理登录") {
+            if purpose == .neteaseMusic {Button("重新扫码登录…") {start(.musicLogin)}}
+            Button("更新服务密钥…") {message=nil;musicLogin.invalidate();showingEntry=true}
+            if purpose != .neteaseMusic {Button("验证密钥（使用服务额度）") {start(.test)}}
+            Button("移除登录",role:.destructive) {confirmingRemoval=true}
+        }.disabled(!loaded || activity != nil || showingEntry).fixedSize()
+    }
+    private var serviceSymbol:String {
+        switch purpose {case .amapMapsWeather:"map";case .fliggyTravelReadOnly:"airplane";case .neteaseMusic:"music.note";case .nasSMB:"externaldrive"}
+    }
+    private var statusTitle:String {
+        switch snapshot.state {
+        case .verified:"可用"
+        case .revalidationRequired,.savedUnverified,.credentialUnconfirmed:"已配置"
+        case .sessionPresentUnverified:"登录已保存"
+        default:snapshot.state.title
         }
     }
-
-    private var managementActions: some View {
-        Menu("登录管理") {
-            Button("更新密钥") { message = nil; musicLogin.invalidate(); showingEntry = true }
-            if purpose == .neteaseMusic { Button("检查登录") { start(.musicStatus) } }
-            Button("刷新状态") { start(.refresh) }
-            Button("移除登录", role: .destructive) { confirmingRemoval = true }
-        }.disabled(!loaded || activity != nil || showingEntry)
+    private var statusColor:Color {
+        if activity != nil {return .accentColor}
+        switch snapshot.state {
+        case .verified:return .green
+        case .notConfigured,.savedUnverified,.revalidationRequired,.credentialUnconfirmed,.sessionPresentUnverified:return .secondary
+        default:return .orange
+        }
+    }
+    private var summary:String {
+        if snapshot.reference == nil {return purpose == .neteaseMusic ? "配置应用密钥后，扫码连接你的网易云音乐账号。":"连接后，支持 ARL 的应用即可使用此服务。"}
+        switch snapshot.state {
+        case .verified:return purpose == .neteaseMusic ? "登录有效，歌单服务可用。":"服务密钥已通过验证。"
+        case .loginRequired,.loginExpired,.invalidOrExpired:return purpose == .neteaseMusic ? "登录已失效，请重新扫码。":"服务密钥失效，请更新密钥。"
+        case .revalidationRequired,.savedUnverified,.credentialUnconfirmed:return purpose == .neteaseMusic ? "登录信息已保存；下次使用时会重新核验。":"密钥已保存；使用时核验，后台不发送计费查询。"
+        case .sessionPresentUnverified:return "登录信息已保存，最近尚无成功的服务调用。"
+        default:return snapshot.state.title+"。状态会自动更新。"
+        }
+    }
+    private func refreshLocalSnapshot() async {
+        let current=await onboarding.snapshot(purpose:purpose)
+        guard !Task.isCancelled,activity == nil else{return}
+        if current.reference != snapshot.reference {musicLogin.invalidate()}
+        snapshot=current;loaded=true
     }
 
     private var operationExplanation: String {

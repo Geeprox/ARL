@@ -191,6 +191,7 @@
       "macOS/ARLControl/Views/MessagesDirectView.swift",
       "macOS/ARLControl/NASSettings/NASServerSetup.swift",
       "macOS/ARLControl/Services/BundledRuntimeOwner.swift",
+      "macOS/ARLControl/Services/ManagedLaunch.swift",
       "macOS/ARLControl/Services/InstallManagement.swift",
       "integrations/credential_read_owner/NASCapability.swift",
       "integrations/nas/native/NASDownloadWidget.swift",

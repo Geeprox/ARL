@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1185,
+  "source_files": 1188,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -10,16 +10,16 @@
   "reviewed_pattern_matches": [
     {
       "path": ".github/workflows/source-checks.yml",
-      "sha256": "c735968d9413307105a47a144399fa200d147680ee655f2ae2d90f9fc6c18712",
+      "sha256": "12b5baa32e738c18da522370b04baa5e3cb35af15cd11cd68222bb40ac9c91aa",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Intentional source-only integration test module names, including the new native listener recovery check."
       }
     },
     {
       "path": "OPEN-SOURCE-REVIEW.md",
-      "sha256": "f80a8e3042ffe47e5c7540c8415978f07ec1c03f413a5cd913b19583fc036075",
+      "sha256": "3d266536a8d998663dcee4475c4513dfaa7d2572f55450fe928ebb40b9e8427c",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Intentional public integration/module names and source review scope; no personal operational state."
       }
     },
     {
@@ -101,9 +101,9 @@
     },
     {
       "path": "arl/compat_host.py",
-      "sha256": "91c34b5a2b93326ac03140c80f1fbf73a46ed94d264484fdd7417d8f3b10367a",
+      "sha256": "b13716146c8063fec67206b947759ef859099c94fe417362dcd61af63fcb73a3",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Intentional protocol, integration or synthetic fixture names; no operational state."
       }
     },
     {
@@ -171,9 +171,9 @@
     },
     {
       "path": "arl/private_compat.py",
-      "sha256": "83010305ed3a010afbe2327ecace7f85e093fa755903694f89c14342257d4b88",
+      "sha256": "959bc912786d8f8178baa61ea31ec2d6c3027ea04b9f83fde0e0844e9f4c944f",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Intentional protocol, integration or synthetic fixture names; no operational state."
       }
     },
     {
@@ -866,9 +866,9 @@
     },
     {
       "path": "macOS/ARLControl/Moments/MomentsController.swift",
-      "sha256": "dde70549e2a3b08113f2481a2f721d3910cb6026b19648b2bef9b8bf3e8164fb",
+      "sha256": "7124d63d7aef5659c2960e7292e0d674fd7746241d4dc3cbd2f10ee1768cd1f9",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Friday is the documented archive subdirectory format; no account, host or archive content."
       }
     },
     {
@@ -893,10 +893,10 @@
       }
     },
     {
-      "path": "macOS/ARLControl/Moments/MomentsView.swift",
-      "sha256": "026860cd2e3205017defd198c8ddc480c2220bb3c08443265259eb8620fc863f",
+      "path": "macOS/ARLControl/NASSettings/NASServerSetup.swift",
+      "sha256": "66db11903dd4101fcf7bcaba61c10a384bad1fced324912bd38e5b75fe513195",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "local_hostname": "nas.local is a generic user-input placeholder, not a deployment hostname."
       }
     },
     {
@@ -1098,9 +1098,9 @@
     },
     {
       "path": "tests/NASServerPipeTests.swift",
-      "sha256": "751eeb43b5ba578849f97d9de651ce9af61273fcaadc3d0a4a53eeb7849bef8f",
+      "sha256": "e45996125cb9d9a84bad4270f17fff4f9fe6a6b96486bd06220c9391700a8d58",
       "categories": {
-        "secret_assignment_review": "Deterministic in-memory credential/provider test fixture."
+        "secret_assignment_review": "The literal fixture-only password belongs to an in-memory synthetic SMB test."
       }
     },
     {
@@ -1363,9 +1363,9 @@
     },
     {
       "path": "tests/test_control.py",
-      "sha256": "dc89378ebcd85eba507e28bdf6ede9a8cfbfa185ccd49d9e2501a82f826caa71",
+      "sha256": "13076b1e0f436ce51852b4340f5d1c040b81ec9d4de3acce24a6ef21dbdc09d6",
       "categories": {
-        "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
+        "private_app_reference": "Intentional protocol, integration or synthetic fixture names; no operational state."
       }
     },
     {

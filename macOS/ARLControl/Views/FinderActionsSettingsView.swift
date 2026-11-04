@@ -7,30 +7,32 @@ struct FinderActionsSettingsView: View {
     @State private var extensionEnabled = false
     private var installed: Bool {
         !preview && Bundle.main.builtInPlugInsURL.map {
-            FileManager.default.fileExists(atPath: $0.appendingPathComponent("ARLFinderActions.appex/Contents/Info.plist").path)
+            FileManager.default.fileExists(atPath:$0.appendingPathComponent("ARLFinderActions.appex/Contents/Info.plist").path)
         } == true
     }
     var body: some View {
-        DetailCard(title: "访达动作") {
-            Text("右键拷贝路径，或在终端打开目录。").font(.callout).foregroundStyle(.secondary)
-            HStack {
-                StatusBadge(title: installed ? (extensionEnabled ? "已启用" : "待启用") : "待安装")
-                Button("系统启用") { FIFinderSyncController.showExtensionManagementInterface() }.disabled(!installed)
-                Button("刷新状态") { refresh() }.disabled(!installed)
+        DetailCard(title:"") {
+            HStack(spacing:12) {
+                Image(systemName:"folder.badge.gearshape").font(.system(size:22)).foregroundStyle(.secondary).frame(width:32)
+                Text("访达右键菜单").font(.headline);Spacer()
+                ConnectionIndicator(ready:extensionEnabled,title:"访达扩展",inactive:!extensionEnabled,text:installed ? (extensionEnabled ? "扩展已启用":"待启用"):"未安装")
             }
-            Text("只在用户目录和挂载卷提供动作。").font(.caption).foregroundStyle(.secondary)
-            DisclosureGroup("使用详情") {
-                Text("在系统扩展设置中勾选访达动作。")
-                Text("多选路径会完整复制并换行。")
-                Text("终端打开仅支持单个目录。")
-                Text("网络硬盘使用已挂载的本机路径。")
-                Text("未挂载硬盘请先在访达中连接。")
-                Text("系统目录或其他位置可能不支持。")
-                Text("菜单不可见时，请重新打开窗口。")
-            }.font(.caption).foregroundStyle(.secondary)
-        }
-        .onAppear { refresh() }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in refresh() }
+            Text("在访达中右键文件或文件夹，选择「访达动作」。").font(.callout).foregroundStyle(.secondary)
+            HStack(alignment:.top,spacing:24) {
+                action("拷贝路径",symbol:"doc.on.doc",detail:"完整路径，多选时逐行拷贝")
+                action("在终端打开",symbol:"terminal",detail:"在所选文件夹中打开终端")
+            }
+            if installed && !extensionEnabled {
+                Button("启用访达扩展…") {FIFinderSyncController.showExtensionManagementInterface()}
+            }
+        }.onAppear{refresh()}
+            .onReceive(NotificationCenter.default.publisher(for:NSApplication.didBecomeActiveNotification)){_ in refresh()}
     }
-    private func refresh() { extensionEnabled = installed && FIFinderSyncController.isExtensionEnabled }
+    private func action(_ title:String,symbol:String,detail:String)->some View {
+        HStack(alignment:.top,spacing:10) {
+            Image(systemName:symbol).font(.system(size:16)).frame(width:20).padding(.top,1)
+            VStack(alignment:.leading,spacing:5) {Text(title).font(.callout.weight(.medium));Text(detail).font(.caption).foregroundStyle(.secondary)}
+        }.frame(maxWidth:.infinity,alignment:.leading)
+    }
+    private func refresh() {extensionEnabled = installed && FIFinderSyncController.isExtensionEnabled}
 }

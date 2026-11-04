@@ -2,6 +2,16 @@
 
 This review covers the current source and the separately prepared public source snapshot. It does not certify an installed app, provider account, physical device, cloud synchronization, or a distributable signed release.
 
+## 2026-11-05 control interface and recovery update
+
+The control interface groups services by Apple ecosystem, NAS and other services, uses consistent status and action controls, and removes empty or completed diagnostic cards. Background checks preserve the layout. Registered applications come from live handshake sessions; there is no list of presumed consumer applications.
+
+Recent logs retain bounded, allowlisted task metadata without prompts, outputs, paths or credentials. Finder actions re-read the current selection inside the action callback and use the same approved ARL icon as the application. Normal foreground launch hands off to the existing managed LaunchAgent before starting service owners.
+
+Login listener recovery requires an exclusive lifetime lock, an explicitly refused connection, and an unchanged private socket identity. It preserves live listeners and foreign files. Restarting a connection never replays business requests. Image-only authorization uses the persistent volume UUID rather than a mount-local device number. Renewing an already stale legacy device binding requires an explicit local confirmation and preserves the existing scope, stop records, retry bounds and failed-resource history.
+
+The current portable profile passes 881 tests. Native fixtures also verify real killed-listener recovery and preservation of live endpoints. These are source and synthetic-runtime checks; installed-interface, provider and archive outcomes remain separate acceptance layers. The NAS backup encryption requirement remains enforced. No local credentials, archives, operational receipts, binaries or private Git ancestry are included in this source update.
+
 ## 2026-10-30 source update
 
 Calendar, Notes and Reminders business requests now execute after their existing identity, permission, target, revision and durable-operation checks without an additional per-operation confirmation dialog. The legacy reminder-create route follows the same policy. Messages sending and initial connection/setup retain their separate controls. No caller can supply an approval flag to expand authority.

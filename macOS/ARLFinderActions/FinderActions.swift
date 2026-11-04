@@ -1,9 +1,11 @@
 import AppKit
 import FinderSync
 import Darwin
+import OSLog
 
 @objc(ARLFinderActions)
 final class FinderActions: FIFinderSync {
+    private let logger = Logger(subsystem:"local.arl.control.finderactions",category:"menu")
     private let roots: Set<URL>
 
     override init() {
@@ -22,29 +24,36 @@ final class FinderActions: FIFinderSync {
         } else { roots = [] }
         super.init()
         FIFinderSyncController.default().directoryURLs = roots
+        logger.notice("extension_started roots=\(self.roots.count,privacy:.public)")
     }
 
     override func menu(for menuKind: FIMenuKind) -> NSMenu? {
         // Finder's menu and target/action APIs are synchronous. Keep every menu
         // object on this callback thread; only the NSAlert edge below uses an actor.
-        guard Thread.isMainThread else { return nil }
+        logger.notice("menu_requested kind=\(menuKind.rawValue,privacy:.public) main=\(Thread.isMainThread,privacy:.public)")
         let context: FinderActionSelection.Context
         switch menuKind {
         case .contextualMenuForItems: context = .items
         case .contextualMenuForContainer: context = .container
         default: return nil
         }
-        guard let selection = currentSelection(context) else { return nil }
+        guard let selection = currentSelection(context) else { logger.notice("selection_unavailable"); return nil }
         let menu = NSMenu()
         menu.autoenablesItems = false
         let parent = NSMenuItem(title: "访达动作", action: nil, keyEquivalent: "")
+        if let resource = Bundle.main.url(forResource: "ARL", withExtension: "icns"),
+           let icon = NSImage(contentsOf: resource) {
+            icon.size = NSSize(width: 16, height: 16)
+            icon.isTemplate = false
+            parent.image = icon
+        }
         let actions = NSMenu(title: "访达动作")
         actions.autoenablesItems = false
-        let copy = NSMenuItem(title: "拷贝路径", action: #selector(copyPaths(_:)), keyEquivalent: "")
-        copy.target = self; copy.representedObject = selection
+        let copy = NSMenuItem(title: "拷贝路径", action: context == .items ? #selector(copySelectedPaths(_:)) : #selector(copyContainerPath(_:)), keyEquivalent: "")
+        copy.target = self
         actions.addItem(copy)
-        let terminal = NSMenuItem(title: "终端打开", action: #selector(openTerminal(_:)), keyEquivalent: "")
-        terminal.target = self; terminal.representedObject = selection
+        let terminal = NSMenuItem(title: "在终端打开", action: context == .items ? #selector(openSelectedDirectory(_:)) : #selector(openContainerDirectory(_:)), keyEquivalent: "")
+        terminal.target = self
         terminal.isEnabled = selection.terminalDirectory(isDirectory: Self.isDirectory) != nil
         actions.addItem(terminal)
         parent.submenu = actions; menu.addItem(parent)
@@ -55,24 +64,26 @@ final class FinderActions: FIFinderSync {
         return FinderActionSelection(context: context, selected: controller.selectedItemURLs(),
             targeted: controller.targetedURL(), roots: roots)
     }
-    private func confirmedSelection(_ sender: NSMenuItem) -> FinderActionSelection? {
-        guard let captured = sender.representedObject as? FinderActionSelection,
-              captured == currentSelection(captured.context) else { return nil }
-        return captured
-    }
     private static func isDirectory(_ url: URL) -> Bool {
         (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
     }
-    @objc private func copyPaths(_ sender: NSMenuItem) {
-        guard Thread.isMainThread else { return }
-        guard let selection = confirmedSelection(sender) else { Self.showFailure("选择已变化，请重新右键。"); return }
+    // Finder proxies the NSMenuItem across the extension boundary. A Swift
+    // representedObject is not an action context. Read Finder's authoritative
+    // URLs synchronously in its action callback; selectors preserve menu kind.
+    @objc private func copySelectedPaths(_ sender:NSMenuItem) {copyPaths(context:.items)}
+    @objc private func copyContainerPath(_ sender:NSMenuItem) {copyPaths(context:.container)}
+    @objc private func openSelectedDirectory(_ sender:NSMenuItem) {openTerminal(context:.items)}
+    @objc private func openContainerDirectory(_ sender:NSMenuItem) {openTerminal(context:.container)}
+    private func copyPaths(context:FinderActionSelection.Context) {
+        logger.notice("copy_requested main=\(Thread.isMainThread,privacy:.public)")
+        guard let selection = currentSelection(context) else { Self.showFailure("无法读取当前选择，请重新右键。"); return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         if !pasteboard.setString(selection.copiedPaths, forType: .string) { Self.showFailure("拷贝失败，请重新右键。") }
     }
-    @objc private func openTerminal(_ sender: NSMenuItem) {
-        guard Thread.isMainThread else { return }
-        guard let selection = confirmedSelection(sender),
+    private func openTerminal(context:FinderActionSelection.Context) {
+        logger.notice("terminal_requested main=\(Thread.isMainThread,privacy:.public)")
+        guard let selection = currentSelection(context),
               let directory = selection.terminalDirectory(isDirectory: Self.isDirectory) else {
             Self.showFailure("请选择一个目录后重试。"); return
         }
@@ -84,10 +95,9 @@ final class FinderActions: FIFinderSync {
             }
     }
     private static func showFailure(_ message: String) {
-        guard Thread.isMainThread else { return }
         // The SDK isolates NSAlert to the UI actor. Capture the message string
         // only; Finder/NSMenu/NSMenuItem objects never enter this operation.
-        MainActor.assumeIsolated {
+        Task { @MainActor in
             let alert = NSAlert()
             alert.messageText = "操作未成"; alert.informativeText = message
             alert.addButton(withTitle: "知道了")

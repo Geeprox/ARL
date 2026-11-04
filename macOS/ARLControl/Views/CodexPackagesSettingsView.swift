@@ -23,7 +23,7 @@ import AppKit
                     Text("套餐").frame(width:80,alignment:.leading)
                     Text("模型").frame(maxWidth:.infinity,alignment:.leading)
                     Text("思考强度").frame(width:100,alignment:.leading)
-                    Image(systemName:"bolt").frame(width:40).accessibilityLabel("加速")
+                    Text("加速").frame(width:44).accessibilityLabel("加速")
                 }.font(.caption).foregroundStyle(.secondary)
                 ForEach(CodexPackageSettingsStore.ids,id:\.self) { id in
                     if let row = settings.draft[id] {
@@ -52,8 +52,12 @@ import AppKit
                                 settings.draft[id]?.service_tier = row.tier == "fast" ? "default" : "fast"
                             } label: {
                                 Image(systemName:row.tier == "fast" ? "bolt.fill" : "bolt")
-                                    .frame(width:16,height:32)
-                            }.buttonStyle(EditorialActionButtonStyle(emphasis:row.tier == "fast" ? .primary:.quiet))
+                                    .font(.system(size:14,weight:.medium)).frame(width:44,height:36)
+                                    .foregroundStyle(row.tier == "fast" ? EditorialStyle.accent:.secondary)
+                                    .background(row.tier == "fast" ? EditorialStyle.accent.opacity(0.08):Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:EditorialStyle.controlRadius))
+                                    .overlay {RoundedRectangle(cornerRadius:EditorialStyle.controlRadius).strokeBorder(row.tier == "fast" ? EditorialStyle.accent.opacity(0.45):EditorialStyle.rule,lineWidth:0.5).allowsHitTesting(false)}
+                                    .contentShape(Rectangle())
+                            }.buttonStyle(.plain)
                                 .disabled(row.tier != "fast" && catalog.models.first(where:{ $0.model == row.model })?.fast_available != true)
                                 .accessibilityLabel("\(row.display_name)套餐加速").accessibilityValue(row.tier == "fast" ? "开启":"关闭")
                                 .help("Fast 加速，可能更快消耗额度")
@@ -61,11 +65,22 @@ import AppKit
                     }
                 }
                 HStack {
-                    Stepper("同时执行 \(settings.maxParallel) 项模型任务",value:Binding(get:{settings.maxParallel},set:{settings.setParallel($0)}),in:1...8)
-                        .fixedSize()
+                    VStack(alignment:.leading,spacing:4) {
+                        Text("并行任务").font(.callout.weight(.medium))
+                        Text("同时处理的模型任务数").font(.caption).foregroundStyle(.secondary)
+                    }
                     Spacer()
+                    HStack(spacing:0) {
+                        Button {settings.setParallel(settings.maxParallel-1)} label:{Image(systemName:"minus").frame(width:36,height:36)}
+                            .disabled(settings.maxParallel<=1).accessibilityLabel("减少并行任务")
+                        Text(String(settings.maxParallel)).font(.callout.monospacedDigit().weight(.medium)).frame(width:32)
+                            .accessibilityLabel("同时执行 \(settings.maxParallel) 项任务")
+                        Button {settings.setParallel(settings.maxParallel+1)} label:{Image(systemName:"plus").frame(width:36,height:36)}
+                            .disabled(settings.maxParallel>=8).accessibilityLabel("增加并行任务")
+                    }.buttonStyle(.plain).background(Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:EditorialStyle.controlRadius))
+                        .overlay {RoundedRectangle(cornerRadius:EditorialStyle.controlRadius).strokeBorder(EditorialStyle.rule,lineWidth:0.5).allowsHitTesting(false)}
                     if settings.changed { Button("保存套餐") { settings.save() }.disabled(!settings.valid) }
-                }.padding(.top,8)
+                }.padding(.top,12).padding(.top,4)
                 if !catalog.isFresh() { Text("正在更新模型目录…").font(.caption).foregroundStyle(.secondary) }
                 else if !settings.valid { Text("部分套餐的模型选项已变化，请重新选择。").font(.caption).foregroundStyle(.orange) }
             } else {

@@ -29,6 +29,11 @@ final class MomentsController {
     @ObservationIgnored private var nextRecoveryRequest=Date.distantPast
     private(set) var recoveryPending=false
     private(set) var imageStopPreserved=false
+    private(set) var imageDownloadIssue: String?
+    private(set) var imageRecoveryMessage: String?
+    private(set) var canReconfirmImages=false
+    @ObservationIgnored private var recoveryRequestID: String?
+    @ObservationIgnored private var imageResumeStop: [String:Any]?
     @ObservationIgnored private var lastFingerprint: String?
     @ObservationIgnored private var pendingFingerprint: String?
     @ObservationIgnored private var changedAt = Date.distantPast
@@ -67,7 +72,11 @@ final class MomentsController {
         }
         return true
     }
-    var destination: String { configuration?.nasDisplayPath ?? "尚未选择" }
+    var destination: String {
+        guard let destination = configuration?.nasDestination else { return "尚未选择" }
+        return destination.share + (destination.directory.isEmpty ? "" : "/" + destination.directory) + "/Friday"
+    }
+    var canOpenNAS: Bool { mountedNAS != nil && nasError == nil }
     var collecting: Bool { configuration?.collecting == true }
     var needsDiskAccess: Bool { message == "full_disk_access_required" }
     var viewerURL: URL { URL(string: "http://127.0.0.1:8791/")! }
@@ -121,15 +130,39 @@ final class MomentsController {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
     }
     func recoverImages() {
-        guard available,configuration != nil,collecting,!closing,!imageStopPreserved,
-              Date()>=nextRecoveryRequest else{return}
+        guard available,configuration != nil,collecting,!closing,!imageStopPreserved,!recoveryPending else{return}
         do {
             try MomentsFiles.privateDirectory(home.appendingPathComponent("requests"))
             let id=UUID().uuidString.lowercased()
             try MomentsFiles.writeJSON(["schema":1,"id":id,"kind":"recover_images",
                 "created_at":ISO8601DateFormatter().string(from:Date())],home.appendingPathComponent("requests/"+id+".json"))
+            recoveryRequestID=id;imageRecoveryMessage=nil
             recoveryPending=true;nextRecoveryRequest=Date().addingTimeInterval(60)
         } catch {message="image_recovery_request_failed"}
+    }
+    func prepareImageResume()->Bool {
+        guard available,collecting,!closing,!recoveryPending,canReconfirmImages,
+              let confirmation=MomentsFiles.json(home.appendingPathComponent("bridge-status.json"))["image_resume_confirmation"] as? [String:Any],
+              let stop=confirmation["stop_fingerprint"] as? [String:Any] else{return false}
+        imageResumeStop=stop;return true
+    }
+    func cancelImageResume() {imageResumeStop=nil}
+    func reconfirmImages() {
+        guard let stop=imageResumeStop,available,collecting,!closing,!recoveryPending else{return}
+        imageResumeStop=nil
+        do {
+            try MomentsFiles.privateDirectory(home.appendingPathComponent("requests"))
+            let id=UUID().uuidString.lowercased()
+            try MomentsFiles.writeJSON(["schema":1,"id":id,"kind":"reconfirm_images","expected_stop":stop,
+                "created_at":ISO8601DateFormatter().string(from:Date())],home.appendingPathComponent("requests/"+id+".json"))
+            recoveryRequestID=id;imageRecoveryMessage=nil
+            recoveryPending=true;nextRecoveryRequest=Date().addingTimeInterval(60)
+        } catch {imageRecoveryMessage="未能提交恢复请求，请稍后重试。"}
+    }
+    func retryNASBackup() {
+        guard !syncing, let configuration, configuration.nasDestination != nil else { return }
+        syncedArchiveIdentity=nil
+        syncNAS(configuration)
     }
     private func riskBlocked(_ archive: URL) -> Bool {
         let q = MomentsFiles.json(archive.appendingPathComponent("data/image-queue.json"))
@@ -142,8 +175,33 @@ final class MomentsController {
         let archive = URL(fileURLWithPath: configuration.archiveRoot, isDirectory: true)
         let status = MomentsFiles.json(archive.appendingPathComponent("data/local-service-status.json"))
         let queue = MomentsFiles.json(archive.appendingPathComponent("data/image-queue.json"))
+        let bridge = MomentsFiles.json(home.appendingPathComponent("bridge-status.json"))
+        canReconfirmImages=bridge["image_resume_confirmation"] is [String:Any]
         imageStopPreserved=queue["halted"] as? Bool == true || queue["risk_control_suspected"] as? Bool == true
-        if Date()>=nextRecoveryRequest {recoveryPending=false}
+        let downloadCode = bridge["download_block_reason"] as? String
+            ?? (status["phase"] as? String == "watching_downloads_paused" ? status["error_code"] as? String : nil)
+        imageDownloadIssue = downloadCode == "image_authorization_or_global_stop"
+            ? "图片下载已暂停：下载授权需要重新确认，待下载图片暂未继续。"
+            : imageStopPreserved ? "图片下载已暂停，请先核对停止原因。" : nil
+        if let id=recoveryRequestID {
+            let reply=MomentsFiles.json(home.appendingPathComponent("responses/"+id+".json"))
+            if reply["schema"] as? Int == 1, reply["id"] as? String == id {
+                recoveryPending=false;recoveryRequestID=nil
+                if reply["reconfirmed"] as? Bool == true {
+                    imageDownloadIssue=nil
+                    imageRecoveryMessage="图片下载已恢复，等待下载的图片将逐步补齐。"
+                } else if reply["blocked"] as? Bool == true {
+                    imageRecoveryMessage="本次检查未启动下载：图片下载仍处于暂停状态。"
+                } else if let requeued=reply["requeued"] as? Int, (0...10000).contains(requeued),
+                          let waiting=reply["waiting_for_new_locator"] as? Int, (0...10000).contains(waiting) {
+                    imageRecoveryMessage = requeued>0 ? "已重新排入 \(requeued) 张图片，将按队列逐步下载。"
+                        : waiting>0 ? "已检查，\(waiting) 张图片仍需微信提供新的下载地址。" : "已检查，暂无可重新下载的图片。"
+                } else {imageRecoveryMessage="图片检查未完成，请稍后重试。"}
+            } else if Date()>=nextRecoveryRequest {
+                recoveryPending=false;recoveryRequestID=nil
+                imageRecoveryMessage="尚未收到图片检查结果，请稍后重试。"
+            }
+        }
         var counts = [String: Int]()
         for record in (queue["assets"] as? [String: [String: Any]] ?? [:]).values {
             if let state = record["status"] as? String { counts[state, default: 0] += 1 }
@@ -242,8 +300,15 @@ final class MomentsController {
                 }.value
                 syncedArchiveIdentity = identityBefore; nasDate = Date(); nasError = nil; persistStatus()
             } catch {
-                let code = (error as? MomentsFault)?.code ?? (error as? NASRuntimeFailure)?.rawValue ?? "connection_failed"
-                nasError = code == "archive_busy" ? nil : "NAS 同步未完成（\(code)）。本地未校验文件会保留。"
+                let code = (error as? MomentsFault)?.code ?? (error as? NASRuntimeFailure)?.rawValue
+                    ?? (error as? CredentialError).map {String(describing:$0)} ?? "connection_failed"
+                switch code {
+                case "archive_busy","busy": break // Wait for the existing local operation; the next tick retries.
+                case "nas_access_denied": nasError="NAS 连接未启用 SMB 加密，备份尚未进行。请在 NAS 开启共享加密后重试。"
+                case "staleReference","notFound","wrongPurpose": nasError="NAS 登录信息已变化，请重新选择备份位置。"
+                case "nas_hash_mismatch","media_hash_mismatch","reclaim_verification_failed": nasError="备份校验未通过。未校验的本地文件已保留，请重试备份。"
+                default: nasError="暂时无法连接备份目录，尚未完成同步。网络恢复后会自动重试。"
+                }
             }
         }
     }

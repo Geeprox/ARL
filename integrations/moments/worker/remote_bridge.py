@@ -24,11 +24,14 @@ class Bridge:
                     result=self.service.queue.recover_failed(user_authorized=True)
                     self.service.manual_refresh=True
                     atomic_json(reply,{'schema':1,'id':p.stem,'at':now(),**result});p.unlink();continue
+                if request.get('kind')=='reconfirm_images' and set(request)=={'schema','id','created_at','kind','expected_stop'}:
+                    result=self.service.queue.reconfirm_image_resume(request['expected_stop'],user_authorized=True)
+                    atomic_json(reply,{'schema':1,'id':p.stem,'at':now(),**result});p.unlink();continue
                 ids=request.get('asset_ids')
                 if request.get('kind')!='images' or not isinstance(ids,list) or not 1<=len(ids)<=20 or any(not isinstance(x,str) or not ASSET.fullmatch(x) for x in ids):raise ValueError()
                 result=self.service.queue.submit(ids,priority=True)
                 result={'accepted':result.get('accepted',[]),'rejected':result.get('rejected',[])}
-            except (ValueError,KeyError,TypeError):result={'error_code':'invalid_request'}
+            except (ValueError,KeyError,TypeError,BlockingIOError):result={'error_code':'request_not_admitted'}
             atomic_json(reply,{'schema':1,'id':p.stem,'at':now(),**result});p.unlink()
     def complete(self,report=None,error=None):
         for identity in self.pending:
@@ -40,5 +43,6 @@ class Bridge:
     def publish(self):
         q=self.service.queue.snapshot()
         # Queue snapshot contains public asset IDs/statuses/local content hashes only.
-        q.update(schema=1,checked_at=now(),posts=self.service.status.get('posts',0),latest_post_at=self.service.status.get('latest_post_at'),last_success_at=self.service.status.get('last_success_at'),collecting=not self.service.collection_blocked(),refresh_scope='mac_local_cache',refreshing=bool(self.pending))
+        q.update(schema=1,checked_at=now(),posts=self.service.status.get('posts',0),latest_post_at=self.service.status.get('latest_post_at'),last_success_at=self.service.status.get('last_success_at'),collecting=not self.service.collection_blocked(),refresh_scope='mac_local_cache',refreshing=bool(self.pending),download_block_reason=self.service.blocked())
+        q['image_resume_confirmation']=self.service.queue.image_resume_confirmation()
         atomic_json(self.home/'bridge-status.json',q)

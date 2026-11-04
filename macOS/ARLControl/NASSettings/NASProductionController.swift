@@ -141,7 +141,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         return .init(address:serverRecord?.originalAddress ?? "",port:serverRecord?.endpoint.port ?? 445,
             timeoutSeconds:serverRecord?.endpoint.timeoutSeconds ?? 8,saved:serverRecord != nil,account:savedAccount,
             state:serverState,directory:serverDirectory,share:previewShare,authorizedScope:granted,
-            busy:serverIntentID != nil,fault:failure,diagnostic:failureDiagnostic)
+            busy:serverIntentID != nil,paused:userPausedServer,fault:failure,diagnostic:failureDiagnostic)
     }
     func maintainServerConnection() async {
         guard enabled,pins != nil,!userPausedServer,serverIntentID == nil,fileOperationID == nil,let saved=serverRecord,ProcessInfo.processInfo.systemUptime >= nextServerCheck else{return}
@@ -225,6 +225,10 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             case .login:
                 userPausedServer=false
                 guard let saved=serverRecord else{throw ARLNASFault.credentialNotSaved}
+                // The metadata picker and the scoped reader share one owner.
+                // Drain the idle reader before entering the picker; cancellation
+                // restores the saved scope rather than leaving two live owners.
+                await owner.stop();try current()
                 let started=ProcessInfo.processInfo.systemUptime
                 let next=try await owner.authenticateServer(endpoint:saved.endpoint,identity:saved.identity);try current()
                 guard next.authenticated else{throw ARLNASFault.connectionFailed}
@@ -258,6 +262,12 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 userPausedServer=true
 
                 await owner.stop();try current();state = .init();serverState = .init();serverDirectory=nil;previewShare=nil;shareNames=[];revision+=1
+            case .restoreSaved:
+                guard let record,let identity=record.identity,credentialMatchesScope() else {throw ARLNASFault.bindingMismatch}
+                await owner.stop();try current()
+                let next=try await owner.connect(configuration:record.configuration,identity:identity);try current()
+                state=next;serverState = .init();serverDirectory=nil;previewShare=nil;shareNames=[]
+                userPausedServer=false;nextServerCheck=0;automaticFailures=0;revision+=1;startPolling()
             }
             failure=nil;failureDiagnostic=nil
         } catch {

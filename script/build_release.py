@@ -181,10 +181,11 @@ def verify_authority(before, signature, executable_hash, info):
 def validate_finder_configuration(info, entitlements):
     required = {'CFBundleDevelopmentRegion','CFBundleExecutable','CFBundleIdentifier',
                 'CFBundleName','CFBundleDisplayName','CFBundlePackageType',
-                'CFBundleShortVersionString','CFBundleVersion','LSMinimumSystemVersion','NSExtension'}
+                'CFBundleShortVersionString','CFBundleVersion','LSMinimumSystemVersion','NSExtension','CFBundleIconFile'}
     require(set(info) == required and info['CFBundleIdentifier'] == FINDER_IDENTIFIER
             and info['CFBundleExecutable'] == 'ARLFinderActions'
             and info['CFBundleName'] == info['CFBundleDisplayName'] == '访达动作'
+            and info['CFBundleIconFile'] == 'ARL.icns'
             and info['CFBundlePackageType'] == 'XPC!'
             and info['NSExtension'] == {'NSExtensionAttributes': {},
                 'NSExtensionPointIdentifier': 'com.apple.FinderSync',
@@ -481,6 +482,11 @@ def stage_resources(ctx):
         finder_info = {**ctx['finder_extension']['info'], 'CFBundleVersion':ctx['build'],
                        'CFBundleShortVersionString':ctx['version']}
         (extension/'Contents/Info.plist').write_bytes(plistlib.dumps(finder_info))
+        finder_resources = extension/'Contents/Resources'
+        finder_resources.mkdir(mode=0o755)
+        icon = regular(ROOT/'macOS/ARLControl/Resources/AppIcon/ARL.icns')
+        require(sha(icon) == ctx['app_icon']['sha256'], 'Finder icon 与已审核 ARL 图标不匹配')
+        shutil.copyfile(icon, finder_resources/'ARL.icns')
         (out/'work/Finder.entitlements.plist').write_bytes(plistlib.dumps(FINDER_ENTITLEMENTS))
     runtime_record = ctx['packager'].populate(stage, app, sha(stage/'inventory.json'))
     runtime_record["nas"] = ctx["nas_packager"].stage(app,document_worker=ctx["output"]/"work/NASPDFTextExtractor",

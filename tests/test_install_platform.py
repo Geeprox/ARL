@@ -72,6 +72,12 @@ class PlatformTests(unittest.TestCase):
         with patch.object(self.platform,'service',return_value=None),patch.object(self.platform,'command') as command:self.platform.restore_old(plan)
         command.assert_called_once_with(['/bin/launchctl','bootstrap',self.platform.domain,self.platform.layout.targets['core_agent']])
 
+    def test_final_launch_refreshes_only_installed_app_extension_registration(self):
+        events=[]
+        with patch.object(self.platform,'bootstrap',side_effect=lambda:events.append('started')),patch.object(self.platform,'command',side_effect=lambda args:events.append(args)):
+            self.platform.start_final({})
+        self.assertEqual(events,['started',['/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister','-f',self.platform.layout.targets['app']]])
+
     def test_legacy_foreground_restore_still_opens_app(self):
         owner={'pid':1,'birth':[1,2],'executable':'legacy-python'}
         plan={'details':{'old_services':{CORE:owner},'old_apps':[{'pid':2,'birth':[3,4],'executable':str(self.platform.layout.targets['app']/'Contents/MacOS/ARL')}]}}

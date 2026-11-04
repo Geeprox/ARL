@@ -71,17 +71,12 @@ struct ContentView: View {
                             enabled:!store.demo && !store.isolated && !store.nativeActionsHeld && store.codex.enabled, controller:codexSettings ?? store.codex)
                     case .capabilities:
                         RegistryView(feature: store.control.registry)
-                        ApplePermissionsView(feature: store.permissions, connected: store.connected,
-                            disabled: store.errorCode == "user_disabled", preview: store.demo,
-                            busy: store.permissionBusy, actionMessage: store.permissionMessage,
-                            perform: store.performPermission, navigate: navigate, nativeActionsHeld: store.nativeActionsHeld,
-                            calendarManagedByMain: true, notesManagedByMain: true)
                     case .moments: MomentsView(controller: store.moments, nas: store.nasSettings)
                     case .calendar, .reminders, .notes, .messages, .credentials, .logs: EmptyView()
                     case .advanced:
                         RuntimeDiagnosticsSummary(store: store, navigate: navigate)
-                        RuntimeOperationRecovery(store: store)
                         AdvancedView(store: store)
+                        RuntimeOperationRecovery(store: store)
                     }
                 }.padding(24).frame(maxWidth: 1180, alignment: .leading).frame(maxWidth: .infinity, alignment: .center)
             }.id(selection)
@@ -132,27 +127,49 @@ private struct RuntimeToolbarActions: View {
 private struct RuntimeDiagnosticsSummary: View {
     let store: RuntimeStore
     let navigate: (ControlSection) -> Void
+    @State private var managed: Bool?
     var body: some View {
-        DetailCard(title: "运行检查") {
-            Button("应用接入") { navigate(.capabilities) }
-            if let code = store.bundledRuntimeError {
-                Text("连接服务异常").font(.callout)
-                Text(code).font(.caption.monospaced()).textSelection(.enabled)
-                Button(store.bundledRuntimeRecovering ? "正在恢复" : "恢复后台") { store.recoverBundledRuntime() }
-                    .disabled(store.bundledRuntimeRecovering)
+        DetailCard(title: "运行状态") {
+            HStack {
+                Label("本机服务", systemImage:"desktopcomputer").font(.callout.weight(.medium))
+                Spacer(); ConnectionIndicator(ready:store.connected,title:"本机服务")
             }
-            if let code = store.controlError {
-                Text("状态读取失败").font(.callout)
-                Text(code).font(.caption.monospaced()).textSelection(.enabled)
-                Button("重新读取状态") { Task { await store.refresh() } }.disabled(store.reading)
+            Divider()
+            HStack {
+                Image(systemName:"shield.lefthalf.filled").font(.callout).frame(width:16)
+                VStack(alignment:.leading,spacing:5) {
+                    Text("自动守护").font(.callout.weight(.medium))
+                    Text("后台异常退出后自动重新启动").font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                ConnectionIndicator(ready:managed == true && BundledRuntimeOwner.current?.watchdogRunning == true,
+                    pending:managed == nil,title:"自动守护",text:managed == nil ? "检查中":managed == true && BundledRuntimeOwner.current?.watchdogRunning == true ? "运行中":"未接管")
+            }
+            if managed == false && !store.demo {
+                Text("系统尚未接管此进程。退出并重新打开 ARL 后会再次尝试接管。").font(.caption).foregroundStyle(.secondary)
             }
             if let snapshot = store.snapshot {
-                MetadataRow(title: "未完任务", value: snapshot.queue.available ? String(snapshot.outstanding) : "暂不可读")
-                MetadataRow(title: "等待解锁", value: snapshot.queue.available ? String(snapshot.queue.counts["needs_unlock"] ?? 0) : "—")
-                MetadataRow(title: "待核对", value: snapshot.queue.available ? String(snapshot.queue.counts["needs_review"] ?? 0) : "—")
+                Divider()
+                HStack {
+                    Label("任务队列",systemImage:"rectangle.stack").font(.callout.weight(.medium));Spacer()
+                    Text(snapshot.queue.available ? (snapshot.outstanding == 0 ? "暂无待处理任务":"\(snapshot.outstanding) 项待处理") : "暂时无法读取").font(.callout).foregroundStyle(.secondary)
+                }
+                let review = (snapshot.queue.counts["needs_review"] ?? 0) + (snapshot.queue.counts["needs_unlock"] ?? 0)
+                if review > 0 {Text("\(review) 项任务需要解锁或核对结果。").font(.caption).foregroundStyle(.orange)}
+            }
+            if store.bundledRuntimeError != nil {
+                Text("后台服务异常，正在尝试恢复。").font(.callout).foregroundStyle(.orange)
+                Button(store.bundledRuntimeRecovering ? "正在恢复":"重启后台服务") {store.recoverBundledRuntime()}.disabled(store.bundledRuntimeRecovering)
+            }
+            if store.controlError != nil {
+                Text("暂时无法读取服务状态，将自动重试。").font(.caption).foregroundStyle(.secondary)
+            }
+        }.task {
+            while !Task.isCancelled {
+                managed = await Task.detached {ManagedLaunch.supervisingCurrentProcess()}.value
+                do {try await Task.sleep(for:.seconds(10))} catch {return}
             }
         }
-        RegistryView(feature: store.control.registry)
     }
 }
 
@@ -252,20 +269,21 @@ struct ModelConnectionSettings: View {
 private struct RuntimeOperationRecovery: View {
     let store: RuntimeStore
     var body: some View {
-        if let record = store.codex.taskRecord {
-            DetailCard(title: "Codex 原任务") {
+        if let record = store.codex.taskRecord, !record.permitsNewIntent {
+            DetailCard(title: "需要核对的模型任务") {
                 MetadataRow(title: "任务", value: record.jobID?.uuidString.lowercased() ?? record.operationID.uuidString.lowercased())
                 MetadataRow(title: "状态", value: record.phase)
                 if let text = record.reply?.text { Text(text).font(.callout).textSelection(.enabled) }
                 HStack {
-                    Button("核对原任务") { store.codex.inspectOriginal() }.disabled(!store.codex.canInspect)
+                    Button("查看执行结果") { store.codex.inspectOriginal() }.disabled(!store.codex.canInspect)
                     Button("取消原任务") { store.codex.requestCancel() }
                         .disabled(record.jobID == nil || record.permitsNewIntent)
                 }
                 if let message = store.codex.message { Text(message).font(.caption).foregroundStyle(.secondary) }
             }
         }
-        if let reminders = store.remindersProduct {
+        if let reminders = store.remindersProduct, let task = reminders.task,
+           ["attempting","unknown","needs_review"].contains(task.state) {
             DetailCard(title: "提醒事项操作记录") {
                 HStack {
                     Button("读取记录") { reminders.refreshHistory() }.disabled(reminders.busy)

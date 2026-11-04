@@ -4,13 +4,15 @@ import SwiftUI
     @ObservedObject var discovery: NASDiscoveryModel
     @ObservedObject var setup: ARLNASSetupModel
     var body: some View {
-        Section("网络中的设备") {
+        VStack(alignment:.leading,spacing:8) {
             HStack {
                 if discovery.phase == .searching {
                     ProgressView().controlSize(.small)
                     Text("正在查找…").foregroundStyle(.secondary)
                 } else if discovery.phase == .failed {
-                    Text("最近查找未完成").foregroundStyle(.secondary)
+                    Text("未能完成查找").foregroundStyle(.secondary)
+                } else if !discovery.devices.isEmpty {
+                    Text("已发现 \(discovery.devices.count) 台设备").foregroundStyle(.secondary)
                 }
                 Spacer()
                 if discovery.phase == .failed || discovery.devices.isEmpty && discovery.phase == .complete {
@@ -29,26 +31,13 @@ import SwiftUI
                                 }
                                 Spacer()
                                 if selected(device) {Image(systemName:"checkmark").foregroundStyle(.secondary)}
-                            }.padding(.vertical,4).contentShape(Rectangle())
+                            }.padding(12).contentShape(Rectangle())
+                                .background(selected(device) ? EditorialStyle.accent.opacity(0.055):Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:8))
+                                .overlay {RoundedRectangle(cornerRadius:8).strokeBorder(selected(device) ? EditorialStyle.accent.opacity(0.4):EditorialStyle.rule,lineWidth:0.5).allowsHitTesting(false)}
                         }.buttonStyle(.plain).help("使用此设备地址")
-                        let alternatives=device.addresses.filter{$0.caseInsensitiveCompare(host) != .orderedSame}
-                        if !alternatives.isEmpty {
-                            DisclosureGroup("其他地址") {
-                                ForEach(alternatives,id:\.self) { address in
-                                    Button(address) {setup.selectDevice(device,address:address)}
-                                }
-                            }.font(.caption)
-                        }
                     } else {
                         Text(device.name).fontWeight(.medium)
                         Text("地址尚未解析，可手动填写").font(.caption).foregroundStyle(.secondary)
-                    }
-                    if device.mounted {Text("已有挂载记录").font(.caption).foregroundStyle(.secondary)}
-                    if !device.seenInCurrentScan,let seen=device.lastSeenAt {
-                        HStack(spacing:4) {
-                            Text("最近发现")
-                            Text(seen,format:.dateTime.month().day().hour().minute())
-                        }.font(.caption).foregroundStyle(.secondary)
                     }
                 }.disabled(setup.isPerforming)
             }

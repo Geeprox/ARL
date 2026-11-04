@@ -36,7 +36,7 @@ METHODS = {
     "providers": object_schema(), "overview": object_schema(), "codex.service.status.v1": object_schema(),
     "settings.modules_snapshot": object_schema(), "settings.scheduler.v1": object_schema(), "settings.snapshot": object_schema(),
     "settings.app_icon.v1": object_schema({"app_id":string(64), "sha256":string(64)}, ["app_id","sha256"]), "settings.logs": log_schema(),
-    "settings.logs_export": log_schema(export=True), "settings.logs.v3": log_v3_schema(), "heartbeat": object_schema(),
+    "settings.logs_export": log_schema(export=True), "settings.logs.v3": log_v3_schema(), "settings.logs.recent.v1": object_schema({"limit":{"type":"integer","minimum":1,"maximum":500},"level":{"type":"string","enum":["info","warning","error"]}}), "settings.log_details.v1": object_schema({"sequence":{"type":"integer","minimum":1,"maximum":1000000000000000},"session_id":{**string(32),"pattern":r"[a-f0-9]{32}"}},["sequence","session_id"]), "heartbeat": object_schema(),
     "submit": object_schema({"tool": string(100), "args": {"type": "object", "properties": {}},
                               "key": string(128)}, ["tool", "args", "key"]),
     "submit_scheduled": object_schema(),
@@ -176,7 +176,8 @@ class Handler(socketserver.StreamRequestHandler):
             code = ('identity_unverified' if code in {'app_identity_unverified','peer_not_authorized'} else
                     'invalid_request' if code in {'invalid_frame','rpc_deadline_exceeded','unsupported_protocol'} else
                     'invalid_arguments' if code in {'invalid_cursor','log_session_changed'} else code if code in CODES else 'internal_error')
-            runtime.control.diagnostics.emit('rpc_rejected',code=code,level='warning')
+            runtime.control.diagnostics.emit('rpc_rejected',code=code,level='warning',app=locals().get('verified'),
+                context={'method':request.get('method')} if type(locals().get('request')) is dict else None)
         try:
             encoded = encode(response)+b"\n"
             # Research frames include the envelope in their 64KiB limit. Legacy
@@ -301,7 +302,7 @@ class Runtime:
         # Explicit public metadata exception, never an identity grant. Even a host
         # policy cannot use this flag to exempt arbitrary tools or task methods.
         public_read = (owner == "settings" and policy.public_metadata and
-                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", *SERVICE_PORTAL_METHODS} and verified_app is None)
+                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", *SERVICE_PORTAL_METHODS} and verified_app is None)
         if self.identity_verifier is not None and verified_app != owner and not public_read:
             raise Fault("app_identity_unverified")
         priority_allowed=(method in {'priority.negotiate.v1','priority.negotiate.v2'} or method=='priority.submit.v1' and 'submit' in policy.methods)
@@ -393,6 +394,10 @@ class Runtime:
             return self.application_models.read_icon(params['app_id'], params['sha256'])
         if method in {'settings.logs','settings.logs_export'}:
             return self.control.diagnostics.query(params,export=method == 'settings.logs_export')
+        if method == 'settings.logs.recent.v1':
+            return self.control.diagnostics.recent(params)
+        if method == 'settings.log_details.v1':
+            return self.control.diagnostics.details(params)
         if method == 'settings.logs.v3':
             return self.control.diagnostics.query_v3(params)
         if method == "runtime.describe":
@@ -528,6 +533,7 @@ class Runtime:
             research_engine = (self.capture if self.capture is not None and row['tool'] == CAPTURE_NAME
                                else self.research_engines.get(row["tool"]))
             started = False
+            args = {}
             replayable = bool(tool and row["idempotent"] and tool.idempotent and
                               row["tool_contract"] == tool.contract_digest())
             try:
@@ -544,6 +550,7 @@ class Runtime:
                 if self.admission is not None:
                     self.admission(row["owner"], row["tool"], args)
                 context = JobContext(self, row)
+                executing_at = time.monotonic()
                 context.check_cancelled()
                 started = True
                 result = tool.handler(args, context)
@@ -560,7 +567,7 @@ class Runtime:
                         effect_observed_at=effect_observed_at)
                     if self.codex_service is not None and row["tool"] == self.codex_service.name:
                         self.codex_service.note_publication(self.store.get(row["owner"], row["id"]))
-                        self.control.diagnostics.emit("model_task_succeeded",app=row["owner"])
+                        self.control.diagnostics.emit("model_task_succeeded",app=row["owner"],context={"task_id":row["id"],"model":args.get("model"),"reasoning_effort":args.get("reasoning_effort"),"duration_ms":max(0,int((time.monotonic()-executing_at)*1000))})
                     continue
                 if tool.idempotent:
                     context.check_cancelled()
@@ -580,7 +587,7 @@ class Runtime:
             except Fault as exc:
                 if self.codex_service is not None and row["tool"] == self.codex_service.name:
                     self.codex_service.finish_failure(self.store, row, exc.code)
-                    self.control.diagnostics.emit("model_task_failed",app=row["owner"],level="error")
+                    self.control.diagnostics.emit("model_task_failed",app=row["owner"],level="error",context={"task_id":row["id"],"model":locals().get("args",{}).get("model"),"reasoning_effort":locals().get("args",{}).get("reasoning_effort"),"reason":exc.code})
                     continue
                 if research_engine is not None:
                     research_engine.complete(row, error=exc.code)

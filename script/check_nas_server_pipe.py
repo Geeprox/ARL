@@ -18,13 +18,14 @@ def main():
     parser.add_argument('--compression-sdk',required=True)
     args=parser.parse_args()
     out=Path(args.output).resolve();support=Path(args.compression_sdk).resolve()
-    assert out.is_relative_to(ROOT/'build') and not out.exists()
+    cache=Path.home()/'Library/Caches/CodexBuilds.noindex'/(ROOT.name+'-'+hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:12])
+    assert (out.is_relative_to(ROOT/'build') or out.is_relative_to(cache)) and not out.exists()
     out.mkdir(mode=0o700)
     sdk=subprocess.check_output(['/usr/bin/xcrun','--sdk','macosx','--show-sdk-path'],text=True).strip()
     compiler=subprocess.check_output(['/usr/bin/xcrun','--find','swiftc'],text=True).strip()
     recipe=json.loads((ROOT/'script/release_recipe.json').read_text())
     exe=out/'checks'
-    command=[compiler,'-sdk',sdk,'-swift-version','6','-j','1','-suppress-warnings','-target','arm64-apple-macos14.0','-module-cache-path',str(out/'ModuleCache'),'-parse-as-library','-I',str(support),'-Xcc','-fmodule-map-file='+str(support/'FlyAICompression/module.modulemap')]
+    command=[compiler,'-D','ARL_NAS_PIPE_TEST','-sdk',sdk,'-swift-version','6','-j','1','-suppress-warnings','-target','arm64-apple-macos14.0','-module-cache-path',str(out/'ModuleCache'),'-parse-as-library','-I',str(support),'-Xcc','-fmodule-map-file='+str(support/'FlyAICompression/module.modulemap')]
     command += [str(ROOT/x) for x in recipe['source_groups']['ARLCredentialOnboarding']]
     command += [str(ROOT/'tests/NASServerPipeTests.swift'),str(support/'FlyAICompression.o'),'-lz','-o',str(exe)]
     result=subprocess.run(command,capture_output=True,text=True,timeout=150)
@@ -33,6 +34,10 @@ def main():
     app=out/'Fixture.app';resources=app/'Contents/Resources/NASRuntime';(app/'Contents/MacOS').mkdir(parents=True)
     shutil.copy2(exe,app/'Contents/MacOS/checks')
     shutil.copytree(Path(args.runtime_template),resources)
+    # Installed resources are read-only. Only this disposable fixture becomes
+    # writable so current synthetic host sources can replace the copied inputs.
+    for copied in [resources,*resources.rglob('*')]:
+        if copied.is_dir():copied.chmod(stat.S_IMODE(copied.stat().st_mode)|0o700)
     runtime=resources/'Runtime'
     for file in (ROOT/'integrations/nas/runtime').rglob('*'):
         if file.is_file() and '__pycache__' not in file.parts:

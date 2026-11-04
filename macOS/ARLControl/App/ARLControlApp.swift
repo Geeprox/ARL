@@ -2,6 +2,11 @@ import SwiftUI
 import AppKit
 
 final class ControlDelegate: NSObject, NSApplicationDelegate {
+    @MainActor private func presentControlWindow() {
+        guard let window = NSApp.windows.first(where: { $0.title == "ARL" }) else { return }
+        NSApp.setActivationPolicy(.regular); NSApp.unhide(nil); window.deminiaturize(nil)
+        window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
+    }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         guard let window = sender.windows.first(where: { $0.title == "ARL" && $0.canBecomeMain }) else {
             return true
@@ -18,6 +23,16 @@ final class ControlDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Handle requests from a foreground launcher after a normal user quit.
+        // The managed background process owns the window and all runtime children.
+        Task { @MainActor in
+            while !Task.isCancelled {
+                if Bundle.main.bundleURL.standardizedFileURL == ManagedLaunch.target.standardizedFileURL,
+                   NSApp.windows.contains(where:{$0.title == "ARL"}),
+                   ManagedLaunch.consumeWindowIntent() { presentControlWindow() }
+                do { try await Task.sleep(for:.milliseconds(250)) } catch { return }
+            }
+        }
         #if ARL_CONSOLIDATED_TEST
         if CommandLine.arguments.contains("--consolidated-native-smoke") {
             NSApp.setActivationPolicy(.accessory)
@@ -50,6 +65,7 @@ final class ControlDelegate: NSObject, NSApplicationDelegate {
         if ["--manage","--internal-app-state","--internal-app-quit","--internal-code-check","--internal-codex-plan","--internal-reminders-state","--internal-reminders-quit","--internal-nas-acceptance"].contains(args.first ?? "") {
             exit(InstallManagement.run(args))
         }
+        if ManagedLaunch.handoffForeground() { exit(0) }
         ARLControlApp.main()
     }
 }

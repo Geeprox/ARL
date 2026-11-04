@@ -10,6 +10,8 @@
 	<string>ARLFinderActions</string>
 	<key>CFBundleIdentifier</key>
 	<string>local.arl.control.finderactions</string>
+	<key>CFBundleIconFile</key>
+	<string>ARL.icns</string>
 	<key>CFBundleName</key>
 	<string>访达动作</string>
 	<key>CFBundlePackageType</key>

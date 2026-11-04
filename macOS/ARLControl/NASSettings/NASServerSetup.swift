@@ -13,6 +13,7 @@ struct NASServerSetupSnapshot {
     var share: String?
     var authorizedScope: String?
     var busy = false
+    var paused = false
     var fault: ARLNASFault?
     var diagnostic: String?
 }
@@ -23,6 +24,7 @@ enum NASServerSetupAction: Equatable {
     case shares(cursor:String?)
     case directory(share:String,path:String,cursor:String?)
     case authorize(share:String,path:String,wholeShare:Bool)
+    case restoreSaved
     case stop
 }
 
@@ -75,6 +77,9 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     @State private var password=""
     @State private var wholeShare=false
     @State private var editingLogin=false
+    @State private var editingDevice=false
+    @State private var choosingLocation=false
+    @StateObject private var discovery=NASDiscoveryModel()
     @State private var task:Task<Void,Never>?
     @State private var taskIsPreview=false
     init(owner:any NASServerSetupOwner,setup:ARLNASSetupModel) {
@@ -84,102 +89,169 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         guard let intent=model.begin(action) else{return}
         setup.refreshCachedStatus()
         switch action {case .directory,.shares:taskIsPreview=true;default:taskIsPreview=false}
-        task=Task{await model.run(intent);setup.refreshCachedStatus()}
+        task=Task {
+            await model.run(intent)
+            if action == .login,choosingLocation,model.snapshot.state.authenticated,
+               let browse=model.begin(.shares(cursor:nil)) {await model.run(browse)}
+            setup.refreshCachedStatus()
+        }
     }
     var body: some View {
-        Section("设备地址") {
-            TextField("设备地址",text:$setup.draft.address)
-
-        }.disabled(model.snapshot.busy)
-        Section("账号登录") {
-            if !model.snapshot.saved || !sameEndpoint || editingLogin {
-                TextField("账号",text:$username)
-                SecureField("密码",text:$password)
-            } else {
+        VStack(alignment:.leading,spacing:20) {
+            HStack(spacing:12) {
+                Image(systemName:"externaldrive.connected.to.line.below").font(.system(size:23)).frame(width:32,height:32).foregroundStyle(.secondary)
+                Text("网络硬盘").font(.headline);Spacer()
+                ConnectionIndicator(ready:setup.snapshot.connected == .verified,
+                    pending:model.snapshot.busy || setup.isPerforming,title:"网络硬盘",inactive:model.snapshot.paused,
+                    text:model.snapshot.busy || setup.isPerforming ? "连接中":model.snapshot.paused ? "已暂停":nil)
+            }
+            if !model.snapshot.saved || editingDevice {
+                VStack(alignment:.leading,spacing:12) {
+                    Text("选择网络硬盘").font(.callout.weight(.semibold))
+                    NASDiscoverySection(discovery:discovery,setup:setup)
+                    TextField("设备地址，例如 nas.local",text:$setup.draft.address).accessibilityLabel("NAS 设备地址")
+                }
+            }
+            if model.snapshot.saved && !editingDevice {
+                Grid(alignment:.leading,horizontalSpacing:24,verticalSpacing:18) {
+                    GridRow {rowTitle("设备");Text(deviceTitle).font(.callout.weight(.medium)).frame(maxWidth:.infinity,alignment:.leading)}
+                    GridRow {
+                        rowTitle("登录账号")
+                        HStack(spacing:10) {
+                            Text(model.snapshot.account ?? "账号已保存").font(.callout)
+                            Label("已保存",systemImage:"lock.fill").font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("更换账号") {username=model.snapshot.account ?? "";editingLogin=true}.controlSize(.small).disabled(model.snapshot.busy)
+                        }
+                    }
+                    if let configuration=setup.snapshot.configuration {
+                        GridRow {
+                            rowTitle("读取位置")
+                            HStack(spacing:10) {
+                                Label(configuration.share+(configuration.root.isEmpty ? " / 全部文件夹":" / "+configuration.root),systemImage:"folder").lineLimit(2).textSelection(.enabled)
+                                Spacer()
+                                Button("更改位置") {choosingLocation=true;launch(.login)}.controlSize(.small).disabled(model.snapshot.busy)
+                            }
+                        }
+                    }
+                }
+            }
+            if !model.snapshot.saved || !sameEndpoint || editingLogin || editingDevice {
+                VStack(alignment:.leading,spacing:12) {
+                    Text(model.snapshot.saved ? "更新登录":"登录网络硬盘").font(.callout.weight(.semibold))
+                    TextField("账号",text:$username).accessibilityLabel("NAS 账号")
+                    SecureField("密码",text:$password).accessibilityLabel("NAS 密码")
+                    HStack {
+                        if model.snapshot.saved {Button("取消") {resetEditing()}}
+                        Spacer()
+                        Button("保存并连接") {saveLogin()}
+                            .buttonStyle(EditorialActionButtonStyle(emphasis:.primary))
+                            .disabled(model.snapshot.busy || username.isEmpty || password.isEmpty || (try? NASAddressInput(setup.draft.address,port:setup.draft.port)) == nil)
+                    }
+                }
+            }
+            if model.snapshot.paused {
                 HStack {
-                    Label(model.snapshot.account ?? "账号已保存",systemImage:"person.crop.circle")
-                    Text("••••••••").foregroundStyle(.secondary).accessibilityLabel("密码已保存")
+                    Label("连接已暂停",systemImage:"pause.circle").foregroundStyle(.secondary)
+                    Spacer();Button("连接网络硬盘") {launch(.login)}
+                }
+            } else if !model.snapshot.busy,let fault=model.snapshot.fault,setup.snapshot.connected != .verified {
+                HStack(alignment:.top,spacing:12) {
+                    Label(recovery(fault),systemImage:"exclamationmark.circle").font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
                     Spacer()
-                    Button("更换登录",systemImage:"pencil") {username=model.snapshot.account ?? "";editingLogin=true}
+                    Button("重新连接") {reconnect()}.disabled(!model.snapshot.saved || !sameEndpoint)
                 }
             }
-
-            HStack {
-                if !model.snapshot.saved || !sameEndpoint || editingLogin { Button("保存并连接") {
-                    guard let intent=model.begin(.save(address:setup.draft.address,port:setup.draft.port,timeout:setup.draft.connectionTimeoutSeconds)) else{return}
-                    let input=ARLNASCredentialInput(username:username,password:password)
-                    username="";password="";taskIsPreview=false
-                    task=Task{await model.run(intent,input:input);await model.maintain();setup.refreshCachedStatus();editingLogin=false}
-                }.disabled(model.snapshot.busy || username.isEmpty || password.isEmpty || (try? NASAddressInput(setup.draft.address,port:setup.draft.port)) == nil) }
-                if model.snapshot.fault != nil { Button("重新连接") {launch(.login)}
-                    .disabled(model.snapshot.busy || !model.snapshot.saved || !sameEndpoint) }
-                if model.snapshot.state.authenticated || setup.snapshot.connected == .verified { Button("断开连接") {task?.cancel();launch(.stop)}
-                    .disabled(!model.snapshot.busy && !model.snapshot.state.authenticated && setup.snapshot.connected != .verified) }
+            if model.snapshot.state.authenticated && (choosingLocation || model.snapshot.authorizedScope == nil) {
+                locationPicker
             }
-            Text(setup.snapshot.connected == .verified ? "已连接" : model.snapshot.state.authenticated ? "服务器已连接" : model.snapshot.saved && sameEndpoint ? "正在自动连接…" : "尚未保存登录").foregroundStyle(.secondary)
-            if model.snapshot.state.authenticated && model.snapshot.authorizedScope == nil {
-                Text(model.snapshot.state.authenticated ? "请选择共享和目录。" : "验证已保存的登录后，选择共享和目录。").foregroundStyle(.secondary)
-            }
-            if let fault=model.snapshot.fault {Text(recovery(fault)).foregroundStyle(.secondary)}
-            if model.snapshot.saved && setup.snapshot.connected == .verified { Button("更换读取目录") {launch(.login)} }
-        }
-        if model.snapshot.state.authenticated && (model.snapshot.authorizedScope == nil || !model.snapshot.state.shares.isEmpty) { Section("选择共享") {
-
-            ForEach(model.snapshot.state.shares) {share in
-                Button(share.name) {wholeShare=false;launch(.directory(share:share.name,path:"",cursor:nil))}
-                    .disabled(!canBrowse)
-            }
-            if let cursor=model.snapshot.state.nextCursor {
-                Button("下一页") {launch(.shares(cursor:cursor))}.disabled(!canBrowse)
-            }
-        }
-        }
-        if let page=model.snapshot.directory,let share=model.snapshot.share {
-            Section("选择目录") {
-                Text(share+(page.path.isEmpty ? "" : "/"+page.path)).textSelection(.enabled)
-
-                if !page.path.isEmpty {
-                    Button("上一级") {wholeShare=false;launch(.directory(share:share,path:page.path.split(separator:"/").dropLast().joined(separator:"/"),cursor:nil))}.disabled(!canBrowse)
+            if model.snapshot.saved || editingDevice {
+                Divider()
+                HStack(alignment:.center,spacing:18) {
+                    VStack(alignment:.leading,spacing:5) {
+                        Text("连接设置").font(.caption.weight(.medium))
+                        Text("SMB · 端口 \(model.snapshot.port) · 超时 \(model.snapshot.timeoutSeconds) 秒").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Menu("管理连接") {
+                        Button("更换设备…") {editingDevice=true;username=model.snapshot.account ?? ""}
+                        Button("更改连接参数…") {editingDevice=true;username=model.snapshot.account ?? ""}
+                        if setup.snapshot.connected == .verified || model.snapshot.state.authenticated {
+                            Button("断开连接") {task?.cancel();launch(.stop)}
+                        }
+                    }.fixedSize().disabled(model.snapshot.busy)
                 }
-                ForEach(page.directories,id:\.self) {path in
-                    Button(path.split(separator:"/").last.map(String.init) ?? path) {wholeShare=false;launch(.directory(share:share,path:path,cursor:nil))}.disabled(!canBrowse)
+            }
+            if editingDevice || !model.snapshot.saved {
+                HStack(spacing:16) {
+                    VStack(alignment:.leading,spacing:6) {Text("端口").font(.caption).foregroundStyle(.secondary);TextField("445",value:$setup.draft.port,format:.number).frame(width:100)}
+                    VStack(alignment:.leading,spacing:6) {Text("连接超时（秒）").font(.caption).foregroundStyle(.secondary);TextField("8",value:$setup.draft.connectionTimeoutSeconds,format:.number).frame(width:120)}
                 }
-                if let cursor=page.nextCursor {Button("下一页") {launch(.directory(share:share,path:page.path,cursor:cursor))}.disabled(!canBrowse)}
-                if page.path.isEmpty {Toggle("整个共享",isOn:$wholeShare).disabled(!canBrowse)}
-                Button("授权目录") {launch(.authorize(share:share,path:page.path,wholeShare:wholeShare))}
-                    .disabled(!canBrowse || page.path.isEmpty && !wholeShare)
             }
-        }
-        if let scope=model.snapshot.authorizedScope {
-            Section("已授权") {
-                Text(scope).textSelection(.enabled)
-
-                if setup.snapshot.connected != .verified { Button("重试目录连接") {
-                    setup.refreshCachedStatus()
-                    if let configuration=setup.snapshot.configuration {setup.draft=ARLNASConfigurationDraft(configuration:configuration)}
-                    guard let intent=setup.beginManualActionAfterClick(.testConnection) else{return}
-                    taskIsPreview=false
-                    task=Task{await setup.performAfterClick(intent);model.refresh()}
-                }.disabled(model.snapshot.busy || setup.isPerforming) }
-                Text(setup.snapshot.connected == .verified ? "目录已连接" : "目录尚未连接").foregroundStyle(.secondary)
+            if let diagnostic=model.snapshot.diagnostic,model.snapshot.fault != nil {
+                Text("连接返回："+diagnostic).font(.caption).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
             }
-        }
-        Section {
-            DisclosureGroup("连接详情") {
-                Stepper("端口：\(setup.draft.port)",value:$setup.draft.port,in:1...65535)
-                Stepper("超时：\(setup.draft.connectionTimeoutSeconds)秒",value:$setup.draft.connectionTimeoutSeconds,in:1...30)
-
-                if let fault=model.snapshot.fault {Text(fault.rawValue).font(.caption).textSelection(.enabled)}
-                if let diagnostic=model.snapshot.diagnostic {Text(diagnostic).font(.caption).textSelection(.enabled)}
-            }
-        }.disabled(model.snapshot.busy)
+        }.disabled(model.snapshot.busy && taskIsPreview)
         .onAppear {
             if !model.snapshot.address.isEmpty {setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds}
         }
         .task {while !Task.isCancelled {await model.maintain();do{try await Task.sleep(for:.seconds(5))}catch{return}}}
         .onChange(of:setup.draft.address) {_ in username="";password="";wholeShare=false}
         .onChange(of:setup.draft.port) {_ in username="";password="";wholeShare=false}
-        .onDisappear {username="";password="";if taskIsPreview {task?.cancel()}}
+        .onChange(of:setup.snapshot.connected) {_ in if setup.snapshot.connected == .verified {choosingLocation=false}}
+        .onDisappear {
+            username="";password="";discovery.cancel()
+            if choosingLocation,setup.snapshot.configuration != nil {
+                choosingLocation=false
+                let previous=task;previous?.cancel()
+                Task {await previous?.value;if let restore=model.begin(.restoreSaved) {await model.run(restore)};setup.refreshCachedStatus()}
+            } else if taskIsPreview {task?.cancel()}
+        }
+    }
+    private func rowTitle(_ title:String)->some View {Text(title).font(.caption).foregroundStyle(.secondary).frame(width:76,alignment:.leading)}
+    private var deviceTitle:String {
+        let host=(try? NASAddressInput(model.snapshot.address,port:model.snapshot.port).host) ?? model.snapshot.address
+        return host.replacingOccurrences(of:".local.",with:"",options:.caseInsensitive).replacingOccurrences(of:".local",with:"",options:.caseInsensitive)
+    }
+    private func resetEditing() {
+        username="";password="";editingDevice=false;editingLogin=false
+        setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds
+    }
+    private func saveLogin() {
+        guard let intent=model.begin(.save(address:setup.draft.address,port:setup.draft.port,timeout:setup.draft.connectionTimeoutSeconds)) else{return}
+        let input=ARLNASCredentialInput(username:username,password:password);username="";password="";taskIsPreview=false
+        task=Task {await model.run(intent,input:input);await model.maintain();setup.refreshCachedStatus();if model.snapshot.saved {editingLogin=false;editingDevice=false}}
+    }
+    private func reconnect() {
+        if setup.snapshot.configuration != nil {
+            setup.refreshCachedStatus()
+            if let configuration=setup.snapshot.configuration {setup.draft=ARLNASConfigurationDraft(configuration:configuration)}
+            guard let intent=setup.beginManualActionAfterClick(.testConnection) else{return}
+            taskIsPreview=false;task=Task {await setup.performAfterClick(intent);model.refresh()}
+        } else {launch(.login)}
+    }
+    private var locationPicker:some View {
+        VStack(alignment:.leading,spacing:12) {
+            Divider()
+            HStack {Text("选择读取位置").font(.callout.weight(.semibold));Spacer();if model.snapshot.authorizedScope != nil {Button("取消选择") {choosingLocation=false;launch(.restoreSaved)}}}
+            if let page=model.snapshot.directory,let share=model.snapshot.share {
+                HStack {Label(share+(page.path.isEmpty ? "":" / "+page.path),systemImage:"folder");Spacer();if !page.path.isEmpty {Button("上一级",systemImage:"arrow.up") {wholeShare=false;launch(.directory(share:share,path:page.path.split(separator:"/").dropLast().joined(separator:"/"),cursor:nil))}.disabled(!canBrowse)}}
+                ForEach(page.directories,id:\.self) {path in
+                    Button {wholeShare=false;launch(.directory(share:share,path:path,cursor:nil))} label: {
+                        HStack {Label(path.split(separator:"/").last.map(String.init) ?? path,systemImage:"folder");Spacer();Image(systemName:"chevron.right").font(.caption).foregroundStyle(.secondary)}.padding(.horizontal,10).frame(minHeight:36).contentShape(Rectangle())
+                    }.buttonStyle(.plain).disabled(!canBrowse)
+                }
+                if let cursor=page.nextCursor {Button("更多文件夹") {launch(.directory(share:share,path:page.path,cursor:cursor))}.disabled(!canBrowse)}
+                if page.path.isEmpty {Toggle("读取此共享下的全部文件夹",isOn:$wholeShare).disabled(!canBrowse)}
+                HStack {Spacer();Button("使用此位置") {launch(.authorize(share:share,path:page.path,wholeShare:wholeShare))}.disabled(!canBrowse || page.path.isEmpty && !wholeShare).buttonStyle(EditorialActionButtonStyle(emphasis:.primary))}
+            } else {
+                ForEach(model.snapshot.state.shares) {share in
+                    Button {wholeShare=false;launch(.directory(share:share.name,path:"",cursor:nil))} label:{HStack {Label(share.name,systemImage:"externaldrive");Spacer();Image(systemName:"chevron.right").font(.caption)}.frame(minHeight:36).contentShape(Rectangle())}.buttonStyle(.plain).disabled(!canBrowse)
+                }
+                if model.snapshot.state.shares.isEmpty {Text("正在读取共享文件夹…").font(.caption).foregroundStyle(.secondary)}
+                if let cursor=model.snapshot.state.nextCursor {Button("更多共享") {launch(.shares(cursor:cursor))}.disabled(!canBrowse)}
+            }
+        }
     }
     private func recovery(_ fault:ARLNASFault) -> String {
         switch fault {

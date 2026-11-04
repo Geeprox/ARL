@@ -1,4 +1,5 @@
 import Foundation
+private func waitForSignal(_ semaphore:DispatchSemaphore) {semaphore.wait()}
 private enum CheckError: Error { case failed(String) }
 private final class Repository: CredentialRepository, @unchecked Sendable {
     private let lock = NSLock()
@@ -53,11 +54,27 @@ private struct FixtureGate: DeploymentGate {
         let nested=try await service.previewServerDirectories(share:"Data",path:"selected")
         guard nested.path=="selected",nested.directories.isEmpty else{throw CheckError.failed("nested")}
         do {_=try await service.readDirectory();throw CheckError.failed("file_data_before_scope")}catch CredentialError.missing{}
+        // Exercise overlapping native pipe teardown followed immediately by a
+        // replacement metadata connection, without waiting for the first caller.
+        let marked=DispatchSemaphore(value:0),release=DispatchSemaphore(value:0)
+        NASPipeStopTesting.afterStopMarked={marked.signal();release.wait()}
+        let firstStop=Task.detached {await runtime.stop()}
+        await Task.detached {waitForSignal(marked)}.value
+        let releaseStop=Task.detached {try? await Task.sleep(for:.milliseconds(100));release.signal()}
+        await runtime.stop()
+        NASPipeStopTesting.afterStopMarked=nil
+        do {
+            let replacement=try await service.authenticateServer(endpoint:endpoint,identity:identity)
+            guard replacement.authenticated else{throw CheckError.failed("overlapping_stop_reconnect")}
+        } catch {
+            await releaseStop.value;await firstStop.value;throw error
+        }
+        await releaseStop.value;await firstStop.value
         repository.rotate()
         let revoked=await service.serverStatus()
         guard !revoked.authenticated,revoked.failure=="source_changed" else{throw CheckError.failed("rotation")}
         await service.stop()
-        guard repository.leases==1 else{throw CheckError.failed("single_lease")}
+        guard repository.leases==2 else{throw CheckError.failed("one_lease_per_connection")}
         print("PASS native NAS server pipe: actual Swift owner→private pipe→production Python host; synthetic SMB only, network forbidden")
     }
 }

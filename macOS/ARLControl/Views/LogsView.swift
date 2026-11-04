@@ -10,130 +10,198 @@ struct MetadataLogDocument: FileDocument {
 }
 struct LogsView: View {
     let store: RuntimeStore
-    @State private var search = ""
-    @State private var level = "all"
-    @State private var selected: Int?
-    @State private var exporting = false
-    @State private var exportData = Data()
-    @State private var exportError = false
-    @State private var preparing = false
-    @State private var exportNotice: String?
-    @FocusState private var logFocused: Bool
-    private var feature: MetadataFeature<RedactedLogPage> { store.control.logs }
-    private var filtered: [RedactedLogEntry] {
-        (feature.value?.entries ?? []).filter {
-            (level == "all" || $0.level == level) && (search.isEmpty || $0.searchableText.localizedCaseInsensitiveContains(search) || $0.eventTitle.localizedCaseInsensitiveContains(search) || ($0.app_id.map { AppIdentity.presentation($0).name.localizedCaseInsensitiveContains(search) } ?? false))
-        }
+    @State private var search=""
+    @State private var level="all"
+    @State private var selected:Int?
+    @State private var recent:RecentLogPage?
+    @State private var recentError:String?
+    @State private var compatibility=false
+    @State private var lastRead:Date?
+    @State private var context:LogTaskContext?
+    @State private var contextLoading=false
+    @State private var exporting=false
+    @State private var exportData=Data()
+    @State private var exportError=false
+    @State private var preparing=false
+    @FocusState private var focusedRow:Int?
+    private var records:[RedactedLogEntry] {recent?.entries ?? store.control.logs.value?.entries ?? []}
+    private var filtered:[RedactedLogEntry] {
+        records.filter {(level == "all" || $0.level == level) && (search.isEmpty || ($0.searchableText+" "+$0.eventTitle+" "+$0.explanation+" "+appName($0)).localizedCaseInsensitiveContains(search))}.sorted{$0.sequence>$1.sequence}
     }
-    private var selectedEntry: RedactedLogEntry? { filtered.first { $0.id == selected } }
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+    private var selectedEntry:RedactedLogEntry? {filtered.first{$0.id==selected}}
+    var body:some View {
+        VStack(alignment:.leading,spacing:18) {
             HStack {
-                EditorialHeading(title: "运行记录", subtitle: "")
+                EditorialHeading(title:"运行记录",subtitle:"最近 24 小时的应用连接、任务结果与异常")
                 Spacer()
-                if let label = store.previewLabel { StatusBadge(title: label) }
                 Menu {
-                    Button("导出结果") {
-                        do { let export = try ControlLogExport.filtered(filtered); exportData = export.content; exporting = true; exportNotice = "已载入的筛选结果 · \(export.count) 条" } catch { exportError = true }
-                    }.help("只导出已载入的筛选结果").disabled(filtered.isEmpty)
-                    Button("导出近况") { exportRecent() }.help("导出最近24小时的运行记录")
-                } label: { Label("导出", systemImage: "square.and.arrow.up") }.disabled(feature.value == nil || preparing)
-                if preparing { ProgressView().controlSize(.small) }
+                    if let entry=selectedEntry {Button("导出这条记录") {export([entry])}}
+                    Button("导出当前结果") {export(filtered.sorted{$0.sequence<$1.sequence})}.disabled(filtered.isEmpty)
+                    Button("导出最近 24 小时") {exportRecent()}
+                } label:{Label("导出",systemImage:"square.and.arrow.up")}.disabled(preparing)
             }
-            HStack(spacing: 12) {
-                TextField("查找记录", text: $search).help("输入事件、应用或状态代码").textFieldStyle(.roundedBorder).accessibilityLabel("查找记录")
-                Picker("级别", selection: $level) { Text("全部级别").tag("all"); Text("信息").tag("info"); Text("警告").tag("warning"); Text("错误").tag("error") }.frame(width: 135)
-            }.disabled(feature.value == nil)
-            HStack(alignment: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    HStack { Text("时间").frame(width: 85, alignment: .leading); Text("事件").frame(maxWidth: .infinity, alignment: .leading); Text("应用").frame(width: 120, alignment: .leading) }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 10).background(EditorialStyle.canvas)
-                    Divider()
-                    List(filtered, selection: $selected) { entry in
-                        HStack(spacing: 12) {
-                            Text(Date(timeIntervalSince1970: Double(entry.at_ms) / 1000), format: .dateTime.hour().minute().second()).font(.caption.monospaced()).foregroundStyle(.secondary).frame(width: 85, alignment: .leading)
-                            HStack(spacing: 7) { Circle().fill(levelColor(entry.level)).frame(width: 5, height: 5); Text(entry.eventTitle).lineLimit(1) }.frame(maxWidth: .infinity, alignment: .leading)
-                            Text(entry.app_id.map { AppIdentity.presentation($0).name } ?? "后台服务").font(.callout).foregroundStyle(.secondary).lineLimit(1).frame(width: 120, alignment: .leading)
-                        }.padding(.vertical, 3).tag(entry.id)
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("\(Date(timeIntervalSince1970: Double(entry.at_ms) / 1000).formatted(date: .omitted, time: .standard))，\(entry.eventTitle)，\(entry.app_id.map { AppIdentity.presentation($0).name } ?? "后台服务")，\(levelTitle(entry.level))")
-                    }.listStyle(.plain).scrollContentBackground(.hidden).background(EditorialStyle.panel)
-                    .focusable().focused($logFocused)
-                    .onKeyPress(.downArrow) { selectAdjacent(1); return .handled }
-                    .onKeyPress(.upArrow) { selectAdjacent(-1); return .handled }
-                    .modifier(LogScrollTrigger(load: { store.requestLogPage() }))
-                    .overlay {
-                        if filtered.isEmpty {
-                            ContentUnavailableView(emptyTitle, systemImage: store.logReadError != nil && feature.value == nil ? "exclamationmark.circle" : "list.bullet.rectangle", description: Text(emptyDescription))
+            HStack(spacing:12) {
+                HStack(spacing:8) {
+                    Image(systemName:"magnifyingglass").foregroundStyle(.secondary)
+                    TextField("搜索应用、事件或原因",text:$search).textFieldStyle(.plain).accessibilityLabel("搜索运行记录")
+                }.padding(.horizontal,12).frame(height:36)
+                    .background(EditorialStyle.panel,in:RoundedRectangle(cornerRadius:6))
+                    .overlay {RoundedRectangle(cornerRadius:6).strokeBorder(EditorialStyle.rule,lineWidth:0.5).allowsHitTesting(false)}
+                EditorialMenu {
+                    Button("全部级别") {level="all"}
+                    Button("仅错误") {level="error"}
+                    Button("仅警告") {level="warning"}
+                    Button("仅信息") {level="info"}
+                } label:{Text(level == "error" ? "仅错误":level == "warning" ? "仅警告":level == "info" ? "仅信息":"全部级别")}.frame(width:120).accessibilityLabel("日志级别")
+            }
+            VStack(spacing:0) {
+                HStack(spacing:16) {
+                    Text("时间").frame(width:76,alignment:.leading)
+                    Text("事件与说明").frame(maxWidth:.infinity,alignment:.leading)
+                    Text("应用").frame(width:110,alignment:.leading)
+                }.font(.caption).foregroundStyle(.secondary).padding(.horizontal,16).padding(.vertical,12)
+                Divider()
+                ScrollView {
+                    LazyVStack(spacing:0) {
+                        ForEach(filtered) {entry in
+                            Button {selected=entry.id} label: {
+                                HStack(alignment:.top,spacing:16) {
+                                    Text(Date(timeIntervalSince1970:Double(entry.at_ms)/1000),format:.dateTime.hour().minute().second()).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width:76,alignment:.leading).padding(.top,2)
+                                    VStack(alignment:.leading,spacing:5) {
+                                        HStack(spacing:7) {Circle().fill(levelColor(entry.level)).frame(width:6,height:6);Text(entry.eventTitle).font(.callout.weight(.medium))}
+                                        Text(entry.explanation).font(.caption).foregroundStyle(.secondary).lineLimit(2).multilineTextAlignment(.leading)
+                                    }.frame(maxWidth:.infinity,alignment:.leading)
+                                    Text(appName(entry)).font(.caption).foregroundStyle(.secondary).lineLimit(2).truncationMode(.middle).frame(width:110,alignment:.leading).help(appName(entry))
+                                }.padding(.horizontal,16).padding(.vertical,12).contentShape(Rectangle())
+                            }.buttonStyle(LogEntryButtonStyle(selected:selected==entry.id))
+                                .focused($focusedRow,equals:entry.id).focusEffectDisabled()
+                                .accessibilityAddTraits(selected==entry.id ? .isSelected:[])
+                                .accessibilityElement(children:.ignore)
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityLabel(entry.eventTitle+"，"+appName(entry)+"，"+entry.explanation)
+                            Divider().padding(.horizontal,16)
                         }
+                    }.onMoveCommand {direction in
+                        if direction == .down {moveSelection(1)}
+                        else if direction == .up {moveSelection(-1)}
+                    }
+                }.overlay {
+                    if filtered.isEmpty {
+                        VStack(spacing:10) {
+                            Image(systemName:recentError == nil ? "list.bullet.rectangle":"exclamationmark.circle").font(.system(size:26,weight:.light)).foregroundStyle(.secondary)
+                            Text(recentError != nil ? "运行记录暂时无法读取":records.isEmpty ? "还没有运行记录":"没有符合条件的记录").font(.headline)
+                            Text(recentError != nil ? "显示上次载入的内容，稍后会自动重试。":records.isEmpty ? "应用连接、模型任务和异常都会记录在这里。":"换个关键词或调整级别试试。").font(.caption).foregroundStyle(.secondary)
+                        }.padding(24)
                     }
                 }
-                if let entry = selectedEntry {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack { Text("记录详情").font(.headline); Spacer(); Button { selected = nil } label: { Image(systemName: "xmark") }.buttonStyle(.borderless).help("关闭详情") }
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 14) {
-                                Text(entry.eventTitle).font(.title3.weight(.medium))
-                                StatusBadge(title: levelTitle(entry.level), color: levelColor(entry.level))
-                                Divider()
-                                detail("时间", Date(timeIntervalSince1970: Double(entry.at_ms) / 1000).formatted())
-                                detail("应用", entry.app_id.map { AppIdentity.presentation($0).name } ?? "后台服务")
-                                detail("事件", entry.event)
-                                if let code = entry.code { detail("状态代码", code) }
-                                detail("序号", String(entry.sequence))
-                                Spacer()
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }.padding(18).frame(width: 230).background(EditorialStyle.canvas)
-                }
-            }.modifier(EditorialSurface()).frame(maxHeight: .infinity)
-            HStack {
-                if feature.value != nil { Text(("筛选结果" + "\n" + "\(filtered.count) 条结果 · 已载入 \(feature.value?.entries.count ?? 0) 条")).font(.caption).foregroundStyle(.secondary) }
-                if let date = store.lastLogSuccess { Text("读取于 \(date.formatted(date: .omitted, time: .standard))").font(.caption).foregroundStyle(.secondary) }
-                if feature.value?.truncated == true { Text("部分记录已过期").font(.caption).foregroundStyle(.orange) }
+            }.modifier(EditorialSurface()).frame(maxHeight:.infinity)
+            HStack(spacing:12) {
+                Text("\(filtered.count) 条记录").font(.caption).foregroundStyle(.secondary)
+                if let lastRead {Text("更新于 \(lastRead.formatted(date:.omitted,time:.shortened))").font(.caption).foregroundStyle(.secondary)}
+                if recent?.truncated == true {Text("显示最新 500 条").font(.caption).foregroundStyle(.secondary)}
+                if recentError != nil {Text("刷新暂未成功").font(.caption).foregroundStyle(.orange)}
                 Spacer()
-                if store.logPaging.inFlight != nil { ProgressView().controlSize(.small) }
-                else if store.logReadError != nil { Text(feature.value == nil ? "加载失败" : "刷新失败，显示上次结果").font(.caption).foregroundStyle(.orange); Button("重试") { store.requestLogPage(retry: true) }.disabled(store.snapshot == nil) }
-                else if store.logPaging.reachedLimit { Text("已载入上限").font(.caption).foregroundStyle(.secondary) }
+                if preparing {ProgressView().controlSize(.small)}
             }
-            if let exportNotice { Text(exportNotice).font(.caption).foregroundStyle(.secondary) }
         }
-        .onChange(of: search) { _, _ in
-            if let selected, !filtered.contains(where: { $0.id == selected }) { self.selected = nil }
-            if !search.isEmpty && filtered.isEmpty { store.requestLogPage() }
+        .inspector(isPresented:Binding(get:{selectedEntry != nil},set:{if !$0 {selected=nil}})) {
+            if let entry=selectedEntry {detailPanel(entry).inspectorColumnWidth(min:260,ideal:300,max:360)}
         }
-        .onChange(of: level) { _, _ in selected = nil; store.resetLogs(level: level == "all" ? nil : level) }
-        .onChange(of: selected) { _, value in if value != nil { logFocused = true } }
-        .onChange(of: store.logPaging.page?.entries.count) { _, _ in
-            if !search.isEmpty && filtered.isEmpty { store.requestLogPage() }
+        .task {
+            while !Task.isCancelled {
+                await refreshRecent()
+                do {try await Task.sleep(for:.seconds(5))}catch{return}
+            }
         }
-        .fileExporter(isPresented: $exporting, document: MetadataLogDocument(data: exportData), contentType: .plainText, defaultFilename: "runtime-metadata.jsonl") { result in
-            if case .failure = result { exportError = true }; exportData = Data()
+        .task(id:selectedEntry?.id) {await loadContext()}
+        .onChange(of:level) {_,_ in selected=nil}
+        .onChange(of:search) {_,_ in if selectedEntry == nil {selected=nil}}
+        .fileExporter(isPresented:$exporting,document:MetadataLogDocument(data:exportData),contentType:.plainText,defaultFilename:"ARL-运行记录.jsonl") {result in if case .failure=result {exportError=true};exportData=Data()}
+        .alert("导出未完成",isPresented:$exportError) {Button("好",role:.cancel) {}} message:{Text("请缩小筛选范围或更换保存位置后重试。")}
+    }
+    private func appName(_ entry:RedactedLogEntry)->String {
+        guard let id=entry.app_id else{return "ARL 后台"}
+        return store.control.registry.value?.first{$0.id==id}?.name ?? AppIdentity.presentation(id).name
+    }
+    private func detailPanel(_ entry:RedactedLogEntry)->some View {
+        VStack(alignment:.leading,spacing:16) {
+            HStack {Text("事件详情").font(.headline);Spacer();Button {selected=nil} label:{Image(systemName:"xmark").frame(width:20,height:24)}.buttonStyle(.plain).help("关闭事件详情")}
+            ScrollView {
+                VStack(alignment:.leading,spacing:18) {
+                    Text(entry.eventTitle).font(.title3.weight(.semibold))
+                    Text(context?.reasonTitle ?? entry.explanation).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                    Divider()
+                    detail("发生时间",Date(timeIntervalSince1970:Double(entry.at_ms)/1000).formatted(date:.abbreviated,time:.standard))
+                    detail("来源应用",appName(entry))
+                    if let context {
+                        if let title=context.packageTitle {detail("套餐",title)}
+                        if let model=context.model {detail("模型",model)}
+                        if let effort=context.reasoning_effort {detail("思考强度",CodexEffortOption.title(effort))}
+                        if let duration=context.duration_ms {detail("执行耗时",String(format:"%.1f 秒",Double(duration)/1000))}
+                        if let id=context.task_id {detail("任务编号",id)}
+                        if let method=context.method {detail("请求的功能",method)}
+                    }
+                    if contextLoading {ProgressView().controlSize(.small)}
+                    else if context?.isEmpty != false {Text("这条记录未保存更详细的任务信息。").font(.caption).foregroundStyle(.secondary)}
+                    if let code=entry.code {detail("状态代码",code)}
+                    Button("导出这条记录") {export([entry])}
+                }.frame(maxWidth:.infinity,alignment:.leading)
+            }
+        }.padding(20).frame(maxHeight:.infinity,alignment:.top).background(EditorialStyle.canvas)
+    }
+    private func detail(_ title:String,_ value:String)->some View {
+        VStack(alignment:.leading,spacing:5) {Text(title).font(.caption).foregroundStyle(.secondary);Text(value).font(.callout).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)}
+    }
+    private func refreshRecent() async {
+        guard !store.demo,!compatibility else{return}
+        do {
+            let result=try await ARLClient(home:store.service.home,app:"settings").rpc("settings.logs.recent.v1",params:["limit":.number(500)],timeout:3)
+            let next=try RecentLogPage.decode(JSONEncoder().encode(result))
+            guard !Task.isCancelled else{return}
+            if recent?.sessionID != next.sessionID {selected=nil}
+            recent=next;lastRead=Date();recentError=nil
+            if selectedEntry == nil {selected=nil}
+        } catch {
+            guard !Task.isCancelled else{return}
+            let code=(error as? ARLError)?.code ?? "unavailable"
+            if code == "unknown_method" || code == "method_not_authorized" {compatibility=true}
+            else {recentError=code}
         }
-        .alert("导出失败", isPresented: $exportError) { Button("确定", role: .cancel) {} } message: { Text("请缩小筛选范围，或检查保存位置后重试。") }
     }
-    private func detail(_ title: String, _ value: String) -> some View { VStack(alignment: .leading, spacing: 4) { Text(title).font(.caption).foregroundStyle(.secondary); Text(value).font(.callout).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) } }
-    private var emptyTitle: String {
-        if feature.value == nil { return store.logReadError == nil ? "读取中" : "读取失败" }
-        return search.isEmpty && level == "all" ? "暂无记录" : "无匹配结果"
+    private func loadContext() async {
+        context=nil
+        guard let entry=selectedEntry,let session=recent?.sessionID ?? store.logPaging.sessionID,!store.demo else{return}
+        contextLoading=true;defer{contextLoading=false}
+        do {
+            let reply=try await ARLClient(home:store.service.home,app:"settings").rpc("settings.log_details.v1",params:["sequence":.number(Double(entry.sequence)),"session_id":.string(session)],timeout:3)
+            let next=try LogTaskContext.decode(JSONEncoder().encode(reply),sequence:entry.sequence,session:session)
+            guard !Task.isCancelled,selectedEntry?.id==entry.id else{return};context=next
+        } catch { /* Legacy events remain readable with their finite explanation. */ }
     }
-    private var emptyDescription: String {
-        if feature.value == nil { return store.logReadError == nil ? "请稍候" : "请重试读取" }
-        return store.logReadError == nil ? "" : "显示上次成功读取的结果"
+    private func levelColor(_ level:String)->Color {level == "error" ? .red:level == "warning" ? .orange:.secondary}
+    private func moveSelection(_ offset:Int) {
+        guard !filtered.isEmpty else{return}
+        let current=filtered.firstIndex{$0.id==selected} ?? (offset>0 ? -1:filtered.count)
+        let next=filtered[max(0,min(filtered.count-1,current+offset))].id
+        selected=next;focusedRow=next
     }
-    private func selectAdjacent(_ offset: Int) {
-        guard !filtered.isEmpty else { return }
-        let index = selected.flatMap { id in filtered.firstIndex { $0.id == id } } ?? -1
-        selected = filtered[max(0, min(filtered.count - 1, index + offset))].id
+    private func export(_ rows:[RedactedLogEntry]) {
+        do {let result=try ControlLogExport.filtered(rows);exportData=result.content;exporting=true}catch{exportError=true}
     }
-    private func levelTitle(_ level: String) -> String { level == "error" ? "错误" : level == "warning" ? "警告" : "信息" }
-    private func levelColor(_ level: String) -> Color { level == "error" ? .red : level == "warning" ? .orange : EditorialStyle.graphite }
     private func exportRecent() {
-        preparing = true
-        Task {
-            do { let export = try await store.service.exportLogs(); exportData = export.content; exportNotice = ("最近 24 小时 · \(export.count) 条\(export.more || export.truncated ? " · 部分记录" : "")"); exporting = true }
-            catch { exportError = true }
-            preparing = false
-        }
+        preparing=true
+        Task {do {let result=try await store.service.exportLogs();exportData=result.content;exporting=true}catch{exportError=true};preparing=false}
+    }
+}
+
+private struct LogEntryButtonStyle:ButtonStyle {
+    let selected:Bool
+    @Environment(\.isFocused) private var focused
+    @State private var hovered=false
+    func makeBody(configuration:Configuration)->some View {
+        configuration.label.foregroundStyle(EditorialStyle.graphite)
+            .background(selected ? EditorialStyle.accent.opacity(0.07):Color.primary.opacity(configuration.isPressed ? 0.07:hovered ? 0.025:0))
+            .overlay {RoundedRectangle(cornerRadius:4).strokeBorder(focused ? EditorialStyle.accent:.clear,lineWidth:1.5).allowsHitTesting(false)}
+            .onHover {hovered=$0}
     }
 }

@@ -19,13 +19,15 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
         let work = Task.detached(priority: .utility) {
             let authority: OwnerReadAuthority
             do { authority = try OwnerReadAuthority.load(role: .owner) }
-            catch { lifecycle.fail(.identity); stop.cancel(); return }
+            catch { Logger(subsystem:"local.arl.control",category:"read-owner").error("startup_failed reason=identity"); lifecycle.fail(.identity); stop.cancel(); return }
             do { try Self.run(service: service, appleCall: appleCall, nasCall: nasCall, authority: authority, stop: stop, lifecycle: lifecycle) }
             catch {
                 if lifecycle.snapshot.failure == nil {
                     lifecycle.fail(error as? OwnerReadFault == .busy ? .taskPending :
                         error as? OwnerReadFault == .cleanupUnproven ? .cleanupPending : .transport)
                 }
+                let reason=lifecycle.snapshot.failure?.rawValue ?? "transport"
+                Logger(subsystem:"local.arl.control",category:"read-owner").error("owner_failed reason=\(reason,privacy:.public)")
                 stop.cancel(); lifecycle.cancel()
             }
         }
@@ -35,7 +37,7 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
         guard enabled else { return nil }
         return .init(service: service, appleCall: appleCall, nasCall: nasCall)
     }
-    /// Explicit local UI recovery only. A timeout does not release either task
+    /// Bounded lifecycle recovery. A timeout does not release either task
     /// or listener ownership; no new owner may start until snapshot.drained.
     func stopAndDrain(seconds: Double = 2) async -> Bool {
         stop.cancel(); lifecycle.cancel(); worker?.cancel()
@@ -49,7 +51,7 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
 
     private static func run(service: CredentialOnboarding, appleCall: AppleCall?, nasCall: NASCall?, authority: OwnerReadAuthority, stop: OwnerReadStop, lifecycle: OwnerReadLifecycle) throws {
         do { try authority.verifySelf() } catch { lifecycle.fail(.identity); throw error }
-        let listener: (fd: Int32, device: dev_t, inode: ino_t)
+        let listener: (fd: Int32, device: dev_t, inode: ino_t, leaseFD: Int32)
         do { listener = try OwnerReadSocket.listener() }
         catch {
             let unproven = error as? OwnerReadFault == .cleanupUnproven
@@ -60,6 +62,7 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
         defer {
             let closed = close(listener.fd) == 0
             let removed = OwnerReadSocket.removeOwnSocket(device: listener.device, inode: listener.inode)
+            flock(listener.leaseFD,LOCK_UN);close(listener.leaseFD)
             lifecycle.listenerClosed(cleanupProven: closed && removed)
         }
         while !stop.cancelled {

@@ -136,7 +136,7 @@ enum OwnerReadSocket {
             return fd
         } catch { close(fd); throw error }
     }
-    static func listener() throws -> (fd: Int32, device: dev_t, inode: ino_t) {
+    static func listener() throws -> (fd: Int32, device: dev_t, inode: ino_t, leaseFD: Int32) {
         // Create only these two fixed directories, checking each existing parent.
         let arl = NSHomeDirectory() + "/Library/Application Support/ARL"
         for directory in [arl, OwnerReadAuthority.directory] {
@@ -147,10 +147,44 @@ enum OwnerReadSocket {
             guard lstat(directory, &st) == 0, st.st_mode & S_IFMT == S_IFDIR,
                   st.st_uid == getuid(), st.st_mode & 0o077 == 0 else { throw OwnerReadFault.identity }
         }
-        // Never unlink an unknown or stale endpoint. Removal requires review.
-        var existing = stat()
-        guard lstat(OwnerReadAuthority.socketPath, &existing) != 0, errno == ENOENT else { throw OwnerReadFault.unavailable }
-        return try bindListener(path: OwnerReadAuthority.socketPath, failAfterBind: false)
+        return try leasedListener(path:OwnerReadAuthority.socketPath)
+    }
+    private static func leasedListener(path:String) throws -> (fd:Int32,device:dev_t,inode:ino_t,leaseFD:Int32) {
+        let directory=URL(fileURLWithPath:path).deletingLastPathComponent().path
+        let parent=open(directory,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC)
+        guard parent>=0 else {throw OwnerReadFault.unavailable}
+        defer {close(parent)}
+        var info=stat()
+        guard fstat(parent,&info)==0,info.st_uid==getuid(),info.st_mode & 0o777 == 0o700 else {throw OwnerReadFault.identity}
+        let lease=openat(parent,"read.socket.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_CLOEXEC,0o600)
+        guard lease>=0 else {throw OwnerReadFault.unavailable}
+        do {
+            guard fstat(lease,&info)==0,info.st_mode & S_IFMT == S_IFREG,info.st_uid==getuid(),
+                  info.st_mode & 0o777 == 0o600,info.st_nlink==1,
+                  flock(lease,LOCK_EX|LOCK_NB)==0 else {throw OwnerReadFault.unavailable}
+            var previous=stat()
+            if lstat(path,&previous)==0 {
+                guard previous.st_mode & S_IFMT == S_IFSOCK,previous.st_uid==getuid(),
+                      previous.st_mode & 0o777 == 0o600 else {throw OwnerReadFault.unavailable}
+                // Same recovery boundary as the Messages relay: an exclusive
+                // lifetime lease AND explicit ECONNREFUSED. A live listener,
+                // uncertain probe, replaced inode or foreign file is retained.
+                var address=try address(path)
+                let probe=socket(AF_UNIX,SOCK_STREAM,0)
+                guard probe>=0 else {throw OwnerReadFault.unavailable}
+                let flags=fcntl(probe,F_GETFL)
+                guard flags>=0,fcntl(probe,F_SETFL,flags|O_NONBLOCK)==0 else {close(probe);throw OwnerReadFault.unavailable}
+                let connected=withUnsafePointer(to:&address) {$0.withMemoryRebound(to:sockaddr.self,capacity:1) {Darwin.connect(probe,$0,socklen_t(MemoryLayout<sockaddr_un>.size))}}
+                let failure=errno;close(probe)
+                var current=stat()
+                guard connected<0,failure==ECONNREFUSED,lstat(path,&current)==0,
+                      current.st_dev==previous.st_dev,current.st_ino==previous.st_ino,
+                      current.st_uid==previous.st_uid,current.st_mode==previous.st_mode,
+                      unlink(path)==0,fsync(parent)==0 else {throw OwnerReadFault.unavailable}
+            } else if errno != ENOENT {throw OwnerReadFault.unavailable}
+            let listener=try bindListener(path:path,failAfterBind:false)
+            return (listener.fd,listener.device,listener.inode,lease)
+        } catch {flock(lease,LOCK_UN);close(lease);throw error}
     }
     private static func bindListener(path: String, failAfterBind: Bool) throws -> (fd: Int32, device: dev_t, inode: ino_t) {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
@@ -185,6 +219,10 @@ enum OwnerReadSocket {
         return unlink(path) == 0
     }
     #if ARL_OWNER_FIXTURE
+    static func fixtureLeasedListener(path:String) throws -> (fd:Int32,device:dev_t,inode:ino_t,leaseFD:Int32) {
+        guard path != OwnerReadAuthority.socketPath,path.hasPrefix("/private/tmp/arl-r5-") else {throw OwnerReadFault.identity}
+        return try leasedListener(path:path)
+    }
     static func fixtureListener(path: String, failAfterBind: Bool = false) throws -> (fd: Int32, device: dev_t, inode: ino_t) {
         // The fixture supplies an owned short temporary path, never the live endpoint.
         guard path != OwnerReadAuthority.socketPath, path.hasPrefix("/private/tmp/arl-r5-") else { throw OwnerReadFault.identity }

@@ -14,7 +14,7 @@ def default_policies(local_enabled=False):
 def metadata_policies():
     if compatibility:return compatibility.metadata_policies()
     return {'settings':AppPolicy(frozenset(),frozenset(),0,0,0,
-        methods=frozenset({'health','ready','overview','settings.snapshot','settings.logs','settings.logs_export','settings.logs.v3','settings.modules_snapshot'}),public_metadata=True)}
+        methods=frozenset({'health','ready','overview','settings.snapshot','settings.logs','settings.logs_export','settings.logs.v3','settings.log_details.v1','settings.logs.recent.v1','settings.modules_snapshot'}),public_metadata=True)}
 
 def managed_app_ids():
     return compatibility.managed_app_ids() if compatibility else frozenset()

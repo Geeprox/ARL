@@ -89,6 +89,9 @@ final class RuntimeStore {
     private(set) var bundledRuntimeRecovering = false
     private(set) var credentialOwnerRecovering = false
     private(set) var credentialOwnerMessage: String?
+    @ObservationIgnored private var credentialOwnerRetryAfter=Date.distantPast
+    @ObservationIgnored private var credentialOwnerRetryCount=0
+    @ObservationIgnored private var credentialOwnerHealthySince:Date?
     let demo: Bool
     #if ARL_FUTURE_OCT3
     let sourceActionsHeld = true
@@ -160,6 +163,8 @@ final class RuntimeStore {
         }
     }
     private func maintainNASConnection() async {
+        observeCredentialOwner()
+        maintainCredentialConnection()
         guard !Task.isCancelled,!exitRequested,exitOperation == nil,lifecycleOperation == nil,
               !nativeActionsHeld,let owner=nasSettings.serverSetupOwner else{return}
         await owner.maintainServerConnection()
@@ -273,6 +278,20 @@ final class RuntimeStore {
         bundledRuntimeError = bundledRuntimeOwner?.failure
         credentialOwnerStatus = credentialReadOwner?.snapshot ?? .disabled
         configureMessagesReceiveRelay()
+        if credentialOwnerStatus.phase == .listening {
+            credentialOwnerMessage=nil
+            if credentialOwnerHealthySince == nil {credentialOwnerHealthySince=Date()}
+            if Date().timeIntervalSince(credentialOwnerHealthySince!)>=30 {credentialOwnerRetryCount=0}
+        } else {credentialOwnerHealthySince=nil}
+    }
+    private func maintainCredentialConnection() {
+        guard !Task.isCancelled,!nativeActionsHeld,!demo,!isolated,!requiresIsolatedHome,
+              credentialOwnerStatus.canAutomaticallyRecover,canRecoverCredentialOwner,
+              Date()>=credentialOwnerRetryAfter else{return}
+        let delays:[TimeInterval]=[5,15,60,120,300]
+        credentialOwnerRetryAfter=Date().addingTimeInterval(delays[min(credentialOwnerRetryCount,delays.count-1)])
+        credentialOwnerRetryCount=min(credentialOwnerRetryCount+1,delays.count-1)
+        recoverCredentialOwner()
     }
     func recoverBundledRuntime() {
         guard let owner = bundledRuntimeOwner, owner.failure != nil, !bundledRuntimeRecovering, !exitRequested, lifecycleOperation == nil else { return }
@@ -310,7 +329,7 @@ final class RuntimeStore {
             }
             guard !Task.isCancelled, lifecycleOperation == token, !exitRequested else { return }
             credentialReadOwner = .start(service: credentialBootstrap.service, enabled: true, appleCall: appleOwnerCall, nasCall: nasOwnerCall)
-            credentialOwnerMessage = "已重新开始核验本机连接；原业务请求不会自动重试。"
+            credentialOwnerMessage = nil
         }
     }
     func refresh(resetLogs: Bool = false) async {

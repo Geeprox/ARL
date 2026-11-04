@@ -14,40 +14,39 @@ struct ServiceConnectionsView: View {
         self.nasSetup = nasSetup
     }
     private var bootstrap: CredentialHostBootstrap { store.credentialBootstrap }
+    @State private var category = "Apple 生态"
     var body: some View {
-        ScrollViewReader {proxy in ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                EditorialHeading(title: "服务连接", subtitle: "")
-                    .padding(.bottom,8)
-                connectionCard("日历",icon:"calendar",symbol:"calendar") {
-                    ConnectionIndicator(ready:calendarReady,pending:store.calendarPermission.busy,title:"日历",text:calendarReady ? "已连接":nil)
-                } content: {
-                    if !calendarReady {calendar}
+        VStack(alignment:.leading,spacing:18) {
+            EditorialHeading(title:"服务连接",subtitle:"")
+            EditorialTabs(options:[.init(title:"Apple 生态",symbol:"apple.logo"),.init(title:"NAS",symbol:"externaldrive"),.init(title:"其他服务",symbol:"square.grid.2x2")],selection:$category)
+            ScrollViewReader {proxy in
+                ScrollView {
+                    VStack(alignment:.leading,spacing:16) {
+                        if category == "Apple 生态" {
+                            connectionCard("日历",icon:"calendar",symbol:"calendar") {
+                                ConnectionIndicator(ready:calendarReady,pending:store.calendarPermission.busy,title:"日历",text:calendarReady ? "已连接":nil)
+                            } content: {if !calendarReady {calendar}}
+                            connectionCard("提醒事项",icon:"reminders",symbol:"checklist") {
+                                ConnectionIndicator(ready:store.remindersFirst.value?.fresh == true && store.remindersFirst.value?.permission_state == "authorized_full",pending:store.remindersRestoring,title:"提醒事项")
+                            } content: {reminders}
+                            connectionCard("备忘录",icon:"notes",symbol:"note.text") {
+                                appleStatus("备忘录",permission:store.notesDirect.permission,observation:store.notesDirect.connection.state)
+                            } content: {TaskNotesConnectionView(controller:store.notesDirect)}
+                            connectionCard("信息",icon:"messages",symbol:"message") {
+                                appleStatus("信息",permission:store.messagesDirect.permission,observation:store.messagesDirect.connection.state)
+                            } content: {messages}
+                        } else if category == "NAS" {
+                            DetailCard(title:"") {
+                                TaskNASConnectionView(model:nasSetup ?? store.nasSettings,preview:store.demo)
+                            }
+                        } else {otherServices}
+                    }.padding(.bottom,4).frame(maxWidth:880,alignment:.leading).frame(maxWidth:.infinity)
                 }
-                connectionCard("提醒事项",icon:"reminders",symbol:"checklist") {
-                    ConnectionIndicator(ready:store.remindersFirst.value?.fresh == true && store.remindersFirst.value?.permission_state == "authorized_full",pending:store.remindersRestoring,title:"提醒事项")
-                } content: { reminders }
-                connectionCard("备忘录",icon:"notes",symbol:"note.text") {
-                    appleStatus("备忘录",permission:store.notesDirect.permission,observation:store.notesDirect.connection.state)
-                } content: { TaskNotesConnectionView(controller:store.notesDirect) }
-                connectionCard("信息",icon:"messages",symbol:"message") {
-                    appleStatus("信息",permission:store.messagesDirect.permission,observation:store.messagesDirect.connection.state)
-                } content: { messages }
-                DetailCard(title:"") {
-                    HStack(spacing:12) {
-                        Image(systemName:"externaldrive.connected.to.line.below").font(.title2).frame(width:32,height:32).foregroundStyle(.secondary)
-                        Text("网络硬盘").font(.headline);Spacer()
-                        ConnectionIndicator(ready:(nasSetup ?? store.nasSettings).snapshot.connected == .verified,pending:(nasSetup ?? store.nasSettings).isPerforming,title:"网络硬盘")
-                    }
-                    TaskNASConnectionView(model:nasSetup ?? store.nasSettings,preview:store.demo)
-                }.id("网络硬盘")
-                DisclosureGroup("其他服务") { otherServices.padding(.top,12) }.padding(.horizontal,4)
-            }.padding(24).frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity)
-                .buttonStyle(EditorialActionButtonStyle()).textFieldStyle(EditorialFieldStyle())
-                .groupBoxStyle(EditorialGroupBoxStyle()).tint(EditorialStyle.accent)
-        }
-        .onAppear {if let initialDestination {proxy.scrollTo(initialDestination,anchor:.top)}}
-        }
+                .onAppear {if let initialDestination {proxy.scrollTo(initialDestination,anchor:.top)}}
+            }
+        }.padding(24).frame(maxWidth:.infinity,alignment:.topLeading)
+            .buttonStyle(EditorialActionButtonStyle()).textFieldStyle(EditorialFieldStyle())
+            .groupBoxStyle(EditorialGroupBoxStyle()).tint(EditorialStyle.accent)
     }
     private var calendarReady:Bool {store.calendarPermission.state == .fullAccess && !store.calendarPermission.lastProbeFailed}
     private func connectionCard<Status:View,Content:View>(_ title:String,icon:String,symbol:String,@ViewBuilder status:@escaping ()->Status,@ViewBuilder content:@escaping ()->Content)->some View {
@@ -134,17 +133,30 @@ struct ServiceConnectionsView: View {
                     }
                 }
             } else { Text("服务列表不可用").font(.callout).foregroundStyle(.secondary) }
-            DisclosureGroup("连接诊断") {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(store.credentialOwnerStatus.title)
-                    Text(store.credentialOwnerStatus.detail)
-                    if let message = store.credentialOwnerMessage { Text(message) }
-                    if store.credentialOwnerStatus.canRequestRecovery {
-                        Button(store.credentialOwnerRecovering ? "核对中" : "恢复连接") { store.recoverCredentialOwner() }.disabled(!store.canRecoverCredentialOwner)
-                    } else { Button("检查连接") { store.observeCredentialOwner() } }
-                }.font(.caption).foregroundStyle(.secondary).padding(.top, 10)
+            DetailCard(title:"连接诊断") {
+                HStack {
+                    VStack(alignment:.leading,spacing:5) {
+                        Text(store.credentialOwnerStatus.title).font(.callout.weight(.medium))
+                        Text(store.credentialOwnerStatus.phase == .failed || store.credentialOwnerStatus.phase == .stopping
+                            ? store.credentialOwnerStatus.detail : "为已授权的应用提供本机服务连接。")
+                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                    }
+                    Spacer()
+                    ConnectionIndicator(ready:store.credentialOwnerStatus.phase == .listening,
+                        pending:store.credentialOwnerRecovering || store.credentialOwnerStatus.phase == .starting,
+                        title:"登录服务",text:store.credentialOwnerRecovering ? "恢复中":store.credentialOwnerStatus.title)
+                }
+                if let message = store.credentialOwnerMessage {Text(message).font(.caption).foregroundStyle(.secondary)}
+                if store.credentialOwnerStatus.canRequestRecovery {
+                    Button(store.credentialOwnerRecovering ? "正在恢复…":"恢复登录服务") {store.recoverCredentialOwner()}.disabled(!store.canRecoverCredentialOwner)
+                }
             }
-        }.onAppear { store.observeCredentialOwner() }
+        }.task {
+            while !Task.isCancelled {
+                store.observeCredentialOwner()
+                do {try await Task.sleep(for:.seconds(5))}catch{return}
+            }
+        }
     }
     private var messages: some View {
         let controller = store.messagesDirect
@@ -163,7 +175,7 @@ private struct TaskNotesConnectionView: View {
     @State private var appearance:UUID?
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if controller.permission != .authorized || controller.connection.state.lastFailure != nil || controller.busy {
+            if controller.permission != .authorized || controller.connection.state.lastFailure != nil {
             AppleConnectionActionsView(target: .notes, permission: controller.permission, enabled: controller.enabled,
                 busy: controller.busy, observation: controller.connection.state,
                 check: { Task { await controller.prepareForDisplay() } }, request: request)
@@ -171,22 +183,22 @@ private struct TaskNotesConnectionView: View {
             if controller.permission == .authorized {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("默认写入文件夹").font(.callout.weight(.medium))
-                    if !controller.folders.isEmpty || controller.scope != nil {
+                    if !controller.folders.isEmpty {
                         EditorialMenu {
-                            ForEach(controller.folders) { folder in
-                                Button(folder.label) {
-                                    controller.performUserActionAfterClick { ticket in await controller.select(folder, ticket: ticket) }
-                                }
+                            ForEach(controller.folders) {folder in
+                                Button(folder.label) {controller.performUserActionAfterClick {ticket in await controller.select(folder,ticket:ticket)}}
                             }
-                        } label: { Text(controller.scope?.folder.label ?? "选择文件夹") }
-                            .frame(maxWidth: 360, alignment: .leading)
-                            .disabled(controller.busy || controller.folders.isEmpty)
+                        } label:{Text(controller.scope?.folder.label ?? "选择文件夹")}
+                            .frame(maxWidth:360,alignment:.leading).disabled(controller.busy)
                     } else {
-                        if let folder = controller.scope?.folder { Text(folder.label).font(.callout).foregroundStyle(.secondary) }
+                        HStack {
+                            if let folder=controller.scope?.folder {Text(folder.label).font(.callout)}
+                            Spacer()
+                            Button(controller.scope == nil ? "选择文件夹":"更改文件夹") {
+                                controller.performUserActionAfterClick {ticket in await controller.loadFolders(ticket:ticket)}
+                            }.disabled(controller.busy)
+                        }
                     }
-                    if controller.folders.isEmpty && controller.scope == nil { Button("选择默认写入文件夹") {
-                        controller.performUserActionAfterClick { ticket in await controller.loadFolders(ticket: ticket) }
-                    }.disabled(controller.busy) }
                     Text("读取和搜索覆盖所有已授权文件夹。").font(.caption).foregroundStyle(.secondary)
                     if let message=controller.message {Text(message).font(.callout).foregroundStyle(.secondary)}
                     if let detail = controller.detail {
@@ -214,22 +226,25 @@ private struct TaskNotesConnectionView: View {
 private struct TaskNASConnectionView: View {
     @ObservedObject var model: ARLNASSetupModel
     var preview = false
-    @StateObject private var discovery = NASDiscoveryModel()
-    @State private var account = ""
+        @State private var account = ""
     @State private var secret = ""
     @State private var action: Task<Void, Never>?
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            if !preview { NASDiscoverySection(discovery: discovery, setup: model) }
             if let owner = model.serverSetupOwner {
                 NASServerSetupSections(owner: owner, setup: model)
             } else {
+                HStack(spacing:12) {
+                    Image(systemName:"externaldrive.connected.to.line.below").font(.system(size:23)).frame(width:32,height:32).foregroundStyle(.secondary)
+                    Text("网络硬盘").font(.headline);Spacer()
+                    ConnectionIndicator(ready:model.snapshot.connected == .verified,pending:model.isPerforming,title:"网络硬盘")
+                }
                 legacyConfiguration
             }
-        }.frame(maxWidth: 600, alignment: .leading)
+        }.frame(maxWidth: .infinity, alignment: .leading)
             .onAppear { model.refreshCachedStatus() }
             .onChange(of: model.draft) { clearCredentialFields(); model.invalidateDirectories() }
-            .onDisappear { clearCredentialFields(); discovery.cancel(); model.invalidateDirectories() }
+            .onDisappear { clearCredentialFields(); model.invalidateDirectories() }
     }
     private var legacyConfiguration: some View {
         VStack(alignment: .leading, spacing: 16) {

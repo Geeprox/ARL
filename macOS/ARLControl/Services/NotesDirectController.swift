@@ -232,7 +232,7 @@ import Observation
             guard epoch == generation else { return }
             scope = candidate; searchResult = nil; readResult = nil
             preferences.set(try JSONEncoder().encode(folder), forKey: "notesDirectSelectedFolderV1")
-            message = "目录已选定，可查找或新建笔记。"
+            message = nil
         } catch { failure(error) }
     }
     func search(query: String, offset: Int = 0, ticket: NotesDirectActionTicket) async {

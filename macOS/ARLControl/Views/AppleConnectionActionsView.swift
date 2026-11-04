@@ -26,9 +26,8 @@ struct AppleConnectionActionsView: View {
                      ? targetTitle+"未运行，打开后会自动连接。" : failure.issue.title)
                     .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
-            if busy || observation.refreshing {
-                ProgressView("正在处理连接").controlSize(.small)
-            } else if enabled {
+            Group {
+            if enabled {
                 if permission == .notDetermined || (permission == .unknown && observation.lastFailure?.issue == .targetNotRunning) {
                     Button("允许访问" + targetTitle, action: request)
                         .buttonStyle(EditorialActionButtonStyle(emphasis: .primary))
@@ -39,6 +38,7 @@ struct AppleConnectionActionsView: View {
                     Button("检查系统权限", action: check)
                 }
             }
+            }.disabled(busy || observation.refreshing)
             if let openMessage { Text(openMessage).font(.caption).foregroundStyle(.secondary) }
             if observation.lastFailure?.issue == .targetNotRunning && permission == .authorized {
                 Button("打开"+targetTitle,action:openTarget).disabled(!enabled || busy)

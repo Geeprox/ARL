@@ -5,39 +5,32 @@ struct ModelsView: View {
     let control: ControlPlaneState
     var codex: CodexNativeController? = nil
     var body: some View {
-        if let snapshot {
-            VStack(alignment: .leading, spacing: 18) {
-                if let codex { CodexTaskPanel(controller: codex) }
-                DetailCard(title: "模型服务") {
-                    if let providers = control.providerHealth.value {
-                        if !providers.contains(where: { $0.id == "codex_app_server" }) { Text("Codex 尚未接通").foregroundStyle(.secondary) }
-                        TimelineView(.periodic(from: .now, by: 5)) { timeline in
-                            VStack(spacing: 0) {
-                                ForEach(providers.filter { $0.id == "codex_app_server" }) { provider in
-                                    DisclosureGroup {
-                                        VStack(alignment: .leading, spacing: 10) {
-                                            MetadataRow(title: "模型调用", value: provider.inference_enabled ? "已启用" : "未启用")
-                                            MetadataRow(title: "模型加载", value: provider.model_load_state == "not_applicable" ? "不适用" : "未知")
-                                            MetadataRow(title: "模型目录", value: provider.catalog_models.isEmpty ? "没有" : provider.catalog_models.joined(separator: "、"))
-                                            if let time = provider.checked_at_ms { MetadataRow(title: "上次检查", value: Date(timeIntervalSince1970: Double(time) / 1000).formatted(date: .omitted, time: .standard)) }
-                                        }.padding(.leading, 50).padding(.vertical, 10)
-                                    } label: {
-                                        HStack(spacing: 14) {
-                                            AppIcon(id: provider.id, symbol: "cpu", size: 38)
-                                            VStack(alignment: .leading, spacing: 5) { Text(provider.title).font(.callout.weight(.semibold)); Text(provider.inference_enabled ? "已启用" : "未启用").font(.caption).foregroundStyle(.secondary) }
-                                            Spacer(minLength: 12)
-                                            StatusBadge(title: provider.isStale(at: timeline.date) ? "状态过期" : provider.stateTitle, color: provider.isStale(at: timeline.date) ? .secondary : provider.state == "ready" ? .green : provider.state == "discovered" ? EditorialStyle.graphite : .secondary)
-                                        }.padding(.vertical, 7)
-                                    }
-                                    if provider.id != providers.last?.id { Divider() }
-                                }
+        if let provider = control.providerHealth.value?.first(where:{$0.id == "codex_app_server"}) {
+            DetailCard(title:"模型服务") {
+                HStack(spacing:12) {
+                    AppIcon(id:provider.id,symbol:"cpu",size:32)
+                    VStack(alignment:.leading,spacing:4) {
+                        Text(provider.title).font(.headline)
+                        Text(provider.inference_enabled ? "模型调用已启用":"模型调用已关闭").font(.caption).foregroundStyle(.secondary)
+                    }; Spacer()
+                    ConnectionIndicator(ready:provider.state == "ready" && !provider.isStale(at:Date()),title:"Codex",text:provider.isStale(at:Date()) ? "状态待更新":provider.stateTitle)
+                }
+                if !provider.catalog_models.isEmpty {
+                    Divider()
+                    VStack(alignment:.leading,spacing:7) {
+                        Text("可用模型 · \(provider.catalog_models.count) 个").font(.caption).foregroundStyle(.secondary)
+                        LazyVGrid(columns:[GridItem(.adaptive(minimum:180),alignment:.leading)],alignment:.leading,spacing:8) {
+                            ForEach(provider.catalog_models,id:\.self) {model in
+                                Text(model).font(.callout).textSelection(.enabled)
+                                    .frame(maxWidth:.infinity,alignment:.leading)
                             }
                         }
-                    } else {
-                        ForEach(snapshot.providers.filter { $0.name == "codex_app_server" }) { provider in HStack { AppIcon(id: provider.id, symbol: "cpu"); Text(provider.title).font(.callout.weight(.medium)); Spacer(); StatusBadge(title: provider.availability == "ready" ? "已发现" : provider.availability == "disabled" ? "已关闭" : "未就绪") } }
                     }
                 }
+                if let time = provider.checked_at_ms {
+                    Text("最近检查 \(Date(timeIntervalSince1970:Double(time)/1000).formatted(date:.omitted,time:.shortened))").font(.caption).foregroundStyle(.secondary)
+                }
             }
-        } else { EmptyRuntimeView() }
+        }
     }
 }

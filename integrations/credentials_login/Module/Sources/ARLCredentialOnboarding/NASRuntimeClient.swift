@@ -50,8 +50,12 @@ enum NASPipeLiveness {
     }
 }
 
+#if ARL_NAS_PIPE_TEST
+enum NASPipeStopTesting {nonisolated(unsafe) static var afterStopMarked:(@Sendable ()->Void)?}
+#endif
+
 private final class NASOwnedPipe: @unchecked Sendable {
-    private let stateLock = NSLock(), exchangeLock = NSLock()
+    private let stateLock = NSLock(), exchangeLock = NSLock(), stopLock = NSLock()
     private let child = MusicReadOwnedChild()
     private let input = Pipe(), output = Pipe()
     private let gate: any DeploymentGate
@@ -322,12 +326,18 @@ private final class NASOwnedPipe: @unchecked Sendable {
         }
     }
     func stop() {
+        // An overlapping cancellation must join teardown. Returning merely
+        // because `stopped` was set can expose a still-live pipe to its replacement.
+        stopLock.lock(); defer { stopLock.unlock() }
         let first = stateLock.withLock { () -> Bool in
             if stopped { return false }; stopped = true
             secret.resetBytes(in: 0..<secret.count); secret.removeAll(keepingCapacity: false)
             return true
         }
         guard first else { return }
+        #if ARL_NAS_PIPE_TEST
+        NASPipeStopTesting.afterStopMarked?()
+        #endif
         _ = child.signal(SIGTERM, expected: nil)
         var until = ProcessInfo.processInfo.systemUptime + 1
         while child.isRunning && ProcessInfo.processInfo.systemUptime < until { child.pollExit(); usleep(10000) }

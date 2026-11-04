@@ -13,6 +13,9 @@ final class OwnerReadLifecycle: @unchecked Sendable {
         let listenerCleanupProven: Bool
         var drained: Bool { workerJoined && !operationPending && listenerCleanupProven }
         var canRequestRecovery: Bool { phase == .failed || phase == .stopping }
+        var canAutomaticallyRecover: Bool {
+            phase == .failed && drained && (failure == .listener || failure == .transport || failure == .taskPending)
+        }
         static let disabled = Snapshot(phase: .disabled, failure: nil, workerJoined: true,
                                        operationPending: false, listenerCleanupProven: true)
         var title: String {
@@ -29,10 +32,10 @@ final class OwnerReadLifecycle: @unchecked Sendable {
             if !listenerCleanupProven && workerJoined { return "旧连接尚未确认关闭，暂时无法恢复。" }
             switch failure {
             case .identity: return "应用身份或连接配置未通过核验，请检查完整安装后手动恢复。"
-            case .listener: return "本机连接端点未能建立。可手动恢复；不会移除其他进程的端点。"
+            case .listener: return "本机登录连接未能建立：端点被占用或尚未释放。ARL 会核对后重试。"
             case .cleanupPending: return "旧连接尚未确认关闭，关闭后才能恢复。"
             case .taskPending: return "旧请求仍在结束，恢复会先核对其完成状态。"
-            case .transport: return "本机连接意外结束，可手动恢复。"
+            case .transport: return "本机登录连接意外结束，ARL 会在旧请求结束后重新连接。"
             case nil: return "仅表示 ARL 本机连接状态，不代表供应方登录或业务操作成功。"
             }
         }

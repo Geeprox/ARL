@@ -81,7 +81,7 @@
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadTransport.swift",
-      "sha256": "b30c07728fcbfe7d2682f1a82e8e0fe0514066f57243cf8837a82d3c265cb777"
+      "sha256": "726eb2c03358cbbabc541182b34f0873909eeecfc83d6d89943d1f7dbde560c8"
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadWire.swift",
