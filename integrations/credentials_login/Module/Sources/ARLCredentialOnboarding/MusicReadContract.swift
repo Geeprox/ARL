@@ -592,7 +592,7 @@ enum MusicReadProtocol {
             guard let bytes=raw["output_bytes"] as? NSNumber,CFGetTypeID(bytes) != CFBooleanGetTypeID(),
                   bytes.doubleValue.rounded()==bytes.doubleValue,(1048577...1_000_000_000).contains(bytes.doubleValue),
                   let limit=raw["output_limit_bytes"] as? NSNumber,CFGetTypeID(limit) != CFBooleanGetTypeID(),
-                  [1048576,1048576+(1048576+1)*(1+2*16)].contains(limit.doubleValue),bytes.doubleValue>limit.doubleValue
+                  [Double(1048576),Double(1048576+(1048576+1)*(1+2*16))].contains(limit.doubleValue),bytes.doubleValue>limit.doubleValue
             else {throw CredentialError.uncertainLocalState}
             outputBytes=bytes.intValue;outputLimit=limit.intValue
         } else if reason == .responseTooLarge {
