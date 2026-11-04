@@ -1,5 +1,6 @@
 """Native Button focus intent/notification/timeout, with no actual activation."""
 from pathlib import Path
+import platform
 import shutil
 import subprocess
 import sys
@@ -15,7 +16,7 @@ class NotesFocusTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="arl-notes-focus-") as temporary:
             output = Path(temporary).resolve()
             sources = ["macOS/ARLControl/Models/NotesDirectModels.swift", "macOS/ARLControl/Services/NotesDirectFocus.swift", "tests/NotesFocusTests.swift"]
-            build = subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-target", "arm64-apple-macos14.0", "-j", "1", "-parse-as-library", "-module-cache-path", str(output / "cache"), *[str(ROOT / source) for source in sources], "-o", str(output / "checks")], capture_output=True, text=True, timeout=90)
+            build = subprocess.run(["xcrun", "swiftc", "-swift-version", "6", "-target", f"{platform.machine()}-apple-macos14.0", "-j", "1", "-parse-as-library", "-module-cache-path", str(output / "cache"), *[str(ROOT / source) for source in sources], "-o", str(output / "checks")], capture_output=True, text=True, timeout=90)
             self.assertEqual(build.returncode, 0, build.stdout + build.stderr)
             result = subprocess.run([str(output / "checks")], capture_output=True, text=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

@@ -10,7 +10,7 @@
   "reviewed_pattern_matches": [
     {
       "path": ".github/workflows/source-checks.yml",
-      "sha256": "12b5baa32e738c18da522370b04baa5e3cb35af15cd11cd68222bb40ac9c91aa",
+      "sha256": "400275d218ce1150ad512c1f920fdffbcdf52c7c851875b4289a58dee0eb4d58",
       "categories": {
         "private_app_reference": "Intentional source-only integration test module names, including the new native listener recovery check."
       }

@@ -21,7 +21,11 @@ jobs:
           name: portable-test-receipts
           path: build/ci-portable/
   native-source:
-    runs-on: macos-latest
+    # Keep native tests available when the hosted ARM64 pool is constrained.
+    # check_native_source.py still compiles the release recipe's ARM64 target.
+    runs-on: macos-15-intel
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
