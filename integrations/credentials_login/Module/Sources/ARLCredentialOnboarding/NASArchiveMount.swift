@@ -39,7 +39,8 @@ public final class NASArchiveMount: @unchecked Sendable {
         let source = withUnsafeBytes(of: value.f_mntfromname) { String(decoding: $0.prefix { $0 != 0 }, as: UTF8.self) }
         let address = URLComponents(string: "smb:" + source)
         let expectedPath = "/" + destination.share + (destination.directory.isEmpty ? "" : "/" + destination.directory)
-        guard type == "smbfs", point == root.path,
+        guard point == root.path else { throw NASRuntimeFailure.unavailable }
+        guard type == "smbfs",
               address?.host?.lowercased() == destination.endpoint.host.lowercased(),
               (address?.port ?? 445) == destination.endpoint.port,
               address?.path == expectedPath else { throw NASRuntimeFailure.sourceChanged }
@@ -60,7 +61,24 @@ public final class NASArchiveMount: @unchecked Sendable {
         task.waitUntilExit()
         guard task.terminationStatus == 0, result.count < 262144,
               let object = try? JSONSerialization.jsonObject(with: result) else { throw NASRuntimeFailure.invalidReply }
-        guard Self.encryptedSMB3(object) else { throw NASRuntimeFailure.accessDenied }
+        try Self.requireEncryptedSMB3(object)
+    }
+    static func requireEncryptedSMB3(_ object: Any) throws {
+        if encryptedSMB3(object) { return }
+        // An explicit null current algorithm is an unencrypted session. Missing
+        // or unfamiliar metadata is not permission to disconnect a live mount.
+        guard unencryptedSMB3(object) else { throw NASRuntimeFailure.invalidReply }
+        throw NASRuntimeFailure.accessDenied
+    }
+    private static func unencryptedSMB3(_ object: Any) -> Bool {
+        if let record = object as? [String: Any] {
+            if let version = record["SMB_VERSION"] as? String {
+                return ["SMB_3.0", "SMB_3.0.2", "SMB_3.1.1"].contains(version)
+                    && record["SMB_CURR_ENCRYPT_ALGORITHM"] is NSNull
+            }
+            return record.values.contains { unencryptedSMB3($0) }
+        }
+        return (object as? [Any])?.contains { unencryptedSMB3($0) } ?? false
     }
     static func encryptedSMB3(_ object: Any) -> Bool {
         // smbutil emits a share dictionary inside an array on current macOS.
@@ -76,22 +94,47 @@ public final class NASArchiveMount: @unchecked Sendable {
         }
         return (object as? [Any])?.contains { encryptedSMB3($0) } ?? false
     }
+    /// Reconnect only a verified, still-owned unencrypted mount. Unknown
+    /// metadata, changed sources, revoked credentials and busy mounts stop here.
+    static func reuseExisting(validate: () throws -> Void,
+                              verifyEncryption: () throws -> Void,
+                              checkCredential: () throws -> Void,
+                              disconnect: () throws -> Void) throws -> Bool {
+        do { try validate() }
+        catch NASRuntimeFailure.unavailable { return false }
+        do { try verifyEncryption(); return true }
+        catch NASRuntimeFailure.accessDenied {
+            try checkCredential()
+            try validate()
+            try disconnect()
+            return false
+        }
+    }
     static func connect(destination: NASArchiveDestination, root: URL, username: String, password: String,
                         checkCredential: @escaping @Sendable () throws -> Void) throws -> NASArchiveMount {
         try destination.validated(); try checkCredential()
         let fm = FileManager.default
+        let ownedRoot = fm.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/ARL/Moments/mounts/" + destination.id.uuidString.lowercased())
+        guard root.isFileURL, root.standardizedFileURL.path == ownedRoot.path else { throw NASRuntimeFailure.invalidRequest }
         // A fixed per-grant private mountpoint, never a caller-provided shell path.
         try fm.createDirectory(at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         guard root.resolvingSymlinksInPath().path == root.path else { throw NASRuntimeFailure.invalidRequest }
         // A normal ARL restart can reuse only this exact server/share/subfolder
         // mount, after credential-generation and current encryption checks.
         let existing = NASArchiveMount(destination: destination, root: root, checkCredential: checkCredential)
-        if (try? existing.validate()) != nil { try existing.verifyEncryption(); return existing }
+        if try reuseExisting(validate: existing.validate, verifyEncryption: existing.verifyEncryption,
+                             checkCredential: checkCredential, disconnect: {
+            guard unmount(root.path, 0) == 0 else { throw NASRuntimeFailure.nasBusy }
+        }) { return existing }
         guard try fm.contentsOfDirectory(atPath: root.path).isEmpty else { throw NASRuntimeFailure.sourceChanged }
+        try checkCredential()
         var parts = URLComponents(); parts.scheme = "smb"; parts.host = destination.endpoint.host; parts.port = destination.endpoint.port
         parts.path = "/" + destination.share + (destination.directory.isEmpty ? "" : "/" + destination.directory)
         guard let address = parts.url else { throw NASRuntimeFailure.invalidRequest }
-        let open = NSMutableDictionary(dictionary: ["UIOption": "NoUI", "NoUserPreferences": true, "ForceNewSession": true])
+        // SMB reads these options before negotiating/authenticating the session,
+        // as well as at mount time. Never reuse a non-encrypted kernel session.
+        let open = NSMutableDictionary(dictionary: ["UIOption": "NoUI", "NoUserPreferences": true, "ForceNewSession": true,
+            "SMBSessionEncryption": true, "SMBShareEncryption": true])
         let options = NSMutableDictionary(dictionary: ["MountAtMountDir": true, "AllowSubMounts": true, "SoftMount": true,
             "MountFlags": Int(MNT_DONTBROWSE | MNT_NOSUID | MNT_NODEV), "SMBSessionEncryption": true, "SMBShareEncryption": true])
         var points: Unmanaged<CFArray>?

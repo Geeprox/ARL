@@ -303,8 +303,8 @@ final class MomentsController {
                 let code = (error as? MomentsFault)?.code ?? (error as? NASRuntimeFailure)?.rawValue
                     ?? (error as? CredentialError).map {String(describing:$0)} ?? "connection_failed"
                 switch code {
-                case "archive_busy","busy": break // Wait for the existing local operation; the next tick retries.
-                case "nas_access_denied": nasError="NAS 连接未启用 SMB 加密，备份尚未进行。请在 NAS 开启共享加密后重试。"
+                case "archive_busy","busy","nas_busy": break // Wait for the existing local operation; the next tick retries.
+                case "nas_access_denied": nasError="NAS 备份连接未通过加密检查，尚未同步。ARL 会自动重连；若持续失败，请检查 NAS 的 SMB 加密设置。"
                 case "staleReference","notFound","wrongPurpose": nasError="NAS 登录信息已变化，请重新选择备份位置。"
                 case "nas_hash_mismatch","media_hash_mismatch","reclaim_verification_failed": nasError="备份校验未通过。未校验的本地文件已保留，请重试备份。"
                 default: nasError="暂时无法连接备份目录，尚未完成同步。网络恢复后会自动重试。"

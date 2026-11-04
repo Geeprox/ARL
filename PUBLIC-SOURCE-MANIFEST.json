@@ -362,7 +362,7 @@
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicWriteJournal.swift": "7bebe4511790a4d636cf3694dc37f96225770a73aaab35dba1bc8bd46fd9566f",
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/MusicWriteRecovery.swift": "e22ad804706dc639a58c75240229a8e9f01027271dffac91c8d2a9e75a63f073",
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASAcceptance.swift": "11bf85ab76ff65c1ac27500fe743e3c589b223d13f2c237144ce97cee206f854",
-    "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASArchiveMount.swift": "a2fe6676b2c539aa5fca7b0fff099eeec4a2d0d59ec932f08d93da73313de7f4",
+    "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASArchiveMount.swift": "5195cc1c19050dffc333c5ebf233fce624f0883a05c0d07e8d9a11a453e22757",
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASBusinessJournal.swift": "8dc2a0084a2cff0d505a8d9da7cb62d36026cf180d530c8adcd82a41559b4f5d",
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASCredentialService.swift": "3ed8529936e55619740541cc9118aecf1e9e431086ab51243e2bc3a629ab435f",
     "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASDirectoryPage.swift": "98c3c0c6c8a2f0f870ec8500a8555a896d99257538047f0778dd488eed8624c2",
@@ -615,7 +615,7 @@
     "macOS/ARLControl/Models/ResourceSampleState.swift": "def2a06266e86db4f236a07a27e5f76e4ada5fe4d2c809823839674289e6c410",
     "macOS/ARLControl/Models/RuntimeSnapshot.swift": "e244fd3b2fea80357569354b9ea7a90bb1ebd69d454b1161116b0db82fd10b4f",
     "macOS/ARLControl/Models/ServiceConnectionCatalog.swift": "b94003ca57d191a781a7f396b1ee44a0ec5c6a8e4e41c84be54f413e457f8135",
-    "macOS/ARLControl/Moments/MomentsController.swift": "7124d63d7aef5659c2960e7292e0d674fd7746241d4dc3cbd2f10ee1768cd1f9",
+    "macOS/ARLControl/Moments/MomentsController.swift": "9521b4a4753aa4f760ac547fd80bac533ccef84eafbc2913c607f8077e346b57",
     "macOS/ARLControl/Moments/MomentsFiles.swift": "d13f3c5669daec54f184a6da850967914e6d69fd0b4dbbb7571650bfce127425",
     "macOS/ARLControl/Moments/MomentsNAS.swift": "e2aa818b0264605db3c37ca56959c1b1b56e8f71fa25a9110c074853f341a298",
     "macOS/ARLControl/Moments/MomentsNASPicker.swift": "40fc1449107e187047e38631f89d8301c4f5b50febf6fb11eb20b7df0c6370ce",
@@ -1057,7 +1057,7 @@
     "tests/test_apple_reusable_review.py": "fd42132f03a26a6aec305033d829fa210cafaceb9238d1b15291e376d4cfadca",
     "tests/test_application_host.py": "5af97bd8c3c8b2acdcdedabdf3c13fdf3e9b7565cd3aea6a33e3d147e0b0fbfb",
     "tests/test_application_models.py": "d5282f68cf4eaebaacd13a8a65c19aeaa182307ddb4be4a7b7adaae004808db7",
-    "tests/test_application_native.py": "1c226f841c96acabe1600a599b3ed9c71cf525ecbc4b2f6b20325bb13a492623",
+    "tests/test_application_native.py": "478f4f6c04f990fb34e2b0ce32fe6acd26ffa9549e5857f0417c928e2a42c1f1",
     "tests/test_application_platform.py": "090ec0773f72957461142cdc04f138e0515843fed01a2a185d9f5029395a56f3",
     "tests/test_attachment_inspection.py": "01cd654c7a92526fb5d59f000f701c51f849160b47692ab5d39373f3427346aa",
     "tests/test_bootstrap_checks.py": "dd8bff949532570ba0dedc51549c288a6fdb21dea148c3af7ac7710534066a02",
@@ -1191,7 +1191,8 @@
     "tests/worker_fixture.py": "72aa18e6400cb1c6e9032a252b90b0f48db446ddf45ff6163cd2d619ff01c9b3",
     "vendor/moments/PILLOW.lock.json": "14fc97936dea38024ac4f564b01508b5bdb0a505d9aad06b501d44920213194b",
     "vendor/nas/DEPENDENCIES.lock.json": "bd489b9e801a9ae87236f2ee3479c0ba5e1814c4b17ac01089ce67edb7183861",
-    "vendor/nas/python-source.json": "ce7c4fb282b1ef6f92f17e99e264b6d577445e4d3da6abe5ae65b14061ec4757"
+    "vendor/nas/python-source.json": "ce7c4fb282b1ef6f92f17e99e264b6d577445e4d3da6abe5ae65b14061ec4757",
+    "tests/NASArchiveRecoveryTests.swift": "370eba21774c01d3b442480842beda1d676e28b5763711e9e02c0a50b9b31095"
   },
   "publish_ready": true
 }

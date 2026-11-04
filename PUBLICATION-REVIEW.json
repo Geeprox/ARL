@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_files": 1188,
+  "source_files": 1189,
   "private_review_completed": true,
   "unresolved_sensitive_findings": 0,
   "history_included": false,
@@ -613,7 +613,7 @@
     },
     {
       "path": "integrations/credentials_login/Module/Sources/ARLCredentialOnboarding/NASArchiveMount.swift",
-      "sha256": "a2fe6676b2c539aa5fca7b0fff099eeec4a2d0d59ec932f08d93da73313de7f4",
+      "sha256": "5195cc1c19050dffc333c5ebf233fce624f0883a05c0d07e8d9a11a453e22757",
       "categories": {
         "private_app_reference": "Intentional integration module, fixture, test or documentation names; no operational state."
       }
@@ -866,7 +866,7 @@
     },
     {
       "path": "macOS/ARLControl/Moments/MomentsController.swift",
-      "sha256": "7124d63d7aef5659c2960e7292e0d674fd7746241d4dc3cbd2f10ee1768cd1f9",
+      "sha256": "9521b4a4753aa4f760ac547fd80bac533ccef84eafbc2913c607f8077e346b57",
       "categories": {
         "private_app_reference": "Friday is the documented archive subdirectory format; no account, host or archive content."
       }
