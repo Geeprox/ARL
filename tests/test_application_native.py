@@ -20,7 +20,8 @@ class NativeApplicationRegressionTests(unittest.TestCase):
             result=subprocess.run([str(binary),*([str(root/'fixture')] if fixture else [])],capture_output=True,text=True,timeout=30)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr[-6000:])
     def test_discovery_aliases_deduplicate_without_merging_unrelated_devices(self):
-        self.compile_run(['macOS/ARLControl/NASSettings/NASAddressInput.swift',
+        self.compile_run(['macOS/ARLControl/Views/EditorialStyle.swift',
+            'macOS/ARLControl/NASSettings/NASAddressInput.swift',
             'macOS/ARLControl/NASSettings/NASDiscovery.swift','macOS/ARLControl/NASSettings/NASDiscoverySection.swift',
             'tests/NASDiscoveryRefreshTests.swift'],flags=['-D','NAS_DISCOVERY_FIXTURE'])
     def test_notes_read_all_and_write_scope_guards(self):
