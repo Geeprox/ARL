@@ -695,7 +695,7 @@
     "macOS/ARLControl/Tests/control_transport_checks.py": "d447ab1c52a1b8a065bfd195309e3f54b0e88a5960d4eafd5ae5fc953467427e",
     "macOS/ARLControl/Views/AdvancedView.swift": "87dc013ababb2cc1eeb5a7ddda82328e7e7578ac2a00129e52b60243d3db08a8",
     "macOS/ARLControl/Views/AppIcon.swift": "c598a2c5aab0741877304a5378304af1f1b5363dd453c6f421c0253ffad0cae3",
-    "macOS/ARLControl/Views/AppleConnectionActionsView.swift": "054a730d53553c12e3e88a3738e57406d5879be0f9776add16c67bb559b87485",
+    "macOS/ARLControl/Views/AppleConnectionActionsView.swift": "0e5803a3a14cc33e9916cbfc7049f27f9396d7aeb518500ba87e07915f8742ca",
     "macOS/ARLControl/Views/ApplePermissionsView.swift": "68d7cddc55fc579f6e7af78d96d76ccca0802315cd61100ef3cf0cc4660bd922",
     "macOS/ARLControl/Views/AppleReadinessView.swift": "3d5fbe35e14540fbdadcf7b0c321c9aa510d91c96da7d3eefc0528b853b3f3ce",
     "macOS/ARLControl/Views/CalendarBusinessView.swift": "0a18c2740bbd8395213ea13e30d1aa1164f1397fdd07520f1cb5c3dc95cfaedd",

@@ -74,29 +74,7 @@ struct RemindersDefaultListSettings: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("默认写入清单").font(.callout.weight(.medium))
             HStack(spacing: 10) {
-                EditorialMenu {
-                    if let catalog = controller.catalog {
-                        ForEach(catalog.sources) { source in
-                            if catalog.lists.contains(where: { $0.source_id == source.id }) {
-                                Section(accountTitle(source)) {
-                                    ForEach(catalog.lists.filter { $0.source_id == source.id }) { list in
-                                        Button {
-                                            controller.select(sourceID: source.id, listID: list.id)
-                                        } label: {
-                                            Label(listTitle(list, catalog: catalog), systemImage: controller.defaultTarget?.list?.id == list.id ? "checkmark" : "list.bullet")
-                                        }.disabled(!list.writable || list.subscribed == true)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Text(controller.defaultTarget?.list?.title ?? (controller.busy ? "正在读取" : "选择清单"))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }.frame(maxWidth: 360)
-                    .disabled(disabled || controller.busy || controller.catalog?.lists.isEmpty != false)
-                    .accessibilityLabel("默认提醒清单")
-                    .accessibilityValue(controller.defaultTarget.map { $0.source.title + "，" + ($0.list?.title ?? "未设置") } ?? "未设置")
+                defaultListMenu
             }
             Text("读取和搜索覆盖所有已授权清单。").font(.caption).foregroundStyle(.secondary)
             if let target = controller.defaultTarget {
@@ -118,6 +96,51 @@ struct RemindersDefaultListSettings: View {
                 }
             } catch { /* The controller retains the local recovery message. */ }
         }
+    }
+    private var defaultListMenu: some View {
+        EditorialMenu {
+            listMenuContents
+        } label: {
+            Text(selectionTitle).frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: 360)
+        .disabled(disabled || controller.busy || controller.catalog?.lists.isEmpty != false)
+        .accessibilityLabel("默认提醒清单")
+        .accessibilityValue(selectionAccessibilityValue)
+    }
+    @ViewBuilder private var listMenuContents: some View {
+        if let catalog = controller.catalog {
+            ForEach(catalog.sources) { source in
+                accountSection(source, catalog: catalog)
+            }
+        }
+    }
+    @ViewBuilder private func accountSection(_ source: RemindersProductSource, catalog: RemindersProductCatalog) -> some View {
+        let lists = catalog.lists.filter { $0.source_id == source.id }
+        if !lists.isEmpty {
+            Section {
+                ForEach(lists) { list in
+                    listOption(list, source: source, catalog: catalog)
+                }
+            } header: {
+                Text(accountTitle(source))
+            }
+        }
+    }
+    private func listOption(_ list: RemindersProductList, source: RemindersProductSource, catalog: RemindersProductCatalog) -> some View {
+        Button {
+            controller.select(sourceID: source.id, listID: list.id)
+        } label: {
+            Label(listTitle(list, catalog: catalog), systemImage: controller.defaultTarget?.list?.id == list.id ? "checkmark" : "list.bullet")
+        }
+        .disabled(!list.writable || list.subscribed == true)
+    }
+    private var selectionTitle: String {
+        controller.defaultTarget?.list?.title ?? (controller.busy ? "正在读取" : "选择清单")
+    }
+    private var selectionAccessibilityValue: String {
+        guard let target = controller.defaultTarget else { return "未设置" }
+        return target.source.title + "，" + (target.list?.title ?? "未设置")
     }
     private func accountTitle(_ source: RemindersProductSource) -> String {
         var parts = [source.title]
