@@ -3,6 +3,15 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      native_runner:
+        description: macOS runner architecture
+        type: choice
+        required: true
+        default: macos-15
+        options:
+          - macos-15
+          - macos-15-intel
 permissions:
   contents: read
 jobs:
@@ -22,9 +31,8 @@ jobs:
           name: portable-test-receipts
           path: build/ci-portable/
   native-source:
-    # Keep native tests available when the hosted ARM64 pool is constrained.
-    # check_native_source.py still compiles the release recipe's ARM64 target.
-    runs-on: macos-15-intel
+    # Match the product's ARM64 architecture; allow explicit Intel host checks.
+    runs-on: ${{ inputs.native_runner || 'macos-15' }}
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     steps:
