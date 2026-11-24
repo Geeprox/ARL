@@ -310,6 +310,7 @@ private struct TaskNASConnectionView: View {
         case .authenticationFailed, .credentialInvalid: "登录失败，请核对账号和密码。"
         case .connectionFailed, .transportTimeout, .transportFailed: "连接失败，请核对地址与网络。"
         case .accessDenied, .readDenied: "访问被拒，请核对目录授权。"
+        case .locationMissing: "找不到已保存的读取位置，请核对共享目录和目录范围。"
         case .configurationNotSaved: "请先保存当前设置。"
         case .credentialNotSaved: "请先保存登录信息。"
         case .configurationChanged, .staleGeneration, .sourceChanged: "设置已变化，请重新连接。"

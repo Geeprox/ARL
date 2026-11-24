@@ -13,6 +13,7 @@ public enum ARLNASFault: String, Error, Sendable, Encodable {
     case disabled, sourceChanged, referenceMismatch, revoked, expired, budgetExhausted
     case ticketInvalid, providerInvalid, credentialsUnavailable, credentialInvalid
     case authenticationFailed, accessDenied, hostKeyMismatch, transportTimeout, transportFailed
+    case locationMissing
     case protocolUnsupported, manualIntentExpired
 }
 

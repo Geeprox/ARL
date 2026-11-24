@@ -50,7 +50,7 @@ def error_code(exc):
     code = getattr(exc, "status", None)
     if code in {0xC000006D, 0xC000006A, 0xC0000071, 0xC0000072, 0xC0000193, 0xC0000234}:
         return "nas_auth_failed"
-    if code in {0xC000000F, 0xC0000034, 0xC000003A}:
+    if code in {0xC000000F, 0xC0000034, 0xC000003A, 0xC00000CC}:
         return "nas_missing"
     if code == 0xC0000022:
         return "nas_access_denied"

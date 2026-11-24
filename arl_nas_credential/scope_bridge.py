@@ -13,9 +13,11 @@ from .contracts import Admission, CredentialFault, CurrentSource, Failure, NASRe
 
 _TO_NAS = {Failure.TRANSPORT_TIMEOUT: "nas_timeout", Failure.TRANSPORT_FAILED: "nas_transport_failed",
            Failure.ACCESS_DENIED: "nas_access_denied", Failure.HOST_KEY_MISMATCH: "nas_host_key_mismatch",
+           Failure.LOCATION_MISSING: "nas_missing",
            Failure.BUSY: "nas_busy"}
 _FROM_NAS = {"nas_timeout": Failure.TRANSPORT_TIMEOUT, "nas_transport_failed": Failure.TRANSPORT_FAILED,
              "nas_auth_failed": Failure.AUTH_FAILED, "nas_access_denied": Failure.ACCESS_DENIED,
+             "nas_missing": Failure.LOCATION_MISSING,
              "nas_host_key_mismatch": Failure.HOST_KEY_MISMATCH,
              "nas_dependency_missing": Failure.UNSUPPORTED}
 _OPERATIONS = {"health", "list", "stat", "read"}
