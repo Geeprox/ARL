@@ -54,7 +54,8 @@ private struct PerformancePlotContent: View {
                         RuleMark(x: .value("时间", selected.load.sampledAt)).foregroundStyle(.secondary.opacity(0.4)).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
                     }
                 }
-                .chartXScale(domain: domain).chartYScale(domain: 0...upper)
+                .chartXScale(domain: domain, range: .plotDimension(padding: 18))
+                .chartYScale(domain: 0...upper)
                 .chartForegroundStyleScale(range: [EditorialStyle.graphite, EditorialStyle.accent, .secondary, .brown])
                 .chartLegend(processID == nil && (metric == .processCPU || metric == .processRSS) ? .visible : .hidden)
                 .chartXAxis { AxisMarks(values: .automatic(desiredCount: 3)) { value in AxisValueLabel(format: .dateTime.minute().second()); AxisTick(); AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3])) } }
