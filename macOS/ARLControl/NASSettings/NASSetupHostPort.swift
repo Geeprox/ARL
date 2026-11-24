@@ -99,6 +99,7 @@ public enum ARLNASControllerResultProjection {
         case "auth_failed", "nas_auth_failed": return .authenticationFailed
         case "access_denied", "nas_access_denied": return .accessDenied
         case "host_key_mismatch", "nas_host_key_mismatch": return .hostKeyMismatch
+        case "nas_missing": return .locationMissing
         case "transport_timeout", "nas_transport_timeout", "nas_timeout": return .transportTimeout
         case "transport_failed", "nas_transport_failed": return .transportFailed
         case "nas_unavailable": return .connectionFailed

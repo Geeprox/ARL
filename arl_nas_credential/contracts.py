@@ -30,6 +30,7 @@ class Failure(str, Enum):
     AUTH_FAILED = "auth_failed"
     ACCESS_DENIED = "access_denied"
     HOST_KEY_MISMATCH = "host_key_mismatch"
+    LOCATION_MISSING = "nas_missing"
     TRANSPORT_TIMEOUT = "transport_timeout"
     TRANSPORT_FAILED = "transport_failed"
 

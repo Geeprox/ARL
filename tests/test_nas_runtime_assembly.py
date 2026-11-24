@@ -173,6 +173,19 @@ class AssemblyTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(SMB.opened,0)
         self.assertEqual(self.wire.lease_count,0)
 
+    async def test_missing_scope_is_reported_without_transport_retry(self):
+        class MissingDirectory(OSError):
+            status = 0xC0000034
+
+        with patch.object(SMB, "health", side_effect=MissingDirectory("private path")):
+            with self.assertRaises(CredentialFault) as caught:
+                await self.runtime.connect(bootstrap())
+
+        self.assertEqual(caught.exception.code, Failure.LOCATION_MISSING)
+        self.assertEqual(host.public_error(caught.exception), "nas_missing")
+        self.assertFalse(self.runtime.snapshot()["connected"])
+        self.assertEqual((SMB.opened, SMB.closed, self.wire.lease_count), (1, 1, 1))
+
     async def test_revoke_on_late_reply_does_not_publish(self):
         await self.runtime.connect(bootstrap())
         SMB.after_list=lambda: setattr(self.wire,"reject","request_reply")

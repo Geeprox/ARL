@@ -785,6 +785,7 @@ private extension ARLNASFault {
         case .authenticationFailed: return "登录失败"
         case .accessDenied: return ("访问被拒" + "\n" + "网络硬盘访问被拒绝。")
         case .hostKeyMismatch: return ("设备身份与设置不符" + "\n" + "服务器身份与已批准的设置不一致。")
+        case .locationMissing: return "找不到已保存的读取位置，请重新选择。"
         case .transportTimeout: return "传输超时"
         case .transportFailed: return "传输失败"
         case .protocolUnsupported: return ("仅支持 SMB 连接" + "\n" + "此界面支持SMB。SFTP需要专门的本机设置流程，并审核服务器密钥与不可越出的目录范围。")
