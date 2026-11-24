@@ -11,7 +11,7 @@ from tests.test_runtime import RuntimeCase
 FIXTURE=Path(__file__).parent/'fixtures/CodexExecutionOptionsServer.py'
 class OptionsTests(RuntimeCase):
  def test_preflight_checks_explicit_model_against_catalog_when_selection_is_enabled(self):
-  adapter=CodexTextAdapter(enabled=True)
+  adapter=CodexTextAdapter(binary=sys.executable,enabled=True)
   session=Mock()
   session.text_controls.return_value='provider-default'
   session.send.side_effect=lambda method, params:method
