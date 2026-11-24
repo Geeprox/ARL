@@ -27,8 +27,19 @@ struct PerformanceHistory: Sendable {
         guard let seconds else { return samples }
         return samples.filter { $0.load.sampledAt >= now.addingTimeInterval(-seconds) && $0.load.sampledAt <= now }
     }
-    func nearest(to date: Date, in visible: [Sample]) -> Sample? {
-        visible.min { abs($0.load.sampledAt.timeIntervalSince(date)) < abs($1.load.sampledAt.timeIntervalSince(date)) }
+    static func nearest(to date: Date, in visible: [Sample]) -> Sample? {
+        var lower = visible.startIndex
+        var upper = visible.endIndex
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if visible[middle].id < date { lower = middle + 1 }
+            else { upper = middle }
+        }
+        if lower == visible.startIndex { return visible.first }
+        if lower == visible.endIndex { return visible.last }
+        let previous = visible[lower - 1]
+        let next = visible[lower]
+        return date.timeIntervalSince(previous.id) <= next.id.timeIntervalSince(date) ? previous : next
     }
 }
 

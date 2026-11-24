@@ -10,6 +10,14 @@ from arl.install_transaction import Layout,InstallFault,failure
 
 class PlatformTests(unittest.TestCase):
     def setUp(self):self.platform=MacPlatform(Layout(Path('/tmp/arl-platform-fixture').resolve()),'/tmp/arl-platform-fixture/host')
+    def test_staged_installer_requests_normal_quit_via_installed_app(self):
+        installed=self.platform.layout.targets['app']/'Contents/MacOS/ARL'
+        record={'pid':123,'birth':[456,789],'executable':str(installed),'drain_supported':True}
+        response=subprocess.CompletedProcess([],0,b'{"terminated":true}',b'')
+        with patch.object(self.platform,'current',side_effect=[True,False]), \
+             patch.object(self.platform,'command',return_value=response) as command:
+            self.platform.quit_app(record)
+        command.assert_called_once_with([installed,'--internal-app-quit','123','456','789'],seconds=45)
     def test_timeout_and_exit_project_command_kind_without_raw_output(self):
         error=subprocess.TimeoutExpired(['/bin/launchctl','bootout','private-label'],20,output=b'secret',stderr=b'secret')
         with patch('arl.install_platform.subprocess.run',side_effect=error),self.assertRaises(InstallFault) as context:

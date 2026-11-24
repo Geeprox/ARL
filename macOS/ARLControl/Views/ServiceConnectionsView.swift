@@ -24,7 +24,8 @@ struct ServiceConnectionsView: View {
                     VStack(alignment:.leading,spacing:16) {
                         if category == "Apple 生态" {
                             connectionCard("日历",icon:"calendar",symbol:"calendar") {
-                                ConnectionIndicator(ready:calendarReady,pending:store.calendarPermission.busy,title:"日历",text:calendarReady ? "已连接":nil)
+                                ConnectionIndicator(ready:calendarReady,pending:store.calendarPermission.busy,
+                                    title:"日历",text:store.calendarPermission.busy ? "等待系统授权" : calendarTitle)
                             } content: {if !calendarReady {calendar}}
                             connectionCard("提醒事项",icon:"reminders",symbol:"checklist") {
                                 ConnectionIndicator(ready:store.remindersFirst.value?.fresh == true && store.remindersFirst.value?.permission_state == "authorized_full",pending:store.remindersRestoring,title:"提醒事项")
@@ -67,10 +68,8 @@ struct ServiceConnectionsView: View {
     private var calendar: some View {
         let permission = store.calendarPermission
         return VStack(alignment: .leading, spacing: 20) {
-            if permission.state != .fullAccess { Text(calendarTitle).font(.callout.weight(.medium)) }
             Group {
-                if permission.busy { ProgressView("等待系统授权").controlSize(.small) }
-                else if permission.lastProbeFailed {
+                if permission.lastProbeFailed {
                     Button("重试") { permission.refresh() }.disabled(!permission.canAct)
                 } else if permission.state == .notDetermined || permission.state == .writeOnly {
                     Button("允许查看与编辑日历") { Task { await permission.requestFullAccess() } }
@@ -82,16 +81,16 @@ struct ServiceConnectionsView: View {
                     Button("检查日历权限") { permission.refresh() }.disabled(!permission.canAct)
                 }
                 if let message = permission.message { Text(message).font(.caption).foregroundStyle(.secondary) }
-            }
+            }.disabled(permission.busy)
         }
     }
     private var calendarTitle: String {
         let p = store.calendarPermission
-        if p.lastProbeFailed { return "权限更新失败" }
+        if p.lastProbeFailed { return "权限暂不可读" }
         switch p.state {
         case .notDetermined: return "待授权"
         case .writeOnly: return "仅允许添加日程"
-        case .fullAccess: return "已允许查看与编辑"
+        case .fullAccess: return "已授权"
         case .denied: return "日历访问已关闭"
         case .restricted: return "系统限制访问"
         case .disabled: return store.demo ? "演示模式" : "日历未启用"

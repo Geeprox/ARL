@@ -18,7 +18,8 @@ try:
  sys.path.insert(0,'/robin-bridge');sys.path.insert(0,'/robin-source')
  from local_api import server
  token=Path('/robin-secret/token').read_text().strip()
- adapter=server('robin',Path('/friday-queue'),token)
+ marker=Path('/robin-bridge/router-enrolled/robin')
+ adapter=server('robin',Path('/friday-queue'),token,router_marker=marker)
  threading.Thread(target=adapter.serve_forever,daemon=True).start()
  os.environ.update(CUSTOM_API_KEY=token,CUSTOM_API_BASE_URL='http://127.0.0.1:19421/v1',CUSTOM_API_MODEL='arl/package/medium')
  # Remove only the previous deployment's compact sampling overrides. UI

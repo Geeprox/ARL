@@ -78,7 +78,6 @@ private struct EditorialButtonSurface: View {
     @Environment(\.isEnabled) private var enabled
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.isFocused) private var focused
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered = false
     private var ink: Color {
         if configuration.role == .destructive { return .red }
@@ -91,7 +90,9 @@ private struct EditorialButtonSurface: View {
     var body: some View {
         configuration.label.font(.system(size: 13, weight: .medium))
             .padding(.horizontal, 12).frame(minWidth: 40, minHeight: EditorialStyle.controlHeight)
-            .foregroundStyle(ink).background(fill, in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
+            .foregroundStyle(ink).background {
+                EditorialInteractionFill(color: fill, radius: EditorialStyle.controlRadius)
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: EditorialStyle.controlRadius)
                     .strokeBorder(focused ? EditorialStyle.accent : emphasis == .quiet ? .clear : EditorialStyle.rule,
@@ -99,10 +100,7 @@ private struct EditorialButtonSurface: View {
             }
             .contentShape(Rectangle())
             .opacity(enabled ? 1 : 0.45)
-            .offset(y: configuration.isPressed && !reduceMotion ? 0.5 : 0)
             .onHover { hovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
     }
 }
 
@@ -157,8 +155,11 @@ struct EditorialTabs: View {
                         .font(.system(size: 13, weight: selection == option.title ? .semibold : .medium))
                         .frame(minWidth: 72, minHeight: 34).padding(.horizontal, 10)
                         .foregroundStyle(selection == option.title ? EditorialStyle.graphite : .secondary)
-                        .background(selection == option.title ? EditorialStyle.panel : .clear,
-                                    in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
+                        .background {
+                            RoundedRectangle(cornerRadius: EditorialStyle.controlRadius)
+                                .fill(selection == option.title ? EditorialStyle.panel : .clear)
+                                .animation(EditorialMotion.stateChange(reduceMotion: reduceMotion), value: selection == option.title)
+                        }
                         .overlay {
                             if selection == option.title {
                                 RoundedRectangle(cornerRadius: EditorialStyle.controlRadius).strokeBorder(EditorialStyle.rule, lineWidth: 0.5)
@@ -169,7 +170,6 @@ struct EditorialTabs: View {
             }
         }.padding(4).background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 9))
             .fixedSize(horizontal: true, vertical: true)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: selection)
             .onMoveCommand { direction in
                 guard let index = options.firstIndex(where: { $0.title == selection }) else { return }
                 if direction == .left { selection = options[max(0, index - 1)].title }
@@ -228,13 +228,15 @@ struct EditorialDestinationRow: View {
     }
 }
 
-private struct EditorialDestinationButtonStyle: ButtonStyle {
+struct EditorialDestinationButtonStyle: ButtonStyle {
     @Environment(\.isFocused) private var focused
     @State private var hovered = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(Color.primary.opacity(configuration.isPressed ? 0.07 : hovered ? 0.035 : 0),
-                        in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
+            .background {
+                EditorialInteractionFill(color: .primary.opacity(configuration.isPressed ? 0.07 : hovered ? 0.035 : 0),
+                                         radius: EditorialStyle.controlRadius)
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: EditorialStyle.controlRadius)
                     .strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2).allowsHitTesting(false)
@@ -274,12 +276,17 @@ struct ConnectionIndicator: View {
     var title = "连接"
     var inactive = false
     var text: String? = nil
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var label:String {text ?? (ready ? "已连接":pending ? "连接中":inactive ? "未运行":"需要处理")}
     private var color:Color {ready ? .green:pending ? EditorialStyle.accent:inactive ? .secondary:.orange}
     var body: some View {
         HStack(spacing:6) {
             Circle().fill(color).frame(width:7,height:7).accessibilityHidden(true)
-            Text(label).font(.caption).foregroundStyle(.secondary).fixedSize()
+                .animation(EditorialMotion.stateChange(reduceMotion: reduceMotion), value: color)
+            Text(label).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .contentTransition(reduceMotion ? .identity : .opacity)
+                .animation(EditorialMotion.stateChange(reduceMotion: reduceMotion), value: label)
         }.help(title+"："+label)
             .accessibilityElement(children:.ignore).accessibilityLabel(title+"："+label)
     }

@@ -58,10 +58,11 @@ class RehearsalPlatform(fixture.FixturePlatform):
         atomic(self.layout.state/'mio-apple/owned-child.json',encode({'synthetic':True}))
     def command(self,args,**kwargs):
         args=list(map(str,args));action=args[1]
-        if args[0]==str(self.host):
+        if args[0]==str(self.host) or (action=='--internal-app-quit' and args[0]==self.owner['executable']):
             if action=='--internal-app-state':
                 value={'schema_version':1,'instances':[{**self.owner,'drain_supported':True}] if self.owner['pid'] in self.live else []}
             elif action=='--internal-app-quit':
+                assert args[0]==self.owner['executable']
                 assert args[2:]==[str(self.owner['pid']),*map(str,self.owner['birth'])]
                 self.events.append('normal_owner_quit');self.live.clear();self.job_pid=None
                 child=self.layout.state/'mio-apple/owned-child.json'

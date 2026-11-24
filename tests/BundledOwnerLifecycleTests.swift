@@ -52,12 +52,21 @@ enum RemindersNativeIO {
   lateCallback?(original)
   try await Task.sleep(for:.milliseconds(30))
   precondition(owner.failure==nil && owner.activated,"stale child callback revoked replacement")
+  let survivingCore=owner.testChild("core")!
+  let immediateMio=owner.testChild("mio")!
+  precondition(kill(immediateMio.processIdentifier,SIGKILL)==0)
+  try await waitUntil { owner.failure != nil }
+  let retried=await owner.retryFailedChildren(home:home)
+  precondition(retried && owner.testChild("core") === survivingCore && owner.testChild("mio") !== immediateMio,
+               "immediate retry replaced a healthy sibling or left Mio stopped")
   for marker in ["install-maintenance.json","disabled"] {
    let path=home.appendingPathComponent(marker);try Data().write(to:path)
    let before=starts, core=owner.testChild("core")!
    precondition(kill(core.processIdentifier,SIGKILL)==0)
    try await Task.sleep(for:.milliseconds(250))
    precondition(starts==before,"maintenance/disabled marker did not hold recovery")
+   let manualRetry=await owner.retryFailedChildren(home:home)
+   precondition(!manualRetry && starts==before,"manual retry ignored a maintenance/disabled marker")
    try FileManager.default.removeItem(at:path)
    try await waitUntil { starts==before+1 && owner.testChild("core")?.isRunning==true }
   }

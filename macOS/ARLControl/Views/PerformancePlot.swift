@@ -9,16 +9,31 @@ struct PerformancePlot: View {
     let now: Date
     var height: CGFloat = 180
     var processID: String? = nil
+
+    var body: some View {
+        let points = PerformanceSeries.points(in: samples, metric: metric, processID: processID)
+        let upper = PerformanceScale.upper(metric: metric, values: points.map(\.value))
+        PerformancePlotContent(samples: samples, chartPoints: points, metric: metric, now: now,
+                               height: height, processID: processID, upper: upper,
+                               axisValues: PerformanceScale.ticks(metric: metric, upper: upper))
+    }
+}
+
+private struct PerformancePlotContent: View {
+    let samples: [PerformanceHistory.Sample]
+    let chartPoints: [PerformancePoint]
+    let metric: PerformanceMetric
+    let now: Date
+    let height: CGFloat
+    let processID: String?
+    let upper: Double
+    let axisValues: [Double]
     @State private var hover: Date?
-    private var points: [Point] { PerformanceSeries.points(in: samples, metric: metric, processID: processID) }
     private var domain: ClosedRange<Date> {
         let end = max(now, samples.last?.load.sampledAt ?? now)
         return (samples.first?.load.sampledAt ?? end.addingTimeInterval(-60)).addingTimeInterval(-1)...max(end, (samples.first?.load.sampledAt ?? end).addingTimeInterval(10))
     }
-    private var axisValues: [Double] { PerformanceScale.ticks(metric: metric, upper: upper) }
-    private var upper: Double { PerformanceScale.upper(metric: metric, values: points.map(\.value)) }
     var body: some View {
-        let chartPoints = points
         let selected = selectedSample
         VStack(alignment: .leading, spacing: 8) {
             if chartPoints.isEmpty {
@@ -55,20 +70,20 @@ struct PerformancePlot: View {
                             case .active(let location):
                                 guard let frame = proxy.plotFrame else { hover = nil; return }
                                 let rect = geometry[frame]
-                                hover = rect.contains(location) ? proxy.value(atX: location.x - rect.minX, as: Date.self) : nil
-                            case .ended: hover = nil
+                                updateHover(rect.contains(location) ? proxy.value(atX: location.x - rect.minX, as: Date.self) : nil)
+                            case .ended: updateHover(nil)
                             }
                         }
                         .gesture(SpatialTapGesture().onEnded { event in
                             guard let frame = proxy.plotFrame else { return }
                             let rect = geometry[frame]
-                            if rect.contains(event.location) { hover = proxy.value(atX: event.location.x - rect.minX, as: Date.self) }
+                            if rect.contains(event.location) { updateHover(proxy.value(atX: event.location.x - rect.minX, as: Date.self)) }
                         })
                     }
                 }
                 .frame(height: max(50, height - 24))
                 .accessibilityLabel(accessibilityDescription)
-                .help(points.first?.displayExplanation ?? "")
+                .help(chartPoints.first?.displayExplanation ?? "")
             }
             if let selected {
                 HStack(spacing: 12) { Text(selected.load.sampledAt.formatted(date: .omitted, time: .standard)).font(.caption.monospaced()); Text(sampleTitle(selected.load)).font(.caption).foregroundStyle(.secondary).lineLimit(2); Spacer(minLength: 0) }
@@ -76,8 +91,15 @@ struct PerformancePlot: View {
             } else { Color.clear.frame(height: 18) }
         }
     }
-    private var selectedSample: PerformanceHistory.Sample? { guard let hover else { return nil }; return samples.min { abs($0.load.sampledAt.timeIntervalSince(hover)) < abs($1.load.sampledAt.timeIntervalSince(hover)) } }
-    private var accessibilityDescription: String { "\(points.count) 个实际测量点。\(samples.last.map { sampleTitle($0.load) } ?? "等待采样")" }
+    private func updateHover(_ date: Date?) {
+        let next = date.flatMap { PerformanceHistory.nearest(to: $0, in: samples)?.id }
+        if hover != next { hover = next }
+    }
+    private var selectedSample: PerformanceHistory.Sample? {
+        guard let hover, let sample = PerformanceHistory.nearest(to: hover, in: samples), sample.id == hover else { return nil }
+        return sample
+    }
+    private var accessibilityDescription: String { "\(chartPoints.count) 个实际测量点。\(samples.last.map { sampleTitle($0.load) } ?? "等待采样")" }
     private func axisTitle(_ value: Double) -> String {
         switch metric { case .cpu, .processCPU: return "\(Int(value))%"; case .swap: return String(format: "%.1f GiB", value); case .processRSS: return "\(Int(value)) MiB"; case .pressure: return [0: "正常", 1: "警告", 2: "严重"][Int(value)] ?? "" }
     }

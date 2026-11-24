@@ -3,6 +3,8 @@ from pathlib import Path
 import argparse,ast,hashlib,json,shutil
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--base',required=True,type=Path);parser.add_argument('--output',required=True,type=Path)
+parser.add_argument('--instruction-isolation-only',action='store_true',
+                    help='仅补齐专用 Codex 进程的全局指令隔离')
 args=parser.parse_args();root=Path(__file__).resolve().parents[2]
 base=args.base.resolve(strict=True);stage=args.output.absolute()
 if stage.exists():raise ValueError('new_staging_directory_required')
@@ -21,7 +23,29 @@ def method(source,current,cls,name,transform=lambda x:x):
   anchor=' def observe(self, job,' if cls=='CodexService' else ' def metadata(self):'
   pos=source.index(anchor);return source[:pos]+fresh+'\n'+source[pos:]
  return source.replace(old,fresh,1)
+def instruction_isolation(source,current):
+ # 旧部署只内联了 app-server 启动参数，缺少已审的 macOS 隔离函数。
+ try:block(source,ast.FunctionDef,'provider_command')
+ except StopIteration:
+  helpers='\n\n'.join(block(current,ast.FunctionDef,name) for name in ('instruction_isolation_profile','provider_command'))
+  source=source.replace('class Session:', 'import sys\n\n'+helpers+'\n\nclass Session:',1)
+  previous=block(source,ast.FunctionDef,'__init__','Session')
+  launch=next(line for line in previous.splitlines(keepends=True) if 'command=list(test_command)' in line)
+  source=source.replace(launch,'  command=list(test_command) if test_command else provider_command(binary,config)\n',1)
+ return source
+
+def seal():
+ for p in stage.rglob('*.py'):ast.parse(p.read_text())
+ manifest={str(p.relative_to(stage)):hashlib.sha256(p.read_bytes()).hexdigest() for p in stage.rglob('*') if p.is_file() and p.name!='manifest.json'}
+ (stage/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,separators=(',',':')))
+ for p in stage.rglob('*'):
+  if p.is_file():p.chmod(0o700 if p.name=='PeerSignatureHelper' else 0o600)
+ print('Staged',len(manifest),'private closure members.')
+
 current=(root/'arl/codex_server.py').read_text();p=stage/'core/arl/codex_server.py';s=p.read_text()
+s=instruction_isolation(s,current)
+if args.instruction_isolation_only:
+ p.write_text(s);seal();raise SystemExit(0)
 imports='from .codex_context import TRANSPORT_FRAME_BYTES, INPUT_POLICY, context_error, token_receipt\n'
 if imports not in s:s=s.replace("NAME='codex.text.plan.v1'",imports+"NAME='codex.text.plan.v1'",1)
 s=s.replace(block(s,ast.Assign,'SCHEMA'),block(current,ast.Assign,'SCHEMA'),1)
@@ -60,9 +84,4 @@ p.write_text(s)
 p=stage/'core/arl/client.py';s=p.read_text();current=(root/'arl/client.py').read_text()
 for name in ('__init__','rpc'):s=method(s,current,'Client',name)
 p.write_text(s)
-for p in stage.rglob('*.py'):ast.parse(p.read_text())
-manifest={str(p.relative_to(stage)):hashlib.sha256(p.read_bytes()).hexdigest() for p in stage.rglob('*') if p.is_file() and p.name!='manifest.json'}
-(stage/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,separators=(',',':')))
-for p in stage.rglob('*'):
- if p.is_file():p.chmod(0o700 if p.name=='PeerSignatureHelper' else 0o600)
-print('Staged',len(manifest),'private closure members.')
+seal()

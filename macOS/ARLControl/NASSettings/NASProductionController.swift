@@ -200,9 +200,9 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         serverIntentID=intent.id;failure=nil;failureDiagnostic=nil
         return intent
     }
-    func performServerAction(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?) async {
+    @discardableResult func performServerAction(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?) async -> Bool {
         defer{input?.clear();if serverIntentID==intent.id {serverIntentID=nil}}
-        guard serverIntentID==intent.id,intent.revision==revision,intent.consume() else{failure = .manualIntentExpired;return}
+        guard serverIntentID==intent.id,intent.revision==revision,intent.consume() else{failure = .manualIntentExpired;return false}
         polling?.cancel();serial=UUID();let captured=serial
         func current() throws {
             guard serverIntentID==intent.id,serial==captured else{throw CancellationError()}
@@ -213,14 +213,14 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             try current()
             switch intent.action {
             case .save(let address,let port,let timeout):
-                userPausedServer=false;nextServerCheck=0;savedAccount=nil
+                userPausedServer=false;nextServerCheck=0
                 let normalized=try NASAddressInput(address,port:port)
                 let endpoint=try NASServerEndpoint(sourceRef:serverRecord?.endpoint.sourceRef ?? UUID().uuidString.lowercased(),host:normalized.host,port:normalized.port,timeoutSeconds:timeout,generation:(serverRecord?.endpoint.generation ?? 0)+1)
                 guard let input,input.consume({username=$0;password=$1}) else{throw ARLNASFault.credentialInvalid}
                 let replacing=try await owner.savedIdentity();try current()
                 let identity=try await owner.saveServer(endpoint:endpoint,username:username,password:password,replacing:replacing);try current()
                 let next=ServerRecord(endpoint:endpoint,originalAddress:address,identity:identity,revision:revision+1)
-                try persist(next,to:serverPath);serverRecord=next;revision=next.revision
+                try persist(next,to:serverPath);serverRecord=next;revision=next.revision;savedAccount=nil
                 serverState = .init();state = .init();serverDirectory=nil;previewShare=nil;shareNames=[]
             case .login:
                 userPausedServer=false
@@ -270,11 +270,13 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 userPausedServer=false;nextServerCheck=0;automaticFailures=0;revision+=1;startPolling()
             }
             failure=nil;failureDiagnostic=nil
+            return true
         } catch {
-            guard serial==captured,serverIntentID==intent.id else{return}
+            guard serial==captured,serverIntentID==intent.id else{return false}
             await owner.stop()
-            guard serial==captured,serverIntentID==intent.id else{return}
+            guard serial==captured,serverIntentID==intent.id else{return false}
             state = .init();serverState = .init();serverDirectory=nil;previewShare=nil;shareNames=[];failure=mapped(error)
+            return false
         }
     }
     private func configuration() -> ARLNASConfiguration? {
