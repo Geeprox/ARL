@@ -240,6 +240,13 @@ import Darwin
         wantsRunning = true; startWatchdog(home: home)
         return await recoverChildren(home: home)
     }
+    func retryFailedChildren(home: URL) async -> Bool {
+        guard wantsRunning, !exitRequested, failure != nil,
+              !FileManager.default.fileExists(atPath: home.appendingPathComponent("disabled").path),
+              !FileManager.default.fileExists(atPath: home.appendingPathComponent("install-maintenance.json").path)
+        else { return false }
+        return await repairChildren(home: home)
+    }
     private func recoverChildren(home: URL) async -> Bool {
         guard !exitRequested, let token = await acquire() else { return false }
         defer { release(token) }

@@ -60,6 +60,11 @@ import Darwin
         if selected.service_tier != row.tier { row.service_tier = selected.service_tier }
         draft[id] = row
     }
+    func revertDraft() {
+        guard let saved else { return }
+        draft = saved.packages
+        message = nil
+    }
     @discardableResult func save() -> Bool {
         guard enabled, valid, changed, let saved, let catalog else { return false }
         let path = home.appendingPathComponent("packages.lock").path

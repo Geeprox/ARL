@@ -1,0 +1,26 @@
+services:
+  router:
+    image: "${NAS_ROUTER_IMAGE:?set an existing verified Python image}"
+    container_name: friday-nas-model-router
+    pull_policy: never
+    user: "1026:100"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    entrypoint: ["python", "-I", "-B", "/router/router.py"]
+    command: ["bilinote"]
+    volumes:
+      - "${FRIDAY_LLM_ROOT:?set NAS bridge root}/router/code:/router:ro"
+      - "${FRIDAY_LLM_ROOT}/router/control:/control"
+      - "${FRIDAY_LLM_ROOT}/router/state:/state"
+      - "${FRIDAY_LLM_ROOT}/router/secret/openai:/run/secrets/openai:ro"
+      - "${FRIDAY_LLM_ROOT}/bilinote:/queue/bilinote"
+    healthcheck:
+      test: ["CMD", "python", "-I", "-B", "-c", "import pathlib,time; p=pathlib.Path('/control/status.json'); assert time.time()-p.stat().st_mtime<15 and pathlib.Path('/queue/bilinote/router.sock').is_socket()"]
+      interval: 15s
+      timeout: 4s
+      retries: 3
+      start_period: 15s

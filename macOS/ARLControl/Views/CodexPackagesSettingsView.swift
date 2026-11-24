@@ -3,6 +3,7 @@ import AppKit
 
 @MainActor struct CodexPackagesSettingsView: View {
     @State private var settings: CodexPackageSettingsStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let controller: CodexNativeController?
     init(home: URL, enabled: Bool, controller: CodexNativeController? = nil) { self.controller=controller; _settings = State(initialValue:CodexPackageSettingsStore(home:home,enabled:enabled)) }
     var body: some View {
@@ -75,12 +76,22 @@ import AppKit
                             .disabled(settings.maxParallel<=1).accessibilityLabel("减少并行任务")
                         Text(String(settings.maxParallel)).font(.callout.monospacedDigit().weight(.medium)).frame(width:32)
                             .accessibilityLabel("同时执行 \(settings.maxParallel) 项任务")
+                            .contentTransition(reduceMotion ? .identity : .numericText(value:Double(settings.maxParallel)))
+                            .animation(EditorialMotion.stateChange(reduceMotion:reduceMotion), value:settings.maxParallel)
                         Button {settings.setParallel(settings.maxParallel+1)} label:{Image(systemName:"plus").frame(width:36,height:36)}
                             .disabled(settings.maxParallel>=8).accessibilityLabel("增加并行任务")
                     }.buttonStyle(.plain).background(Color.primary.opacity(0.025),in:RoundedRectangle(cornerRadius:EditorialStyle.controlRadius))
                         .overlay {RoundedRectangle(cornerRadius:EditorialStyle.controlRadius).strokeBorder(EditorialStyle.rule,lineWidth:0.5).allowsHitTesting(false)}
-                    if settings.changed { Button("保存套餐") { settings.save() }.disabled(!settings.valid) }
-                }.padding(.top,12).padding(.top,4)
+                }.padding(.top,16)
+                if settings.changed {
+                    HStack {
+                        Spacer()
+                        Button("还原修改") { settings.revertDraft() }
+                        Button("保存套餐") { settings.save() }
+                            .buttonStyle(EditorialActionButtonStyle(emphasis:.primary))
+                            .disabled(!settings.valid)
+                    }
+                }
                 if !catalog.isFresh() { Text("正在更新模型目录…").font(.caption).foregroundStyle(.secondary) }
                 else if !settings.valid { Text("部分套餐的模型选项已变化，请重新选择。").font(.caption).foregroundStyle(.orange) }
             } else {

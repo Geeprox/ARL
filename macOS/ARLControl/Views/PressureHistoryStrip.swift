@@ -22,17 +22,19 @@ struct PressureHistoryStrip: View {
                     GeometryReader { geometry in
                         Rectangle().fill(.clear).contentShape(Rectangle()).onContinuousHover { phase in
                             switch phase { case .active(let point):
+                                guard geometry.size.width > 0 else { return }
                                 let date = start.addingTimeInterval(point.x / geometry.size.width * duration)
-                                selected = samples.min { abs($0.load.sampledAt.timeIntervalSince(date)) < abs($1.load.sampledAt.timeIntervalSince(date)) }
-                            case .ended: selected = nil }
+                                let next = PerformanceHistory.nearest(to: date, in: samples)
+                                if selected?.id != next?.id { selected = next }
+                            case .ended: if selected != nil { selected = nil } }
                         }
                     }
                 }.accessibilityLabel("内存压力历史，\(samples.count) 个实际样本")
             }
             HStack {
-                if let selected { Text("\(selected.load.sampledAt.formatted(date: .omitted, time: .standard)) · \(selected.load.pressure)") }
+                if let selected, selected.id >= start { Text("\(selected.load.sampledAt.formatted(date: .omitted, time: .standard)) · \(selected.load.pressure)") }
                 else { Text("正常 / 警告 / 严重"); Spacer(); Text("本次运行") }
-            }.font(.caption2).foregroundStyle(.secondary)
+            }.font(.caption2).foregroundStyle(.secondary).frame(height: 16)
         }
     }
     private func color(_ pressure: String) -> Color { switch pressure { case "正常": .green.opacity(0.7); case "警告": .orange; case "严重": .red; default: .secondary.opacity(0.3) } }

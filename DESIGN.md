@@ -43,3 +43,19 @@ directly in SwiftUI and verify the installed interface.
   never imply a restriction on reading or searching other authorized locations.
 - Finder actions carry the same approved ARL artwork as the main application.
   Primary and secondary actions share the same geometry throughout the app.
+
+## State changes
+
+- Buttons and rows use a 100 ms surface fade for pointer feedback. Selection
+  and connection indicators use a 160 ms transition limited to the affected
+  fill or label. Keyboard focus and window resizing respond immediately.
+- Navigation keeps native macOS scrolling, focus and panel behavior. Avoid
+  animating a whole pane during data refresh. Keep fields and the selected
+  log detail in place while background observations update.
+- Honor the system appearance and Reduce Motion setting. Status still has a
+  readable label without animation. Only explicit small number changes, such
+  as the parallel task setting, use numeric transitions. Live chart samples
+  update without a transition and hover snaps to an observed sample.
+- On narrow windows, use a single column for charts and keep the source under
+  the event description in log rows. Use disclosure and separate diagnostics
+  for technical detail so ordinary states remain easy to scan.

@@ -1,5 +1,7 @@
 # NAS Codex v2 consumer and native package settings
 
+新增的按应用通道设置、每日 API 限额和部署步骤见 [NAS 应用模型通道](NAS-MODEL-ROUTING.md)。
+
 Deployed 2026-10-24 for the existing Friday NAS PDFMathTranslate and BiliNote audiences. The primary ARL app exposes owner-controlled package configuration through PreferencesView.swift (build 133). Existing v1 callers keep their policy; no implicit registration or public model API is added.
 
 `nas/` contains the fixed host, SDK worker, OpenAI compatibility and original-application launch integration. `core/` contains the v2 package registry and atomic resolution/admission gateway. `runtime-v2.patch` applies only to the identified frozen NAS host baseline, whose manifest digest is recorded in `source-manifest.json`; it is not a blind patch for the current primary runtime. Preserve the existing private host configuration, peer registration/signature pins when rebuilding. The historical provider hash is provenance only; current official updates require a valid OpenAI code signature and a fresh protocol/model preflight. Admission and completion still pin the exact running binary. Credentials and live configuration are intentionally absent.

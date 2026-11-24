@@ -45,7 +45,7 @@ enum NASServerSetupAction: Equatable {
     func maintainServerConnection() async
     func serverSetupSnapshot() -> NASServerSetupSnapshot
     func beginServerAction(_ action:NASServerSetupAction) -> NASServerSetupIntent?
-    func performServerAction(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?) async
+    @discardableResult func performServerAction(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?) async -> Bool
 }
 
 extension NASServerSetupOwner { func maintainServerConnection() async {} }
@@ -64,9 +64,9 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     func begin(_ action:NASServerSetupAction) -> NASServerSetupIntent? {
         let intent=owner.beginServerAction(action);refresh();return intent
     }
-    func run(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?=nil) async {
+    @discardableResult func run(_ intent:NASServerSetupIntent,input:ARLNASCredentialInput?=nil) async -> Bool {
         defer{input?.clear();refresh()}
-        await owner.performServerAction(intent,input:input)
+        return await owner.performServerAction(intent,input:input)
     }
 }
 
@@ -77,8 +77,10 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     @State private var password=""
     @State private var wholeShare=false
     @State private var editingLogin=false
+    @State private var loginFailure:String?
     @State private var editingDevice=false
     @State private var choosingLocation=false
+    @State private var restoringLocation=false
     @StateObject private var discovery=NASDiscoveryModel()
     @State private var task:Task<Void,Never>?
     @State private var taskIsPreview=false
@@ -86,12 +88,17 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         self.setup=setup;_model=StateObject(wrappedValue:NASServerSetupModel(owner:owner))
     }
     private func launch(_ action:NASServerSetupAction) {
-        guard let intent=model.begin(action) else{return}
+        guard !restoringLocation,let intent=model.begin(action) else{return}
         setup.refreshCachedStatus()
-        switch action {case .directory,.shares:taskIsPreview=true;default:taskIsPreview=false}
+        switch action {
+        case .directory,.shares:taskIsPreview=true
+        case .login:taskIsPreview=choosingLocation
+        default:taskIsPreview=false
+        }
         task=Task {
-            await model.run(intent)
-            if action == .login,choosingLocation,model.snapshot.state.authenticated,
+            let succeeded=await model.run(intent)
+            if succeeded, !Task.isCancelled, action == .login,
+               (choosingLocation || model.snapshot.authorizedScope == nil),model.snapshot.state.authenticated,
                let browse=model.begin(.shares(cursor:nil)) {await model.run(browse)}
             setup.refreshCachedStatus()
         }
@@ -130,7 +137,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                             HStack(spacing:10) {
                                 Label(configuration.share+(configuration.root.isEmpty ? " / 全部文件夹":" / "+configuration.root),systemImage:"folder").lineLimit(2).textSelection(.enabled)
                                 Spacer()
-                                Button("更改位置") {choosingLocation=true;launch(.login)}.controlSize(.small).disabled(model.snapshot.busy)
+                                Button("更改位置") {choosingLocation=true;launch(.login)}.controlSize(.small).disabled(model.snapshot.busy || restoringLocation)
                             }
                         }
                     }
@@ -140,9 +147,14 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                 VStack(alignment:.leading,spacing:12) {
                     Text(model.snapshot.saved ? "更新登录":"登录网络硬盘").font(.callout.weight(.semibold))
                     TextField("账号",text:$username).accessibilityLabel("NAS 账号")
+                        .disabled(model.snapshot.busy)
                     SecureField("密码",text:$password).accessibilityLabel("NAS 密码")
+                        .disabled(model.snapshot.busy)
+                    if let loginFailure {
+                        EditorialNotice(title:loginFailure,detail:"",symbol:"exclamationmark.circle",color:.orange)
+                    }
                     HStack {
-                        if model.snapshot.saved {Button("取消") {resetEditing()}}
+                        if model.snapshot.saved {Button("取消") {resetEditing()}.disabled(model.snapshot.busy)}
                         Spacer()
                         Button("保存并连接") {saveLogin()}
                             .buttonStyle(EditorialActionButtonStyle(emphasis:.primary))
@@ -162,7 +174,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                     Button("重新连接") {reconnect()}.disabled(!model.snapshot.saved || !sameEndpoint)
                 }
             }
-            if model.snapshot.state.authenticated && (choosingLocation || model.snapshot.authorizedScope == nil) {
+            if !restoringLocation && (choosingLocation || (model.snapshot.state.authenticated && model.snapshot.authorizedScope == nil)) {
                 locationPicker
             }
             if model.snapshot.saved || editingDevice {
@@ -191,7 +203,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
             if let diagnostic=model.snapshot.diagnostic,model.snapshot.fault != nil {
                 Text("连接返回："+diagnostic).font(.caption).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
             }
-        }.disabled(model.snapshot.busy && taskIsPreview)
+        }
         .onAppear {
             if !model.snapshot.address.isEmpty {setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds}
         }
@@ -201,11 +213,8 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         .onChange(of:setup.snapshot.connected) {_ in if setup.snapshot.connected == .verified {choosingLocation=false}}
         .onDisappear {
             username="";password="";discovery.cancel()
-            if choosingLocation,setup.snapshot.configuration != nil {
-                choosingLocation=false
-                let previous=task;previous?.cancel()
-                Task {await previous?.value;if let restore=model.begin(.restoreSaved) {await model.run(restore)};setup.refreshCachedStatus()}
-            } else if taskIsPreview {task?.cancel()}
+            if choosingLocation {cancelLocationSelection()}
+            else if taskIsPreview {task?.cancel()}
         }
     }
     private func rowTitle(_ title:String)->some View {Text(title).font(.caption).foregroundStyle(.secondary).frame(width:76,alignment:.leading)}
@@ -214,15 +223,48 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         return host.replacingOccurrences(of:".local.",with:"",options:.caseInsensitive).replacingOccurrences(of:".local",with:"",options:.caseInsensitive)
     }
     private func resetEditing() {
-        username="";password="";editingDevice=false;editingLogin=false
+        username="";password="";loginFailure=nil;editingDevice=false;editingLogin=false
         setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds
     }
     private func saveLogin() {
-        guard let intent=model.begin(.save(address:setup.draft.address,port:setup.draft.port,timeout:setup.draft.connectionTimeoutSeconds)) else{return}
-        let input=ARLNASCredentialInput(username:username,password:password);username="";password="";taskIsPreview=false
-        task=Task {await model.run(intent,input:input);await model.maintain();setup.refreshCachedStatus();if model.snapshot.saved {editingLogin=false;editingDevice=false}}
+        guard !restoringLocation,
+              let intent=model.begin(.save(address:setup.draft.address,port:setup.draft.port,timeout:setup.draft.connectionTimeoutSeconds))
+        else{return}
+        let input=ARLNASCredentialInput(username:username,password:password)
+        password="";loginFailure=nil;taskIsPreview=false
+        task=Task {
+            let saved=await model.run(intent,input:input)
+            if saved {
+                await model.maintain()
+                if model.snapshot.state.authenticated {
+                    username="";editingLogin=false;editingDevice=false
+                } else {
+                    editingLogin=true
+                    loginFailure=model.snapshot.fault.map(recovery) ?? "登录信息已保存，尚未连接网络硬盘"
+                }
+            } else {
+                loginFailure=model.snapshot.fault.map(recovery) ?? "未能保存登录信息"
+            }
+            setup.refreshCachedStatus()
+        }
+    }
+    private func cancelLocationSelection() {
+        guard !restoringLocation else{return}
+        choosingLocation=false
+        restoringLocation=true
+        let previous=task
+        if taskIsPreview {previous?.cancel()}
+        taskIsPreview=false
+        task=Task {
+            await previous?.value
+            let action:NASServerSetupAction=setup.snapshot.configuration == nil ? .stop : .restoreSaved
+            if let restore=model.begin(action) {await model.run(restore)}
+            setup.refreshCachedStatus()
+            restoringLocation=false
+        }
     }
     private func reconnect() {
+        guard !restoringLocation else{return}
         if setup.snapshot.configuration != nil {
             setup.refreshCachedStatus()
             if let configuration=setup.snapshot.configuration {setup.draft=ARLNASConfigurationDraft(configuration:configuration)}
@@ -233,7 +275,11 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     private var locationPicker:some View {
         VStack(alignment:.leading,spacing:12) {
             Divider()
-            HStack {Text("选择读取位置").font(.callout.weight(.semibold));Spacer();if model.snapshot.authorizedScope != nil {Button("取消选择") {choosingLocation=false;launch(.restoreSaved)}}}
+            HStack {
+                Text("选择读取位置").font(.callout.weight(.semibold))
+                Spacer()
+                Button("取消选择",action:cancelLocationSelection).disabled(model.snapshot.busy && !taskIsPreview)
+            }
             if let page=model.snapshot.directory,let share=model.snapshot.share {
                 HStack {Label(share+(page.path.isEmpty ? "":" / "+page.path),systemImage:"folder");Spacer();if !page.path.isEmpty {Button("上一级",systemImage:"arrow.up") {wholeShare=false;launch(.directory(share:share,path:page.path.split(separator:"/").dropLast().joined(separator:"/"),cursor:nil))}.disabled(!canBrowse)}}
                 ForEach(page.directories,id:\.self) {path in
@@ -248,7 +294,10 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                 ForEach(model.snapshot.state.shares) {share in
                     Button {wholeShare=false;launch(.directory(share:share.name,path:"",cursor:nil))} label:{HStack {Label(share.name,systemImage:"externaldrive");Spacer();Image(systemName:"chevron.right").font(.caption)}.frame(minHeight:36).contentShape(Rectangle())}.buttonStyle(.plain).disabled(!canBrowse)
                 }
-                if model.snapshot.state.shares.isEmpty {Text("正在读取共享文件夹…").font(.caption).foregroundStyle(.secondary)}
+                if model.snapshot.state.shares.isEmpty, model.snapshot.fault == nil {
+                    Text(model.snapshot.busy ? "正在读取共享文件夹…" : "没有可访问的共享文件夹")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 if let cursor=model.snapshot.state.nextCursor {Button("更多共享") {launch(.shares(cursor:cursor))}.disabled(!canBrowse)}
             }
         }

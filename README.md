@@ -63,6 +63,8 @@ python3 -B script/bootstrap.py --check --native
 
 NAS 普通读取支持在设置中选择共享和目录，也支持共享根目录（目录留空），并未限定为 `ARL-Test/`。更换目录后需保存并重新连接，使新范围与凭据代次绑定；文件读取仍限制在所选范围内。`ARL-Test/` 是固定样例创建与精确清理工具的验收目录，真实 NAS 读取、文档、大文件和写入仍分别需要验收。
 
+首页「运行概览 → 应用连接」可查看 Friday、BiliNote、PDFMathTranslate、Robin 和宝宝起名工作台的通道及当日 API 用量。点 Friday 或接入 NAS 路由的应用可以分别设置文字通道。宝宝起名工作台在原服务管理模型和档位。[应用通道与用量](integrations/nas_codex_v2_20261024/NAS-MODEL-ROUTING.md)
+
 后台采用两层[运行时守护](docs/RUNTIME-SUPERVISION.md)：launchd 负责主进程异常退出后的重启，原生 owner 负责 Core/Mio 子进程的自动检测和退避恢复。正常退出、停用和安装维护期间暂停拉起，健康的兄弟进程继续运行；子进程守护已进入 build 146，其他安装需升级到包含该实现的构建后生效。
 
 ## 构建与验证

@@ -5,32 +5,31 @@ struct MetricsView: View {
     @State private var range: PerformanceTimeRange = .session
     @State private var processMemory = true
     @State private var explaining = false
-    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+    @State private var usesTwoColumns = false
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(),spacing:16), count: usesTwoColumns ? 2 : 1)
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                    let state = sampleState(at: timeline.date)
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            let state = sampleState(at: timeline.date)
+            let current = state.current
+            let samples = visibleSamples(at: timeline.date)
+            VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 12) {
                         StatusBadge(title: state.title, color: state.current != nil ? EditorialStyle.accent : .secondary)
-                        Text("\(visibleSamples(at: timeline.date).count) 个样本").font(.caption).foregroundStyle(.secondary).monospacedDigit()
-                    }
-                }
-                Spacer(minLength: 8)
-                Button { explaining.toggle() } label: { Image(systemName: "info.circle") }.buttonStyle(.borderless).help("指标说明").popover(isPresented: $explaining) { MetricExplanationView() }
-                Text("时间范围").font(.caption).foregroundStyle(.secondary)
-                PerformanceRangeSelector(selection: $range, historySpan: store.history.span)
-            }.frame(height: 34)
-            TimelineView(.periodic(from: .now, by: 1)) { timeline in
-                let state = sampleState(at: timeline.date)
-                let current = state.current
-                let samples = visibleSamples(at: timeline.date)
-                VStack(alignment: .leading, spacing: 16) {
+                        Text("\(samples.count) 个样本").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                        Spacer(minLength: 8)
+                        Button { explaining.toggle() } label: { Image(systemName: "info.circle") }
+                            .buttonStyle(EditorialActionButtonStyle(emphasis:.quiet))
+                            .accessibilityLabel("指标说明").help("指标说明")
+                            .popover(isPresented: $explaining) { MetricExplanationView() }
+                        Text("时间范围").font(.caption).foregroundStyle(.secondary)
+                        PerformanceRangeSelector(selection: $range, historySpan: store.history.span)
+                    }.frame(minHeight:36)
                     LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                         DetailCard(title: "", height: 270) {
                             HStack(spacing: 8) {
                                 metricTitle(processMemory ? "内存用量" : "处理器").help(processMemory ? "ARL进程实际占用的内存" : "ARL进程的处理器用量")
-                                if processMemory { Text("内存用量").help("进程实际占用的内存").font(.caption).foregroundStyle(.secondary) }
                                 Spacer(minLength: 0)
                                 Menu { Button("内存用量") { processMemory = true }; Button("处理器") { processMemory = false } } label: { Image(systemName: "ellipsis").font(.callout) }.menuStyle(.borderlessButton).fixedSize().help("切换进程指标")
                             }.frame(height: 18)
@@ -48,10 +47,10 @@ struct MetricsView: View {
                         }.help("系统临时用硬盘代替的内存")
                     }
                     processTable(current)
-                    HStack { Text(state.sampleTimeTitle); Spacer(); Text(("本次运行，最多1小时" + "\n" + "本次会话 · 最多 1 小时")); if let total = current?.memoryTotalBytes { Text("物理内存 \(MetricFormat.bytes(total))") } }.font(.caption2).foregroundStyle(.secondary)
-                }
+                    HStack { Text(state.sampleTimeTitle); Spacer(); Text("本次运行 · 最多 1 小时"); if let total = current?.memoryTotalBytes { Text("物理内存 \(MetricFormat.bytes(total))") } }.font(.caption2).foregroundStyle(.secondary)
             }
         }
+        .onGeometryChange(for: Bool.self) { $0.size.width >= 640 } action: { usesTwoColumns = $0 }
     }
     private func processTable(_ current: SystemLoad?) -> some View {
         DetailCard(title: "后台程序") {

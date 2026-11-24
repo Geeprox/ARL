@@ -70,8 +70,13 @@ private struct SidebarButtonStyle: ButtonStyle {
     @State private var hovered = false
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.foregroundStyle(EditorialStyle.graphite)
-            .background(selected ? EditorialStyle.panel : configuration.isPressed || hovered ? Color.primary.opacity(0.045) : .clear,
-                        in: RoundedRectangle(cornerRadius: EditorialStyle.controlRadius))
+            .background {
+                ZStack {
+                    EditorialInteractionFill(color: selected ? EditorialStyle.panel : .clear, radius: EditorialStyle.controlRadius)
+                    EditorialInteractionFill(color: .primary.opacity(configuration.isPressed ? 0.09 : hovered ? 0.045 : 0),
+                                             radius: EditorialStyle.controlRadius)
+                }.allowsHitTesting(false)
+            }
             .overlay { RoundedRectangle(cornerRadius: EditorialStyle.controlRadius).strokeBorder(focused ? EditorialStyle.accent : .clear, lineWidth: 2).allowsHitTesting(false) }
             .onHover { hovered = $0 }
     }

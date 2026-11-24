@@ -18,6 +18,29 @@ enum EditorialStyle {
     static let sectionSpacing: CGFloat = 20
 }
 
+/// Timing shared by small interactive surfaces and semantic state changes.
+enum EditorialMotion {
+    static func feedback(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .easeOut(duration: 0.10)
+    }
+
+    static func stateChange(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .easeInOut(duration: 0.16)
+    }
+}
+
+struct EditorialInteractionFill: View {
+    let color: Color
+    let radius: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .fill(color)
+            .animation(EditorialMotion.feedback(reduceMotion: reduceMotion), value: color)
+    }
+}
+
 struct EditorialHeading: View {
     let title: String
     let subtitle: String

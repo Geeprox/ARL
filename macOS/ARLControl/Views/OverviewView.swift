@@ -6,51 +6,35 @@ struct OverviewView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
             EditorialHeading(title: "运行概览", subtitle: "")
-            if let code = store.bundledRuntimeError {
+            if store.bundledRuntimeError != nil || store.bundledRuntimeRecovering {
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("本机服务连接失败", systemImage: "exclamationmark.circle").font(.callout.weight(.semibold))
-                    Text(code).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    Button(store.bundledRuntimeRecovering ? "正在恢复" : "恢复连接") { store.recoverBundledRuntime() }
+                    EditorialNotice(title: "后台服务正在恢复",
+                                    detail: "ARL 会自动重试，也可以立即重试。",
+                                    symbol: "arrow.clockwise", color: .orange)
+                    Button(store.bundledRuntimeRecovering ? "正在重试" : "立即重试") { store.recoverBundledRuntime() }
                         .disabled(store.bundledRuntimeRecovering || store.nativeActionsHeld)
                 }
-            } else if let code = store.controlError {
-                HStack {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("运行状态读取失败").font(.callout.weight(.semibold))
-                        Text(code).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
-                    }
-                    Spacer()
-                    Button("重试") { Task { await store.refresh() } }.disabled(store.reading)
+            } else if store.controlError != nil {
+                VStack(alignment: .leading, spacing: 10) {
+                    EditorialNotice(title: "暂时无法读取运行状态", detail: "",
+                                    symbol: "exclamationmark.circle", color: .orange)
+                    Button(store.reading ? "正在更新" : "立即更新") { Task { await store.refresh() } }.disabled(store.reading)
                 }
             }
             VStack(spacing: 0) {
-                fact("本机服务", value: Self.runtimeTitle(state: store.control.runtime.value?.state, connected: store.connected, hasIssue: store.bundledRuntimeError != nil || store.controlError != nil), symbol: "desktopcomputer")
+                fact("本机服务", value: Self.runtimeTitle(state: store.control.runtime.value?.state, connected: store.connected, hasIssue: !store.connected && (store.bundledRuntimeError != nil || store.controlError != nil)), symbol: "desktopcomputer")
                 Divider()
                 TimelineView(.periodic(from: .now, by: 5)) { timeline in
                     fact("Mio 本机连接", value: Self.mioTitle(store.modules.value?.mioStatus(at: timeline.date)), symbol: "link")
                 }
                 if let queue=store.scheduler {
                     Divider()
-                    fact("模型任务",value:queue.running > 0 ? "\(queue.running) 项执行中 · \(queue.queued) 项排队":"空闲",symbol:"cpu")
+                    fact("模型任务",value:Self.queueTitle(running:queue.running, queued:queue.queued),symbol:"cpu")
                 }
             }
-            TimelineView(.periodic(from: .now, by: 5)) { timeline in
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("应用连接").font(.system(size: 15, weight: .semibold)).accessibilityAddTraits(.isHeader)
-                    if let entries = store.control.registry.value {
-                        let connected = AppRegistration.connected(entries, at: timeline.date)
-                        if connected.isEmpty { Text("暂无已连接应用").foregroundStyle(.secondary).font(.callout) }
-                        ForEach(connected) { app in
-                            HStack(spacing: 12) {
-                                AppIcon(id: app.id, symbol: app.symbol, registeredIcon: app.applicationIcon, iconHome: app.applicationIconHome, protocolIcon: true)
-                                Text(app.name).font(.callout)
-                                Spacer()
-                                ConnectionIndicator(ready:true,title:app.name)
-                            }
-                        }
-                    } else { Text("尚未检查应用连接").font(.callout).foregroundStyle(.secondary) }
-                }
-            }
+            ApplicationConnectionsView(registry: store.control.registry.value,
+                                       nasEnabled: !store.demo && !store.isolated,
+                                       nasChangesAllowed: !store.nativeActionsHeld)
         }.frame(maxWidth: 880, alignment: .leading).frame(maxWidth: .infinity, alignment: .leading)
     }
     static func runtimeTitle(state: String?, connected: Bool, hasIssue: Bool) -> String {
@@ -68,12 +52,20 @@ struct OverviewView: View {
     static func mioTitle(_ status: MioTunnelStatus?) -> String {
         switch status {
         case .ready: "已连接"
-        case .live: "已连接，状态待检查"
+        case .live: "等待隧道就绪"
         case .notReady: "需要处理"
         case .unavailable: "未连接"
-        case .failed: "检查失败"
-        case .stale: "需要重新检查"
+        case .failed: "状态暂不可用"
+        case .stale: "等待状态更新"
         case .unknown, nil: "未检查"
+        }
+    }
+    static func queueTitle(running: Int, queued: Int) -> String {
+        switch (running, queued) {
+        case (0, 0): "空闲"
+        case (0, _): "\(queued) 项排队"
+        case (_, 0): "\(running) 项执行中"
+        default: "\(running) 项执行中 · \(queued) 项排队"
         }
     }
     private func fact(_ title: String, value: String, symbol: String) -> some View {
@@ -82,7 +74,9 @@ struct OverviewView: View {
             Text(title)
             Spacer()
             if ["运行中","已连接"].contains(value) {ConnectionIndicator(ready:true,title:title)}
-            else if ["未检查","正在启动","需要重新检查"].contains(value) {ConnectionIndicator(ready:false,pending:true,title:title)}
+            else if ["未检查","正在启动","等待状态更新","等待隧道就绪"].contains(value) {
+                ConnectionIndicator(ready:false,pending:true,title:title,text:value)
+            }
             else {Text(value).foregroundStyle(.secondary)}
         }.font(.system(size: 13)).padding(.vertical, 17)
     }

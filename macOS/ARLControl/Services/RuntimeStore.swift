@@ -293,13 +293,14 @@ final class RuntimeStore {
         credentialOwnerRetryCount=min(credentialOwnerRetryCount+1,delays.count-1)
         recoverCredentialOwner()
     }
-    func recoverBundledRuntime() {
+    func recoverBundledRuntime(restartAll: Bool = false) {
         guard let owner = bundledRuntimeOwner, owner.failure != nil, !bundledRuntimeRecovering, !exitRequested, lifecycleOperation == nil else { return }
         let token = UUID(); lifecycleOperation = token
         bundledRuntimeRecovering = true
         Task {
             defer { if lifecycleOperation == token { lifecycleOperation = nil } }
-            _ = await owner.recover(home: calendarHome)
+            if restartAll { _ = await owner.recover(home: calendarHome) }
+            else { _ = await owner.retryFailedChildren(home: calendarHome) }
             bundledRuntimeRecovering = false; observeCredentialOwner()
             await refresh()
         }

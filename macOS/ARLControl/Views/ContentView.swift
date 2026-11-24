@@ -33,7 +33,7 @@ struct ContentView: View {
         }
         .toolbarBackground(EditorialStyle.canvas, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
-        .tint(EditorialStyle.accent).frame(minWidth: 850, minHeight: 580)
+        .tint(EditorialStyle.accent).frame(minWidth: 760, minHeight: 540)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await store.refresh() }
         }
@@ -159,7 +159,12 @@ private struct RuntimeDiagnosticsSummary: View {
             }
             if store.bundledRuntimeError != nil {
                 Text("后台服务异常，正在尝试恢复。").font(.callout).foregroundStyle(.orange)
-                Button(store.bundledRuntimeRecovering ? "正在恢复":"重启后台服务") {store.recoverBundledRuntime()}.disabled(store.bundledRuntimeRecovering)
+                if let code = store.bundledRuntimeError {
+                    Text(code).font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                Button(store.bundledRuntimeRecovering ? "正在恢复":"重启后台服务") {
+                    store.recoverBundledRuntime(restartAll: true)
+                }.disabled(store.bundledRuntimeRecovering || store.nativeActionsHeld)
             }
             if store.controlError != nil {
                 Text("暂时无法读取服务状态，将自动重试。").font(.caption).foregroundStyle(.secondary)

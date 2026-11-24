@@ -73,18 +73,30 @@ import ImageIO
 }
 
 @MainActor private struct RegisteredApplicationIconView: View {
+    private struct Identity: Hashable {
+        let home: URL
+        let icon: RegisteredApplicationIcon
+    }
+    private struct Lookup: Hashable {
+        let identity: Identity
+        let refreshAt: Date
+    }
     let icon: RegisteredApplicationIcon
     let home: URL
     let symbol: String
     let size: CGFloat
     let refreshAt: Date
-    @State private var image: NSImage?
-    private var lookupID: String { home.path + ":" + icon.app_id + ":" + icon.sha256 + ":" + String(refreshAt.timeIntervalSince1970) }
+    @State private var resolved: (identity: Identity, image: NSImage)?
+    private var identity: Identity { Identity(home:home, icon:icon) }
     var body: some View {
+        let lookup = Lookup(identity:identity, refreshAt:refreshAt)
         Group {
-            if let image { Image(nsImage:image).resizable().interpolation(.high).scaledToFit() }
+            if let resolved, resolved.identity == lookup.identity {
+                Image(nsImage:resolved.image).resizable().interpolation(.high).scaledToFit()
+            }
             else { Image(systemName:symbol).font(.system(size:size * 0.55)).foregroundStyle(.secondary) }
-        }.task(id:lookupID) {
+        }.task(id:lookup) {
+            guard resolved?.identity != lookup.identity else { return }
             do {
                 let data = try await SettingsService(home:home).readApplicationIcon(icon)
                 try Task.checkCancellation()
@@ -92,9 +104,9 @@ import ImageIO
                       let properties = CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any],
                       properties[kCGImagePropertyPixelWidth] as? Int == 64,
                       properties[kCGImagePropertyPixelHeight] as? Int == 64,
-                      let decoded = NSImage(data:data) else { image = nil; return }
-                image = decoded
-            } catch { if !Task.isCancelled { image = nil } }
+                      let decoded = NSImage(data:data) else { return }
+                resolved = (lookup.identity, decoded)
+            } catch { /* Retry unresolved icons on the next visible refresh. */ }
         }
     }
 }

@@ -38,7 +38,8 @@ class MacPlatform:
         if args[0]=='/bin/launchctl' and args[1] in {'print','bootout','bootstrap'}:category='launchctl_'+args[1]
         elif args[0]=='/usr/bin/codesign':category='code_signature'
         elif args[0]=='/usr/bin/open':category='open_app'
-        elif args[0]==str(self.host):category={'--internal-app-state':'app_state','--internal-app-quit':'app_quit','--internal-reminders-state':'reminders_state','--internal-reminders-quit':'reminders_quit'}.get(args[1],'app_internal')
+        elif args[0] in {str(self.host),str(self.layout.targets['app']/'Contents/MacOS/ARL')}:
+            category={'--internal-app-state':'app_state','--internal-app-quit':'app_quit','--internal-reminders-state':'reminders_state','--internal-reminders-quit':'reminders_quit'}.get(args[1],'app_internal')
         try:
             result=subprocess.run(args,stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=seconds,env={'PATH':'/usr/bin:/bin:/usr/sbin:/sbin','HOME':str(self.layout.account),'LANG':'C'})
         except subprocess.TimeoutExpired:
@@ -207,7 +208,10 @@ class MacPlatform:
     def quit_app(self,record):
         require(record.get('drain_supported') is True,'legacy_app_drain_unsupported')
         require(self.current(record),'install_app_generation_changed')
-        r=self.command([self.host,'--internal-app-quit',str(record['pid']),str(record['birth'][0]),str(record['birth'][1])],seconds=45)
+        # 由目标安装版请求正常退出。候选包的管理进程留在暂存路径，避免替换旧包时失去父进程身份。
+        installed=self.layout.targets['app']/'Contents/MacOS/ARL'
+        host=installed if record['executable']==str(installed) else self.host
+        r=self.command([host,'--internal-app-quit',str(record['pid']),str(record['birth'][0]),str(record['birth'][1])],seconds=45)
         require(json.loads(r.stdout).get('terminated') is True and not self.current(record),'install_app_drain_unproven')
     def reminders_image_path(self,value):
         if type(value) is not str:return False
