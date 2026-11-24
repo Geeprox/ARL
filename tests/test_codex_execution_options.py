@@ -1,6 +1,6 @@
 import copy,json,sys,time,threading
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from arl.contracts import Fault
 from arl.codex_execution_options import read_catalog,selection
 from arl.codex_server import CodexTextAdapter,CodexService,confirmed_preferences,NAME
@@ -10,6 +10,30 @@ from arl.storage import Store
 from tests.test_runtime import RuntimeCase
 FIXTURE=Path(__file__).parent/'fixtures/CodexExecutionOptionsServer.py'
 class OptionsTests(RuntimeCase):
+ def test_preflight_checks_explicit_model_against_catalog_when_selection_is_enabled(self):
+  adapter=CodexTextAdapter(binary=sys.executable,enabled=True)
+  session=Mock()
+  session.text_controls.return_value='provider-default'
+  session.send.side_effect=lambda method, params:method
+  responses={
+   'config/read':{'config':{'mcp_servers':{}}},
+   'account/read':{'account':{'type':'chatgpt'}},
+   'model/list':{'data':[{'model':'chosen','defaultReasoningEffort':'medium',
+    'supportedReasoningEfforts':[{'reasoningEffort':'medium'}]}]},
+   'thread/start':{'model':'chosen','thread':{'id':'fixture','ephemeral':True},
+    'modelProvider':'openai','approvalPolicy':'never','sandbox':{'type':'readOnly'},
+    'reasoningEffort':'medium','serviceTier':'default'},
+  }
+  session.response.side_effect=responses.__getitem__
+  with patch.object(adapter,'verify'),patch('arl.codex_server.Session',return_value=session):
+   for model,selectable in [('chosen',False),('unlisted',True)]:
+    self.assert_fault('provider_model_change_not_authorized',lambda:adapter.preflight_model(
+      model,reasoning_effort='medium',service_tier='default',selectable=selectable))
+   self.assertFalse(any(call.args[0]=='thread/start' for call in session.send.call_args_list))
+   result=adapter.preflight_model('chosen',reasoning_effort='medium',service_tier='default',selectable=True)
+  self.assertEqual(result['model'],'chosen')
+  self.assertNotIn('turn/start',[call.args[0] for call in session.send.call_args_list])
+
  def route(self, max_calls=32):
   adapter=CodexTextAdapter(enabled=True,test_command=[sys.executable, '-B','-I',str(FIXTURE)])
   service=CodexService(adapter,caller='options-fixture',model='synthetic-model',authorization_current=lambda:True,
