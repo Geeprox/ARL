@@ -118,7 +118,9 @@ import Darwin
     #endif
     private func ensureChild(_ key: String, executable: URL, arguments: [String]) throws {
         if let child = children[key] {
-            guard child.isRunning, child.executableURL == executable, child.arguments == arguments
+            // Foundation URLs for the same bundled executable can have different bases.
+            // Compare the absolute file paths without resolving new symlinks.
+            guard child.isRunning, child.executableURL?.path == executable.path, child.arguments == arguments
             else { throw ARLError(code: "bundled_runtime_cleanup_pending") }
             observeTermination(child, key: key)
             return

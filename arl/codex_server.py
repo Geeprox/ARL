@@ -287,7 +287,7 @@ class CodexTextAdapter:
      configured_model=session.text_controls()
      account=session.response(session.send('account/read',{'refreshToken':False}))
      if (account.get('account') or {}).get('type')!='chatgpt':raise Fault('provider_existing_account_required')
-     if configured_model!=model:raise Fault('provider_model_change_not_authorized')
+     if not selectable and configured_model!=model:raise Fault('provider_model_change_not_authorized')
     catalog=None
     if selectable or self.capture_execution_catalog:
      from .codex_execution_options import read_catalog,selection

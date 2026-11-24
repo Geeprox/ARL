@@ -34,15 +34,19 @@ enum RemindersNativeIO {
   var starts=0
   owner.activationTestHook={
    starts += 1
+   let executable=URL(fileURLWithPath:CommandLine.arguments[1])
+   let relativeExecutable=URL(fileURLWithPath:executable.lastPathComponent,
+                              relativeTo:executable.deletingLastPathComponent())
+   precondition(executable != relativeExecutable && executable.path == relativeExecutable.path)
    for key in ["core","mio"] {
-    try owner.ensureFixtureChild(key:key, executable:URL(fileURLWithPath:CommandLine.arguments[1]), arguments:["30"])
+    try owner.ensureFixtureChild(key:key, executable:starts == 1 ? executable : relativeExecutable, arguments:["30"])
    }
   }
   let started=await owner.recover(home:home);precondition(started)
   let original=owner.testChild("core")!, sibling=owner.testChild("mio")!
   let lateCallback=original.terminationHandler
   precondition(kill(original.processIdentifier,SIGKILL)==0)
-  try await waitUntil { starts==2 && owner.testChild("core")?.isRunning==true }
+  try await waitUntil { starts==2 && owner.activated && owner.testChild("core")?.isRunning==true }
   precondition(!original.isRunning && owner.testChild("core") !== original)
   precondition(owner.testChild("mio") === sibling && sibling.isRunning,"healthy sibling was restarted")
   lateCallback?(original)
