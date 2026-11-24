@@ -87,6 +87,9 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     init(owner:any NASServerSetupOwner,setup:ARLNASSetupModel) {
         self.setup=setup;_model=StateObject(wrappedValue:NASServerSetupModel(owner:owner))
     }
+    private var showsLocationAction: Bool {
+        model.snapshot.saved && !editingDevice && setup.snapshot.configuration != nil
+    }
     private func launch(_ action:NASServerSetupAction) {
         guard !restoringLocation,let intent=model.begin(action) else{return}
         setup.refreshCachedStatus()
@@ -171,7 +174,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                 HStack(alignment:.top,spacing:12) {
                     Label(recovery(fault),systemImage:"exclamationmark.circle").font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
                     Spacer()
-                    if fault != .locationMissing || setup.snapshot.configuration == nil {
+                    if fault != .locationMissing || !showsLocationAction {
                         Button("重新连接") {reconnect()}.disabled(!model.snapshot.saved || !sameEndpoint)
                     }
                 }
@@ -202,8 +205,11 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                     VStack(alignment:.leading,spacing:6) {Text("连接超时（秒）").font(.caption).foregroundStyle(.secondary);TextField("8",value:$setup.draft.connectionTimeoutSeconds,format:.number).frame(width:120)}
                 }
             }
-            if let diagnostic=model.snapshot.diagnostic,let fault=model.snapshot.fault,fault != .locationMissing {
-                Text("连接返回："+diagnostic).font(.caption).foregroundStyle(.secondary).textSelection(.enabled).fixedSize(horizontal:false,vertical:true)
+            if !model.snapshot.busy, model.snapshot.fault != nil, let diagnostic = model.snapshot.diagnostic {
+                DisclosureGroup("连接详情") {
+                    Text(diagnostic).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                        .fixedSize(horizontal:false,vertical:true)
+                }
             }
         }
         .onAppear {
@@ -310,7 +316,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         case .credentialNotSaved: return "请先保存账号密码"
         case .credentialsUnavailable: return "连接未完成，请查看详情"
         case .accessDenied,.readDenied: return "访问被拒，请核对服务器权限"
-        case .locationMissing: return "找不到已保存的读取位置，请更改位置"
+        case .locationMissing: return showsLocationAction ? "找不到已保存的读取位置，请更改位置" : "找不到已保存的读取位置"
         case .transportTimeout: return "连接超时，请核对地址和网络"
         case .bindingMismatch,.sourceChanged: return "设置已变，请重新选择范围"
         case .expired: return "登录已过期，请重新验证"

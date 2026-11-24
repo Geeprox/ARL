@@ -186,6 +186,17 @@ class AssemblyTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.runtime.snapshot()["connected"])
         self.assertEqual((SMB.opened, SMB.closed, self.wire.lease_count), (1, 1, 1))
 
+    async def test_missing_share_has_the_same_recovery_code(self):
+        class MissingShare(OSError):
+            status = 0xC00000CC
+
+        with patch.object(SMB, "__init__", side_effect=MissingShare("private share")):
+            with self.assertRaises(CredentialFault) as caught:
+                await self.runtime.connect(bootstrap())
+
+        self.assertEqual(host.public_error(caught.exception), "nas_missing")
+        self.assertEqual(self.wire.lease_count, 1)
+
     async def test_revoke_on_late_reply_does_not_publish(self):
         await self.runtime.connect(bootstrap())
         SMB.after_list=lambda: setattr(self.wire,"reject","request_reply")

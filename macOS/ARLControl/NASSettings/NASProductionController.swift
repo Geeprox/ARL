@@ -138,10 +138,11 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             serverState = .init(failure:"expired");serverDirectory=nil;previewShare=nil;shareNames=[]
         }
         let granted=record.map {$0.configuration.host+":"+String($0.configuration.port)+"/"+$0.configuration.share+($0.configuration.root.isEmpty ? "" : "/"+$0.configuration.root)}
+        let fault = failure ?? state.failure.map(ARLNASControllerResultProjection.fault)
         return .init(address:serverRecord?.originalAddress ?? "",port:serverRecord?.endpoint.port ?? 445,
             timeoutSeconds:serverRecord?.endpoint.timeoutSeconds ?? 8,saved:serverRecord != nil,account:savedAccount,
             state:serverState,directory:serverDirectory,share:previewShare,authorizedScope:granted,
-            busy:serverIntentID != nil,paused:userPausedServer,fault:failure,diagnostic:failureDiagnostic)
+            busy:serverIntentID != nil,paused:userPausedServer,fault:fault,diagnostic:failureDiagnostic ?? state.failure)
     }
     func maintainServerConnection() async {
         guard enabled,pins != nil,!userPausedServer,serverIntentID == nil,fileOperationID == nil,let saved=serverRecord,ProcessInfo.processInfo.systemUptime >= nextServerCheck else{return}
@@ -154,7 +155,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             do {
                 let next=try await owner.connect(configuration:record.configuration,identity:identity)
                 guard serverIntentID==token,self.record?.configuration==record.configuration else{return}
-                state=next;failure=nil;automaticFailures=0;startPolling()
+                state=next;failure=nil;failureDiagnostic=nil;automaticFailures=0;startPolling()
             } catch {
                 failure=mapped(error);automaticFailures=min(automaticFailures+1,5)
                 nextServerCheck=ProcessInfo.processInfo.systemUptime+[5.0,15,30,60,300][automaticFailures-1]
