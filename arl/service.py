@@ -17,7 +17,7 @@ from .application_models import ApplicationModels, METHODS as APPLICATION_METHOD
 from .messages_receive import MessagesReceive, METHODS as MESSAGES_RECEIVE_METHODS
 from .diagnostics import CODES, log_schema, log_v3_schema
 from .lifecycle import InstanceLock, peer_uid, private_home
-from .overview import overview
+from .overview import TASK_ATTENTION_METHOD, overview, task_attention
 from .runtime_description import RuntimeDescription
 from .modules import MioMetadata
 from .providers import Router
@@ -35,6 +35,7 @@ METHODS = {
     "runtime.describe": object_schema(), "health": object_schema(), "ready": object_schema(), "capabilities": object_schema(),
     "providers": object_schema(), "overview": object_schema(), "codex.service.status.v1": object_schema(),
     "settings.modules_snapshot": object_schema(), "settings.scheduler.v1": object_schema(), "settings.snapshot": object_schema(),
+    TASK_ATTENTION_METHOD: object_schema({"offset": {"type": "integer", "minimum": 0, "maximum": 1000000}}),
     "settings.app_icon.v1": object_schema({"app_id":string(64), "sha256":string(64)}, ["app_id","sha256"]), "settings.logs": log_schema(),
     "settings.logs_export": log_schema(export=True), "settings.logs.v3": log_v3_schema(), "settings.logs.recent.v1": object_schema({"limit":{"type":"integer","minimum":1,"maximum":500},"level":{"type":"string","enum":["info","warning","error"]}}), "settings.log_details.v1": object_schema({"sequence":{"type":"integer","minimum":1,"maximum":1000000000000000},"session_id":{**string(32),"pattern":r"[a-f0-9]{32}"}},["sequence","session_id"]), "heartbeat": object_schema(),
     "submit": object_schema({"tool": string(100), "args": {"type": "object", "properties": {}},
@@ -302,7 +303,7 @@ class Runtime:
         # Explicit public metadata exception, never an identity grant. Even a host
         # policy cannot use this flag to exempt arbitrary tools or task methods.
         public_read = (owner == "settings" and policy.public_metadata and
-                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", *SERVICE_PORTAL_METHODS} and verified_app is None)
+                       method in {"runtime.describe", "health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", TASK_ATTENTION_METHOD, *SERVICE_PORTAL_METHODS} and verified_app is None)
         if self.identity_verifier is not None and verified_app != owner and not public_read:
             raise Fault("app_identity_unverified")
         priority_allowed=(method in {'priority.negotiate.v1','priority.negotiate.v2'} or method=='priority.submit.v1' and 'submit' in policy.methods)
@@ -384,6 +385,12 @@ class Runtime:
             platform=getattr(self,'application_platform',None)
             if platform is None or self.store is None:raise Fault('scheduler_unavailable')
             return platform.snapshot()
+        if method == TASK_ATTENTION_METHOD:
+            if owner != "settings":
+                raise Fault("method_not_authorized")
+            if self.store is None:
+                raise Fault("not_ready")
+            return task_attention(self.store, params.get("offset", 0))
         if method == 'settings.modules_snapshot':
             return self.modules.snapshot()
         if method == 'settings.snapshot':

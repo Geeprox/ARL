@@ -17,8 +17,10 @@ from arl.diagnostics import Diagnostics
 from arl.host import metadata_policies
 from arl.identity import RegisteredPeerVerifier, process_identity
 from arl.metrics import ResourceSampler, mac_system
+from arl.overview import TASK_ATTENTION_METHOD
 from arl.providers import MockProvider
 from arl.service import Runtime
+from arl.storage import Store
 from arl.supervisor import ControlledSupervisor, LaunchSpec, pin_sources
 from pathlib import Path
 from tests.test_runtime import RuntimeCase, running
@@ -106,6 +108,47 @@ class ControlUnitTests(RuntimeCase):
         self.assert_fault('app_identity_unverified',lambda:self.request(runtime,'submit',{'tool':'runtime.ping','args':{},'key':'key'}))
         self.assert_fault('method_not_authorized',lambda:self.request(runtime,'heartbeat',app='friday',verified='friday'))
         runtime.control.close()
+
+    def test_attention_lists_only_bounded_public_metadata_and_has_no_job_authority(self):
+        runtime = self.runtime(policies=metadata_policies(), identity_verifier=lambda c, a: None, execute_jobs=False)
+        self.addCleanup(runtime.control.close)
+        self.assert_fault('not_ready', lambda: self.request(runtime, TASK_ATTENTION_METHOD))
+        store = runtime.store = Store(self.home / 'attention.sqlite')
+        self.addCleanup(store.close)
+        runtime.policies['friday'] = AppPolicy(frozenset(), methods=frozenset({TASK_ATTENTION_METHOD}))
+
+        rows = [(f'private-job-{i}', f'private-owner-{i}', f'private-key-{i}', 'digest',
+                 'private-tool', '{"private_input": 1}', 0, 'needs_review', '{"private_output": 1}',
+                 'private-error', i, i) for i in range(24)]
+        rows.append(('acceptance-job', 'org.arl.acceptance.fixture', 'acceptance-key', 'digest',
+                     'codex.text.plan.v1', '{}', 0, 'needs_review', '{}', 'codex_scope_unavailable', 30, 30))
+        rows.append(('unlock-job', 'friday', 'unlock-key', 'digest', 'apple.calendar.list',
+                     '{}', 1, 'needs_unlock', None, 'needs_unlock', 31, 31))
+        rows.append(('queued-job', 'friday', 'queued-key', 'digest', 'apple.calendar.list',
+                     '{}', 1, 'queued', None, None, 32, 32))
+        store.db.executemany('INSERT INTO jobs(id,owner,key,digest,tool,args,idempotent,state,result,error,created,updated)'
+                             ' VALUES(?,?,?,?,?,?,?,?,?,?,?,?)', rows)
+        result = self.request(runtime, TASK_ATTENTION_METHOD)
+        self.assertEqual((result['total'], len(result['items']), result['next_offset']), (26, 24, 24))
+        unlock, acceptance = result['items'][:2]
+        self.assertEqual((unlock['kind'], unlock['source'], unlock['state']), ('calendar', 'friday', 'needs_unlock'))
+        self.assertEqual((acceptance['kind'], acceptance['source'], acceptance['reason']),
+                         ('codex', 'arl_acceptance', 'codex_scope_unavailable'))
+        self.assertEqual(set(acceptance), {'receipt', 'kind', 'source', 'state', 'reason', 'updated_at_ms'})
+        self.assertRegex(acceptance['receipt'], '^[a-f0-9]{64}$')
+        self.assertEqual(result['items'][2]['reason'], 'unclassified')
+        next_page = self.request(runtime, TASK_ATTENTION_METHOD, {'offset': 24})
+        self.assertEqual((len(next_page['items']), next_page['next_offset']), (2, None))
+        self.assertFalse(set(row['receipt'] for row in next_page['items']) & set(row['receipt'] for row in result['items']))
+        self.assertNotRegex(json.dumps([result, next_page]), r'private[-_]|acceptance-job|queued-job|org\.arl\.')
+        self.assert_fault('invalid_arguments', lambda: self.request(runtime, TASK_ATTENTION_METHOD, {'owner': 'friday'}))
+        self.assert_fault('invalid_arguments', lambda: self.request(runtime, TASK_ATTENTION_METHOD, {'offset': True}))
+        self.assert_fault('app_identity_unverified', lambda: self.request(runtime, TASK_ATTENTION_METHOD, app='friday'))
+        self.assert_fault('method_not_authorized', lambda: self.request(runtime, TASK_ATTENTION_METHOD, app='friday', verified='friday'))
+        self.assert_fault('app_identity_unverified', lambda: self.request(runtime, 'resume', {'id': unlock['receipt']}))
+        store.db.execute("UPDATE jobs SET updated = 35 WHERE id = 'acceptance-job'")
+        self.assertNotEqual(self.request(runtime, TASK_ATTENTION_METHOD)['items'][0]['receipt'], acceptance['receipt'])
+        self.assertEqual(store.state_counts()['needs_review'], 25)
 
     def test_live_guard_death_revokes_metadata_and_descriptors_are_bounded(self):
         runtime=self.runtime(); alive=[True]

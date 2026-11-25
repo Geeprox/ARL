@@ -1,7 +1,43 @@
-"""Public same-UID settings metadata. No object IDs, payloads or host paths."""
+"""Public same-UID settings metadata. No raw object IDs, payloads or host paths."""
+import hashlib
 import re
 
 from . import PROTOCOL, VERSION
+from .contracts import encode
+
+TASK_ATTENTION_METHOD = "settings.task_attention.v1"
+
+TASK_ATTENTION_REASONS = frozenset({
+    "needs_unlock", "codex_scope_unavailable", "interrupted", "cancelled",
+    "tool_contract_changed", "deadline_exceeded", "priority_recovery_requires_new_authorization",
+    "priority_authorization_missing", "priority_policy_epoch_changed", "priority_not_configured",
+})
+
+
+def task_attention(store, offset):
+    limit = 24
+    total, rows = store.task_attention_page(offset, limit)
+    items = []
+    for row in rows:
+        tool, owner = row["tool"], row["owner"]
+        kind = "other"
+        if tool.startswith(("codex.", "model.")):
+            kind = "codex" if tool.startswith("codex.") else "model"
+        elif tool.startswith(("apple.calendar.", "apple.reminders.")):
+            kind = "calendar" if tool.startswith("apple.calendar.") else "reminders"
+        elif tool.startswith(("nas.", "mio_nas_")):
+            kind = "nas"
+        source = owner if owner in {"friday", "tisra", "mio"} else "other"
+        if owner.startswith("org.arl.acceptance.") and tool == "codex.text.plan.v1":
+            source = "arl_acceptance"
+        items.append({
+            "receipt": hashlib.sha256(encode([row["id"], row["state"], row["updated"]])).hexdigest(),
+            "kind": kind, "source": source, "state": row["state"],
+            "reason": row["error"] if row["error"] in TASK_ATTENTION_REASONS else "unclassified",
+            "updated_at_ms": int(row["updated"] * 1000),
+        })
+    return {"schema_version": 1, "total": total, "items": items,
+            "next_offset": offset + limit if offset + limit < total else None}
 
 
 def label(value):

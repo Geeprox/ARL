@@ -24,6 +24,37 @@ struct RuntimeSnapshot: Codable, Sendable {
         }
     }
 }
+
+struct RuntimeTaskAttentionPage: Decodable, Sendable {
+    struct Item: Decodable, Identifiable, Sendable {
+        enum Kind: String, Decodable, Sendable { case codex, model, calendar, reminders, nas, other }
+        enum Source: String, Decodable, Sendable { case friday, tisra, mio, arlAcceptance = "arl_acceptance", other }
+        enum State: String, Decodable, Sendable { case needsUnlock = "needs_unlock", needsReview = "needs_review" }
+        let receipt: String
+        let kind: Kind
+        let source: Source
+        let state: State
+        let reason: String
+        let updated_at_ms: Int
+        var id: String { receipt }
+    }
+    let schema_version: Int
+    let total: Int
+    let items: [Item]
+    let next_offset: Int?
+
+    func isValid(offset: Int) -> Bool {
+        let pageSize = 24
+        return schema_version == 1 && total >= 0 && (0...1_000_000).contains(offset)
+            && items.count == min(max(total - offset, 0), pageSize)
+            && next_offset == (offset + pageSize < total ? offset + pageSize : nil)
+            && Set(items.map(\.receipt)).count == items.count
+            && items.allSatisfy {
+                $0.receipt.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+                    && (0...1_000_000_000_000_000).contains($0.updated_at_ms)
+            }
+    }
+}
 struct ModelProvider: Codable, Identifiable, Sendable {
     let name: String; let availability: String; let models: [String]; let paid: Bool
     let inference_policy: String; let allowed_apps: [String]
