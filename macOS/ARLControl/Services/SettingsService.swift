@@ -81,6 +81,14 @@ actor SettingsService {
               let bytes=try? JSONEncoder().encode(reply),let value=try? JSONDecoder().decode(ModelSchedulerStatus.self,from:bytes),value.schema_version == 1,(1...8).contains(value.max_parallel),value.running >= 0,value.queued >= 0 else{return nil}
         return value
     }
+    func readTaskAttention(offset: Int) async throws -> RuntimeTaskAttentionPage {
+        guard !demo else { throw ARLError(code: "task_attention_unavailable") }
+        let reply = try await ARLClient(home: home, app: "settings").rpc(
+            "settings.task_attention.v1", params: ["offset": .number(Double(offset))], timeout: 3)
+        let page = try JSONDecoder().decode(RuntimeTaskAttentionPage.self, from: JSONEncoder().encode(reply))
+        guard page.isValid(offset: offset) else { throw ARLError(code: "invalid_response") }
+        return page
+    }
     func readMioCalendarPermission() async -> MetadataFeature<MioCalendarPermissionStatus> {
         guard !nativeActionsHeld, !demo else { return .unsupported }
         let now = ProcessInfo.processInfo.systemUptime

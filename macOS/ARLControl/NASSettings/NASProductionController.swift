@@ -147,7 +147,12 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
     func maintainServerConnection() async {
         guard enabled,pins != nil,!userPausedServer,serverIntentID == nil,fileOperationID == nil,let saved=serverRecord,ProcessInfo.processInfo.systemUptime >= nextServerCheck else{return}
         nextServerCheck=ProcessInfo.processInfo.systemUptime+60
-        if savedAccount == nil {savedAccount=try? await owner.savedServerAccount(endpoint:saved.endpoint,identity:saved.identity)}
+        if savedAccount == nil {
+            let account = try? await owner.savedServerAccount(endpoint: saved.endpoint, identity: saved.identity)
+            guard !Task.isCancelled, !userPausedServer, serverIntentID == nil, fileOperationID == nil,
+                  serverRecord?.endpoint == saved.endpoint, serverRecord?.identity == saved.identity else { return }
+            if savedAccount == nil { savedAccount = account }
+        }
         if serverState.authenticated || state.connected {return}
         if let record,let identity=record.identity,credentialMatchesScope() {
             let token=UUID();serverIntentID=token
@@ -157,6 +162,8 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 guard serverIntentID==token,self.record?.configuration==record.configuration else{return}
                 state=next;failure=nil;failureDiagnostic=nil;automaticFailures=0;startPolling()
             } catch {
+                guard serverIntentID==token,self.record?.configuration==record.configuration else{return}
+                if error is CancellationError { nextServerCheck = 0; return }
                 failure=mapped(error);automaticFailures=min(automaticFailures+1,5)
                 nextServerCheck=ProcessInfo.processInfo.systemUptime+[5.0,15,30,60,300][automaticFailures-1]
                 if failure == .authenticationFailed || failure == .credentialInvalid {nextServerCheck = .infinity}

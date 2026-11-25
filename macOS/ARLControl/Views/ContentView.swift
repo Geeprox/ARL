@@ -150,12 +150,18 @@ private struct RuntimeDiagnosticsSummary: View {
             }
             if let snapshot = store.snapshot {
                 Divider()
+                let counts = snapshot.queue.counts
+                let active = (counts["queued"] ?? 0) + (counts["running"] ?? 0)
+                let review = counts["needs_review"] ?? 0
+                let unlock = counts["needs_unlock"] ?? 0
                 HStack {
                     Label("任务队列",systemImage:"rectangle.stack").font(.callout.weight(.medium));Spacer()
-                    Text(snapshot.queue.available ? (snapshot.outstanding == 0 ? "暂无待处理任务":"\(snapshot.outstanding) 项待处理") : "暂时无法读取").font(.callout).foregroundStyle(.secondary)
+                    Text(snapshot.queue.available ? (active == 0 ? "暂无排队或运行任务" : "\(active) 项排队或运行") : "暂时无法读取")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                let review = (snapshot.queue.counts["needs_review"] ?? 0) + (snapshot.queue.counts["needs_unlock"] ?? 0)
-                if review > 0 {Text("\(review) 项任务需要解锁或核对结果。").font(.caption).foregroundStyle(.orange)}
+                if snapshot.queue.available && (review > 0 || unlock > 0) {
+                    RuntimeTaskAttention(service: store.service, reviewCount: review, unlockCount: unlock)
+                }
             }
             if store.bundledRuntimeError != nil {
                 Text("后台服务异常，正在尝试恢复。").font(.callout).foregroundStyle(.orange)
@@ -174,6 +180,153 @@ private struct RuntimeDiagnosticsSummary: View {
                 managed = await Task.detached {ManagedLaunch.supervisingCurrentProcess()}.value
                 do {try await Task.sleep(for:.seconds(10))} catch {return}
             }
+        }
+    }
+}
+
+private struct RuntimeTaskAttention: View {
+    let service: SettingsService
+    let reviewCount: Int
+    let unlockCount: Int
+    @AppStorage("viewedRuntimeTaskReceipts") private var storedReceipts = ""
+    @State private var expanded = false
+    @State private var items: [RuntimeTaskAttentionPage.Item] = []
+    @State private var total: Int?
+    @State private var nextOffset: Int?
+    @State private var loadID = UUID()
+    @State private var loading = false
+    @State private var readFailed = false
+
+    private var expectedCount: Int { reviewCount + unlockCount }
+    private var viewed: Set<String> { Set(storedReceipts.split(separator: "\n").map(String.init)) }
+    private var unseen: Int? {
+        guard !readFailed, total == expectedCount, items.count == expectedCount, nextOffset == nil else { return nil }
+        return items.count { !viewed.contains($0.id) }
+    }
+    private var summary: String {
+        if unseen == 0 { return "\(expectedCount) 项已查看" }
+        if unlockCount == 0 { return "\(unseen ?? reviewCount) 项待核对" }
+        if reviewCount == 0 || unseen == unlockCount { return "\(unlockCount) 项等待解锁" }
+        return "\(unseen ?? expectedCount) 项需关注"
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $expanded) {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(items) { item in
+                    Divider()
+                    taskRow(item, seen: viewed.contains(item.id))
+                }
+                if loading {
+                    ProgressView("正在读取任务…").controlSize(.small)
+                } else if readFailed {
+                    Text("暂时无法读取任务详情。").font(.caption).foregroundStyle(.secondary)
+                    Button("重新读取") { Task { await load() } }
+                } else if items.isEmpty {
+                    Text("当前没有需关注的任务。").font(.caption).foregroundStyle(.secondary)
+                } else if let nextOffset {
+                    Button("查看更多任务") { Task { await load(offset: nextOffset) } }
+                }
+            }.padding(.top, 6)
+        } label: {
+            Label(summary, systemImage: unseen == 0 ? "checkmark.circle" : "exclamationmark.circle")
+                .font(.callout.weight(.medium)).foregroundStyle(unseen == 0 ? Color.secondary : Color.orange)
+        }
+        .accessibilityIdentifier("runtime-task-attention")
+        .task(id: [reviewCount, unlockCount, expanded ? 1 : 0]) {
+            await load(keepVisiblePages: true)
+            while expanded && !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(15)) } catch { return }
+                if !loading { await load(keepVisiblePages: true) }
+            }
+        }
+    }
+
+    private func taskRow(_ item: RuntimeTaskAttentionPage.Item, seen: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title(item.kind)).font(.callout.weight(.semibold))
+                Spacer(minLength: 8)
+                Text(item.state == .needsUnlock ? "等待解锁" : seen ? "已查看" : "结果待核对")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Text("\(source(item.source)) · \(Date(timeIntervalSince1970: Double(item.updated_at_ms) / 1000).formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption).foregroundStyle(.secondary)
+            Text(guidance(item)).font(.callout).fixedSize(horizontal: false, vertical: true)
+            if item.state == .needsReview {
+                Button(seen ? "撤销已查看" : "标记已查看") {
+                    var updated = viewed
+                    if seen { updated.remove(item.id) } else { updated.insert(item.id) }
+                    storedReceipts = updated.sorted().joined(separator: "\n")
+                }.controlSize(.small)
+            }
+        }
+    }
+
+    private func load(offset: Int = 0, keepVisiblePages: Bool = false) async {
+        let id = UUID()
+        loadID = id; loading = true; readFailed = false
+        defer { if loadID == id { loading = false } }
+        do {
+            var page = try await service.readTaskAttention(offset: offset)
+            let reset = offset == 0 || page.total != total
+            if reset && offset != 0 { page = try await service.readTaskAttention(offset: 0) }
+            let pageTotal = page.total
+            var received = page.items
+            var receivedIDs = Set(received.map(\.id))
+            if reset && keepVisiblePages {
+                let previousCount = items.count
+                while let cursor = page.next_offset, cursor < previousCount {
+                    let next = try await service.readTaskAttention(offset: cursor)
+                    guard loadID == id, !Task.isCancelled else { return }
+                    guard next.total == pageTotal else {
+                        readFailed = true
+                        return
+                    }
+                    received.append(contentsOf: next.items.filter { receivedIDs.insert($0.id).inserted })
+                    page = next
+                }
+            }
+            guard loadID == id, !Task.isCancelled else { return }
+            let existing = Set(items.map(\.id))
+            items = reset ? received : items + received.filter { !existing.contains($0.id) }
+            total = page.total; nextOffset = page.next_offset
+        } catch {
+            guard loadID == id, !Task.isCancelled else { return }
+            readFailed = true
+        }
+    }
+
+    private func title(_ kind: RuntimeTaskAttentionPage.Item.Kind) -> String {
+        switch kind {
+        case .codex: "Codex 模型任务"
+        case .model: "模型任务"
+        case .calendar: "日历操作"
+        case .reminders: "提醒事项操作"
+        case .nas: "NAS 操作"
+        case .other: "应用任务"
+        }
+    }
+
+    private func source(_ source: RuntimeTaskAttentionPage.Item.Source) -> String {
+        switch source {
+        case .friday: "由 Friday 发起"
+        case .tisra: "由 Tisra 发起"
+        case .mio: "由 Mio 发起"
+        case .arlAcceptance: "ARL 验收记录"
+        case .other: "来源应用未标识"
+        }
+    }
+
+    private func guidance(_ item: RuntimeTaskAttentionPage.Item) -> String {
+        if item.state == .needsUnlock { return "解锁这台 Mac 后，回到发起任务的应用继续。" }
+        if item.source == .arlAcceptance && item.reason == "codex_scope_unavailable" {
+            return "这次验收的 Codex 调用授权中断，后台没有确认完整结果。可以标记已查看。"
+        }
+        switch item.reason {
+        case "codex_scope_unavailable": return "任务使用的 Codex 授权已不可用，请先在发起应用核对结果。"
+        case "tool_contract_changed": return "任务使用的能力已有变更，请先在发起应用核对原操作。"
+        default: return "后台没有确认原任务的结果，请先在发起应用核对。"
         }
     }
 }

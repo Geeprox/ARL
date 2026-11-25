@@ -100,6 +100,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         }
         task=Task {
             let succeeded=await model.run(intent)
+            if succeeded, case .authorize = action { choosingLocation=false }
             if succeeded, !Task.isCancelled, action == .login,
                (choosingLocation || model.snapshot.authorizedScope == nil),model.snapshot.state.authenticated,
                let browse=model.begin(.shares(cursor:nil)) {await model.run(browse)}
@@ -215,13 +216,13 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
         .onAppear {
             if !model.snapshot.address.isEmpty {setup.draft.address=model.snapshot.address;setup.draft.port=model.snapshot.port;setup.draft.connectionTimeoutSeconds=model.snapshot.timeoutSeconds}
         }
-        .task {while !Task.isCancelled {await model.maintain();do{try await Task.sleep(for:.seconds(5))}catch{return}}}
+        .onReceive(setup.$snapshot) { _ in model.refresh() }
         .onChange(of:setup.draft.address) {_ in username="";password="";wholeShare=false}
         .onChange(of:setup.draft.port) {_ in username="";password="";wholeShare=false}
         .onChange(of:setup.snapshot.connected) {_ in if setup.snapshot.connected == .verified {choosingLocation=false}}
         .onDisappear {
             username="";password="";discovery.cancel()
-            if choosingLocation {cancelLocationSelection()}
+            if choosingLocation && taskIsPreview {cancelLocationSelection()}
             else if taskIsPreview {task?.cancel()}
         }
     }

@@ -1,6 +1,6 @@
 # Settings 只读 API（arl/1 增量）
 
-独立 app ID 为 `settings`。默认方法白名单仅 `health`、`ready`、`overview`；tools/providers 为空，提交/待办/输出预算为 0。不能 submit/get/cancel/resume/wake/poll_wakes/stop，也不能直接 providers/capabilities。即使部署未安装 peer verifier，该方法白名单仍生效。其他 app 的已有 arl/1 方法与返回结构保持兼容；overview 仅为 settings 开放。
+独立 app ID 为 `settings`。概览使用 `health`、`ready`、`overview`。tools/providers 为空，提交/待办/输出预算为 0。不能 submit/get/cancel/resume/wake/poll_wakes/stop，也不能直接 providers/capabilities。即使部署未安装 peer verifier，方法白名单仍生效。其他 app 的已有 arl/1 方法与返回结构保持兼容；overview 仅为 settings 开放。
 
 请求是一条换行结尾 JSON，走现有私有 Unix socket：
 
@@ -16,8 +16,14 @@ providers 只展示筛选过的名称、模型标识、availability、paid、inf
 
 capabilities 仅给名称、availability、identity_gate、authorization_gate；无参数 schema/对象列表。`adapter` 仅表示 transport 已配置，`authorization_not_checked` 明确未宣称 OS 授权。`permission_required` 表示默认 Apple bridge 未启用；overview 不触发 TCC、不读 Apple 数据、不做自动配置。`identity_verifier_configured` 也不等于该客户端已验证。
 
-默认 read permission 是显式的同 UID 公共元数据例外：socket peer UID 仍须与运行用户一致；服务端仅当 owner=settings、policy.public_metadata=true、method 属于上述三项且 verified_app=None 时，允许未验证读取。它不是身份凭据，也不给私有工具授权。若 verifier 已把连接验证为别的 app，则不能声明 settings。host 可关闭 settings 的 public_metadata（无 RPC 修改入口）；public_metadata 不能豁免其他 app 或任何写/对象方法。未验证声明 tisra/friday 仍按原严格 verifier 拒绝。默认开发无 verifier 时，原 app ID 仍是逻辑分区，生产私有能力继续要求真实 transport 验证。
+默认 read permission 是显式的同 UID 公共元数据例外：socket peer UID 仍须与运行用户一致；服务端仅当 owner=settings、policy.public_metadata=true、method 属于公共元数据白名单且 verified_app=None 时，允许未验证读取。它不是身份凭据，也不给私有工具授权。若 verifier 已把连接验证为别的 app，则不能声明 settings。host 可关闭 settings 的 public_metadata（无 RPC 修改入口）；public_metadata 不能豁免其他 app 或任何写/对象方法。未验证声明 tisra/friday 仍按原严格 verifier 拒绝。默认开发无 verifier 时，原 app ID 仍是逻辑分区，生产私有能力继续要求真实 transport 验证。
 
 UI 应被动连接固定安装 home，使用 health/overview；缺少服务或 disabled 时显示相应状态。不要用 UI 自报 tisra、安装 launchd、修改 disabled、调用 RuntimeLauncher 或自动启权限。UI 的启动/停用/配置编辑均不在本 API 范围。接入 Swift SDK：`ARLClient(home: ..., app: "settings")` 的 rpc 方法；具体 SDK 类型签名以 examples/ARLClient.swift 为准。
 
 回归在 tests/test_settings.py：严格 verifier 下未验证 settings 读取、所有对象/写方法拒绝、伪造 app/owner、撤销公共读取、flag 不能豁免写、启动未 ready 与输出字段脱敏。
+
+## 待核对与等待解锁
+
+`settings.task_attention.v1` 接受可选的非负整数 `offset`，每页最多 24 条。返回 `schema_version`、`total`、`items` 和可空的 `next_offset`。条目仅含不可执行的 `receipt`、有限的任务类别和来源、状态、原因和更新时间。只有 `needs_review` 与 `needs_unlock` 出现在这里。接口不返回任务 ID、输入、输出、私有调用者标识或上游异常。
+
+原生界面的「标记已查看」保存本机显示选择，用户可撤销。任务状态或更新时间变化时回执随之更新。业务任务原记录与各发起应用已有的结果核对、恢复权限独立于此选择。

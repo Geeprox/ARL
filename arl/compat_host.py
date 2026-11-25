@@ -20,6 +20,7 @@ from pathlib import Path
 from . import VERSION
 from .contracts import AppPolicy, Fault
 from .lifecycle import private_home
+from .overview import TASK_ATTENTION_METHOD
 from .service import Runtime
 
 
@@ -33,7 +34,7 @@ def state_home():
 
 def metadata_policies():
     return {"settings": AppPolicy(frozenset(), frozenset(), 0, 0, 0,
-        methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1"}), public_metadata=True)}
+        methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", TASK_ATTENTION_METHOD}), public_metadata=True)}
 
 
 class PeerComposition:

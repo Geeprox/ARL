@@ -415,6 +415,15 @@ class Store:
                     counts[row[0]] = row[1]
             return counts
 
+    def task_attention_page(self, offset, limit):
+        with self.lock:
+            pending = "FROM jobs WHERE state IN ('needs_unlock','needs_review')"
+            total = self.db.execute("SELECT COUNT(*) " + pending).fetchone()[0]
+            rows = self.db.execute(
+                "SELECT id, owner, tool, state, error, updated " + pending
+                + " ORDER BY updated DESC, id DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
+            return total, rows
+
     def close(self):
         with self.lock:
             self.db.close()
