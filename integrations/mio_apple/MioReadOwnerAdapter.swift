@@ -1,5 +1,8 @@
 import Foundation
 import CoreFoundation
+#if canImport(ARLCredentialOnboarding)
+import ARLCredentialOnboarding
+#endif
 
 /// Native replacement for Host.legacy's per-call Python/runpy process. Fixed travel reads and six music tools enter the owner socket.
 /// Catalog and connectivity ping never read credentials.
@@ -276,9 +279,17 @@ enum MioReadOwnerAdapter {
             bytes=try NASCapability.failure(operation:operation,code:fault.rawValue)
             value=try OwnerReadJSON.object(bytes,limit:OwnerReadWire.responseLimit);succeeded=false
         }
-        // Native JSON text is retained, not summarized/re-serialized or routed
-        // through music state/error/setup projection. Structured fields match it.
-        return ["jsonrpc":"2.0","id":id,"result":["content":[["type":"text","text":String(decoding:bytes,as:UTF8.self)]],
+        var content = [["type": "text", "text": String(decoding: bytes, as: UTF8.self)]]
+        if succeeded, let entries = value["entries"] as? [[String: Any]],
+           entries.contains(where: { entry in
+               guard entry["kind"] as? String == "file", let path = entry["path"] as? String else { return false }
+               return NASDocumentContract.supports(filename: path)
+           }) {
+            // Older ChatGPT catalog snapshots still expose read_text under its
+            // former description. This note describes the live implementation.
+            content.append(["type": "text", "text": "To extract document content, use mio_nas_read_document if available. The existing mio_nas_read_text tool also extracts PDF (including scanned pages), Office and other rich documents from the same file reference. Document extraction is independent of the download response size. Follow the returned continuation to read more."])
+        }
+        return ["jsonrpc":"2.0","id":id,"result":["content":content,
             "structuredContent":value,"isError":!succeeded]]
     }
     private static func content(_ value: [String: Any], error: Bool) throws -> [String: Any] {

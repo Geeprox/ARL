@@ -1,6 +1,6 @@
 # NAS 文档文本提取组件
 
-2026-10-30 状态：当前正式安装及实机结果统一见 [TODO 收尾状态](TODO-CLOSURE-20261030.md)；主仓目录与 owner 已包含文档工具。当前会话目录尚未显示该工具，真实 NAS 列表请求仍返回 `nas_transport_failed`，没有据此宣称文档实测完成。新增固定样例、真实调用与精确清理入口、只读故障诊断，以及支持宿主文件 API 的组件路径，见 [NAS 收尾与验收](NAS-TODO-CLOSURE-20261030.md)。下文2026-10-24的候选与验证记录保留为当时的证据。
+使用 `mio_nas_read_document` 从已定位的 NAS 文件提取文本。旧工具目录里的 `mio_nas_read_text` 也会按实际文件名识别 PDF、Office 和其他富文档。文档的 `next_unit_offset` 与 `next_text_offset` 用于继续读取同一引用与修订。普通 UTF-8 文本仍用 `next_offset` 续读原字节。
 
 ## 支持范围
 
@@ -10,20 +10,24 @@
 | DOCX | 正文、表格、文本框的段落文字、制表符与换行 | 不读取页眉、页脚、脚注、批注或图片文字；按文档 XML 结构提取，不承诺版面还原 |
 | XLSX | 工作簿顺序、工作表名/隐藏状态、单元格引用、共享/内联字符串、原始标量、公式及已有缓存值 | 不执行公式或外部连接；不推算未缓存值，不恢复日期/数字样式，不读取图表或图片 |
 | PPTX | presentation 关系定义的幻灯片顺序及页内文字 | 不提取演讲备注、图片或独立图表/SmartArt 部件 |
+| DOCM、XLSM、PPTM | 复用对应的 OOXML 文本提取器 | 宏、公式和外部链接作为数据处理 |
+| DOC、RTF、ODT | macOS 文本转换 | 文本输出省略版式和嵌入媒体 |
+| TXT、Markdown、CSV、TSV、LOG、JSON、JSONL、XML、YAML | 按行读取文本，支持 UTF-8、带 BOM 的 UTF-16/32 和 GB18030 | 保留分隔符与数据原文 |
+| HTML | 标记内可见文本 | 跳过脚本、样式和外部资源 |
 
-DOC/XLS/PPT、宏文档等其他扩展名返回 unsupported_document_format。加密 ZIP 返回 encrypted_office_package；OLE/复合容器（可能是加密 OOXML 或旧格式）返回 encrypted_or_compound_office_unsupported，不推断密码错误。加密 Office 的覆盖证据包括真实密码 ZIP 拒绝，以及合成复合容器头识别；没有把复合头样例称为真实加密 Office 文件验收。
+旧版二进制 XLS/PPT 等未覆盖格式返回 `unsupported_document_format`。加密 ZIP 返回 `encrypted_office_package`。在现代 OOXML 扩展名下遇到 OLE 容器时返回 `encrypted_or_compound_office_unsupported`。
 
 ## 下载桥接
 
 源码入口为 integrations/nas/document_text.py：
 
 - extract_document 接受现有 attachment_bridge.VerifiedFile，先验证原始字节、大小和 SHA，再提取文字。
-- extract_download 复用原 collect_download：核对原请求、来源/配置/epoch、完整分块、EOF 与 SHA；随后才调用解析器。
+- extract_download 使用文件式 collect_download_file，核对原请求、来源/配置/epoch、完整分块、EOF 与 SHA，再解析临时文件。
 - 原 host 的 verify 回调在解析前后继续生效；解析中撤销则不交付结果。没有重试、重新连接、范围重绑、NAS 写入或发布行为。
 - PDF worker 路径由受信 host 在组合时传入，不能来自文档、Mio 参数、文件名或 URL。worker 仅从 stdin 接收原始 PDF、向 stdout 返回 JSON。134候选已将它纳入原应用闭包与既有验证链；当前未新增或更换身份 pin。
 - 不需要第三方 Python 包。Office 使用标准库 zipfile/ElementTree；PDF 使用系统 PDFKit。134候选已扩展原 owner、Mio 目录与recipe；正式运行进程未变。
 
-内存便利下载接口保留 1 MiB 界限；大文件使用磁盘暂存下载接口。正式文档读取链路另有 32 MiB 解析输入预算，每个实际读取的 XML 部件最多 8 MiB；每次最多返回 128 个提取单元、64 KiB 文字及192 KiB紧凑UTF-8 JSON。PDF worker 有45秒进程期限，单页渲染最长边为2048像素，约5秒后在页间返回续读位置。它们是当前本地资源预算，不是供应商格式上限。到达文本/单元/JSON预算时 complete=false、truncated=true 并携带 stopped_reasons；覆盖范围始终单独列出。coverage 明示本地 OCR 及其可能误差；无内嵌文字不能作为文档无内容的证据。
+文档读取使用原 SMB 会话，把整份文件流式写入私有临时文件，并在打开时和完成时核对文件修订，流式记录 SHA-256。PDFKit 映射这个文件，Office 直接读取包内 XML。整文件不再经过 1 MiB 内存便利接口或 32 MiB 解析门槛。每次响应最多 128 个提取单元和 64 KiB 文字，另受 JSON 消息帧约束。PDF 图片页使用本机 Vision OCR。达到单次返回预算时通过 `complete`、`truncated`、`stopped_reasons` 和续页位置报告进度。
 
 ## 验证与交接
 

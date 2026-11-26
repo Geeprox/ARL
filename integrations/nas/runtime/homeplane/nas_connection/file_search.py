@@ -172,51 +172,6 @@ class ScopedFileReader:
         finally:
             self._active = False
 
-    async def read_complete(self, reference, *, max_bytes=1048576):
-        """Exact bounded bytes for document parsing, through unchanged range admission."""
-        keys = {'source_ref', 'config_generation', 'connection_epoch', 'object_ref', 'revision', 'size'}
-        if (not isinstance(reference, dict) or set(reference) != keys
-                or type(max_bytes) is not int or not 1 <= max_bytes <= 32 * 1024 * 1024
-                or type(reference.get('size')) is not int or not 0 <= reference['size'] <= max_bytes
-                or tuple(reference.get(k) for k in ('source_ref', 'config_generation', 'connection_epoch')) != self.fence):
-            _invalid()
-        base = {k: v for k, v in reference.items() if k != 'size'}
-        file_request(dict(base, operation='read', offset=0, length=1))
-        self._enter()
-        try:
-            await self._validate()
-            raw = bytearray(); size = reference['size']; entry = None
-            # Empty files still require an exact stat/read/stat via the manager.
-            while not raw or len(raw) < min(size, max_bytes):
-                offset = len(raw); length = max(1, min(32768, min(size, max_bytes) - offset))
-                result = await self._call(dict(base, operation='read', offset=offset, length=length))
-                row = result.get('entry')
-                if (not isinstance(row, dict) or row.get('object_ref') != base['object_ref']
-                        or row.get('revision') != base['revision'] or row.get('size') != size
-                        or row.get('kind') != 'file' or entry is not None and row != entry):
-                    raise NASConnectionError('nas_revision_changed')
-                entry = row
-                try:
-                    encoded = result['data_base64']; chunk = base64.b64decode(encoded, validate=True)
-                    canonical = base64.b64encode(chunk).decode() == encoded
-                except (ValueError, KeyError, TypeError):
-                    raise NASConnectionError('nas_transport_failed') from None
-                end = offset + len(chunk); eof = end == size
-                if (not canonical or len(chunk) != min(length, size - offset)
-                        or type(result.get('bytes_read')) is not int or result['bytes_read'] != len(chunk)
-                        or type(result.get('offset')) is not int or result['offset'] != offset
-                        or type(result.get('length')) is not int or result['length'] != length
-                        or result.get('eof') is not eof
-                        or result.get('next_offset') != (None if eof else end)
-                        or not eof and type(result.get('next_offset')) is not int):
-                    raise NASConnectionError('nas_transport_failed')
-                raw.extend(chunk)
-                if eof: break
-            await self._validate()
-            return bytes(raw), entry
-        finally:
-            self._active = False
-
     async def read_utf8(self, reference, *, max_bytes=65536, offset=0):
         """Read one resumable byte range, preserving valid UTF-8 boundaries.
 

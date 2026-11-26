@@ -7,6 +7,8 @@ import base64
 import hashlib
 import json
 import math
+import os
+import re
 import unicodedata
 import time
 import uuid
@@ -16,7 +18,7 @@ from typing import Awaitable, Callable
 from .contracts import (
     MAX_PAGE,
     MAX_RANGE,
-    FILE_OUTPUT, FILE_SESSION_BYTES, file_request,
+    FILE_OUTPUT, file_request,
     NASConnectionConfig,
     NASConnectionEntry,
     NASConnectionError,
@@ -269,8 +271,8 @@ class NASConnectionManager:
         async with self._io:
             fence = (self.generation, self._epoch)
             try:
-                result = await asyncio.wait_for(self._transport.request(operation, payload),
-                                                self.config.operation_timeout_seconds)
+                timeout = 90 if operation == "spool" else self.config.operation_timeout_seconds
+                result = await asyncio.wait_for(self._transport.request(operation, payload), timeout)
                 self._fence(fence)
                 if operation == "health" and result != {"reachable": True, "authenticated": True, "readable": True}:
                     raise NASConnectionError("nas_transport_failed")
@@ -390,6 +392,28 @@ class NASConnectionManager:
         result = entry.model_dump(mode="json")
         result["path"] = "/".join(x for x in (self.config.root, self._path(entry.object_ref)) if x)
         return result
+
+    async def spool_file(self, reference, file):
+        source = reference["source_ref"]
+        fence = self._source(source)
+        if fence != (reference["config_generation"], reference["connection_epoch"]):
+            raise NASConnectionError("nas_source_changed")
+        object_ref, revision, size = (reference[key] for key in ("object_ref", "revision", "size"))
+        path = self._path(object_ref)
+        result = await self._request("spool", {"path": path, "revision": revision, "size": size, "fd": file.fileno()})
+        self._fence(fence)
+        raw_entry = result.get("entry")
+        sha = result.get("sha256")
+        if (not isinstance(raw_entry, dict) or raw_entry.get("path") != path
+                or not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{64}", sha) is None):
+            raise NASConnectionError("nas_transport_failed")
+        entry = self._entry(raw_entry)
+        if (entry.object_ref != object_ref or entry.revision != revision or entry.kind != "file"
+                or entry.size != size or os.fstat(file.fileno()).st_size != size):
+            raise NASConnectionError("nas_revision_changed")
+        self._file_bytes += size
+        file.seek(0)
+        return self._file_entry(entry), sha
 
     def _file_envelope(self, operation, fence):
         return {"schema_version": 1, "operation": operation, "source_ref": self.config.source_ref,

@@ -19,7 +19,6 @@ from integrations.nas.attachment_bridge import VerifiedFile, BridgeFault, DOWNLO
 from tests.fixtures import nas_documents as sample
 
 ROOT = Path(__file__).resolve().parents[1]
-AUDIT = ROOT / "build/audit/nas-document-text-20261024.noindex"
 
 
 def artifact(name, raw):
@@ -60,10 +59,6 @@ class DownloadReplyFixture:
             downloadable_artifact=False, delivery_code="platform_file_publisher_required"))
 
 class OfficeChecks(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        AUDIT.mkdir(mode=0o700, parents=True, exist_ok=True)
-
     def fault(self, code, function):
         with self.assertRaises(document.DocumentFault) as caught:
             function()
@@ -82,7 +77,7 @@ class OfficeChecks(unittest.TestCase):
     @unittest.skipUnless(shutil.which("textutil"), "native macOS textutil")
     def test_independent_native_docx_conversion(self):
         expected = "ARL native DOCX fixture\n你好，原文🙂\nVersion: 1"
-        with tempfile.TemporaryDirectory(dir=AUDIT) as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             source = home / "synthetic.txt"
             target = home / "native.docx"
@@ -110,9 +105,23 @@ class OfficeChecks(unittest.TestCase):
         self.assertEqual([unit["index"] for unit in result["units"]], [1, 2])
 
     def test_legacy_formats_and_unknown_extensions_are_explicit(self):
-        for name in ["fixture.doc", "fixture.xls", "fixture.ppt", "fixture.zip", "fixture.docm"]:
+        for name in ["fixture.xls", "fixture.ppt", "fixture.zip"]:
             self.fault("unsupported_document_format",
                 lambda: document.extract_document(artifact(name, b"synthetic")))
+
+    def test_common_text_and_macro_enabled_documents(self):
+        cases = [
+            ("fixture.md", "# 标题\n**正文**".encode("utf-16"), "**正文**"),
+            ("fixture.csv", '姓名,备注\n张三,"保留, 引号"'.encode("gb18030"), '张三,"保留, 引号"'),
+            ("fixture.json", b'{"number":2}', '{"number":2}'),
+            ("fixture.html", b'<p>A &amp; B</p><script>hidden</script><p>visible</p>', "A & B"),
+            ("fixture.docm", sample.docx(), "ARL DOCX fixture"),
+        ]
+        for name, raw, expected in cases:
+            with self.subTest(name=name):
+                result = document.extract_document(artifact(name, raw))
+                self.assertIn(expected, result["text"])
+                self.assertNotIn("hidden", result["text"])
 
     def test_compound_office_boundary_does_not_attempt_decryption(self):
         raw = bytes.fromhex("d0cf11e0a1b11ae1") + bytes(128)
@@ -152,7 +161,7 @@ class OfficeChecks(unittest.TestCase):
             cursor=(result["next_unit_offset"],result["next_text_offset"])
         self.assertEqual(parts[1],text);self.assertEqual(len(parts),141)
 
-    def test_duplicate_parts_and_expansion_budget(self):
+    def test_duplicate_parts_and_large_xml_part(self):
         out = io.BytesIO()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", UserWarning)
@@ -160,12 +169,14 @@ class OfficeChecks(unittest.TestCase):
                 archive.writestr("word/document.xml", "<x/>")
                 archive.writestr("word/document.xml", "<x/>")
         self.fault("ambiguous_office_package", lambda: document.extract_document(artifact("fixture.docx", out.getvalue())))
-        large = sample.archive({"word/document.xml": b"x" * (document.MAX_XML_BYTES + 1)})
-        self.fault("office_part_memory_budget", lambda: document.extract_document(artifact("fixture.docx", large)))
+        large = sample.docx("<w:p><w:r><w:t>" + "x" * (9 * 1024 * 1024) + "</w:t></w:r></w:p>")
+        result = document.extract_document(artifact("fixture.docx", large))
+        self.assertEqual(len(result["text"]), document.MAX_TEXT_BYTES)
+        self.assertTrue(result["truncated"])
 
     @unittest.skipUnless(shutil.which("zip"), "system zip needed for a real encrypted ZIP fixture")
     def test_real_password_encrypted_zip_is_refused(self):
-        with tempfile.TemporaryDirectory(dir=AUDIT) as temporary:
+        with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             (home / "word").mkdir()
             (home / "word/document.xml").write_text("<document/>")
@@ -240,13 +251,13 @@ class OfficeChecks(unittest.TestCase):
         def verify():
             if revoked:
                 raise BridgeFault("owner_revoked")
-        original_extract = document.extract_document
+        original_extract = document.extract_document_file
         def revoke_after_actual_parse(*args, **kwargs):
             nonlocal revoked
             value = original_extract(*args, **kwargs)
             revoked = True
             return value
-        with patch.object(document, "extract_document", side_effect=revoke_after_actual_parse):
+        with patch.object(document, "extract_document_file", side_effect=revoke_after_actual_parse):
             with self.assertRaises(BridgeFault) as caught:
                 document.extract_download(mcp_reply(original), expected={k: original[k] for k in DOWNLOAD_KEYS},
                     call=calls, verify=verify)
@@ -258,8 +269,7 @@ class OfficeChecks(unittest.TestCase):
 class PDFKitChecks(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        AUDIT.mkdir(mode=0o700, parents=True, exist_ok=True)
-        cls.temporary = tempfile.TemporaryDirectory(prefix="pdfkit-", dir=AUDIT)
+        cls.temporary = tempfile.TemporaryDirectory(prefix="pdfkit-")
         cls.home = Path(cls.temporary.name)
         cls.helper = cls.home / "NASPDFTextExtractor"
         cls.protector = cls.home / "NASPDFProtectionFixture"
@@ -310,18 +320,27 @@ class PDFKitChecks(unittest.TestCase):
             self.extract(protected.stdout)
         self.assertEqual(caught.exception.code, "encrypted_pdf")
 
-    def test_invalid_pdf_and_worker_input_limit(self):
+    def test_invalid_pdf_and_large_mapped_input(self):
         with self.assertRaises(document.DocumentFault) as caught:
             self.extract(b"invalid PDF")
         self.assertEqual(caught.exception.code, "invalid_pdf")
-        response = subprocess.run([str(self.helper)], input=b"x" * (document.MAX_DOCUMENT_BYTES + 1), capture_output=True, timeout=10)
-        self.assertEqual(json.loads(response.stdout), {"ok": False, "code": "input_budget"})
+        raw = sample.pdf().replace(b"startxref", b"%" + b"x" * (33 * 1024 * 1024) + b"\nstartxref", 1)
+        self.assertIn("ARL PDF fixture", self.extract(raw)["text"])
 
     def test_real_pdf_page_budget_is_explicit(self):
         result = self.extract(sample.pdf(pages=129))
         self.assertEqual(len(result["units"]), 128)
         self.assertTrue(result["truncated"])
         self.assertIn("pdf_worker_budget", result["stopped_reasons"])
+
+    def test_native_legacy_word_formats(self):
+        for kind in ("doc", "rtf", "odt"):
+            with self.subTest(kind=kind):
+                raw = subprocess.check_output(["/usr/bin/textutil", "-convert", kind, "-format", "txt",
+                                               "-stdin", "-stdout"], input="原始 Word 正文".encode(),
+                                              timeout=15)
+                result = document.extract_document(artifact("fixture." + kind, raw))
+                self.assertIn("原始 Word 正文", result["text"])
 
 
 if __name__ == "__main__":

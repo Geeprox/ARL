@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import stat
 import sys
+import threading
 import time
 from dataclasses import asdict
 
@@ -211,11 +212,28 @@ class OwnedSMBTransport:
             if operation == "read":
                 return await asyncio.to_thread(reader.read_range, payload["path"], payload["revision"],
                                                payload["offset"], payload["length"])
+            if operation == "spool":
+                cancelled = threading.Event()
+                fd = os.dup(payload["fd"])
+                def spool():
+                    with os.fdopen(fd, "wb") as sink:
+                        return reader.spool_file(payload["path"], payload["revision"],
+                                                 payload["size"], sink, cancelled.is_set)
+                try:
+                    pending = asyncio.get_running_loop().run_in_executor(None, spool)
+                except BaseException:
+                    os.close(fd)
+                    raise
+                try:
+                    return await asyncio.shield(pending)
+                finally:
+                    cancelled.set()
             raise CredentialFault(Failure.DISABLED)
         except BaseException as error:
             record_failure(error,operation)
             # A timed-out thread must never be reused. Native parent owns process teardown.
-            self.closed = True
+            if not isinstance(error, NASConnectionError) or error.code not in {"nas_missing", "nas_revision_changed"}:
+                self.closed = True
             raise
         finally:
             self.busy = False

@@ -2,6 +2,7 @@ import Foundation
 import PDFKit
 import Vision
 import AppKit
+import Darwin
 
 // Offline worker: raw PDF on stdin, bounded JSON on stdout. No file path,
 // password, networking, GUI, permission request or authority issuance.
@@ -35,11 +36,17 @@ import AppKit
                   let start = Int(args.count == 3 ? args[1] : "1"), start >= 1,
                   let textOffset = Int(args.count == 3 ? args[2] : "0"), textOffset >= 0
             else { emit(["ok": false, "code": "invalid_document_cursor"]); return }
-            let memoryBudget = 32 * 1024 * 1024
-            var data = Data()
-            while let chunk = try FileHandle.standardInput.read(upToCount: min(65536, memoryBudget + 1 - data.count)), !chunk.isEmpty {
-                data.append(chunk)
-                guard data.count <= memoryBudget else { emit(["ok": false, "code": "input_budget"]); return }
+            let data: Data
+            var info = stat()
+            if fstat(STDIN_FILENO, &info) == 0 && (info.st_mode & S_IFMT) == S_IFREG {
+                guard info.st_size > 0, let count = Int(exactly: info.st_size),
+                      let address = mmap(nil, count, PROT_READ, MAP_PRIVATE, STDIN_FILENO, 0),
+                      address != MAP_FAILED else { emit(["ok": false, "code": "invalid_pdf"]); return }
+                data = Data(bytesNoCopy: address, count: count, deallocator: .custom { address, size in
+                    _ = munmap(address, size)
+                })
+            } else {
+                data = try FileHandle.standardInput.readToEnd() ?? Data()
             }
             guard let document = PDFDocument(data: data) else { emit(["ok": false, "code": "invalid_pdf"]); return }
             guard !document.isEncrypted && !document.isLocked else { emit(["ok": false, "code": "encrypted_pdf"]); return }

@@ -43,6 +43,15 @@ import ARLCredentialOnboarding
             try expect(try bytes(result["structuredContent"]!)==output,"no lost parser text, units, provenance or error")
             let text=(result["content"] as! [[String:Any]])[0]["text"] as! String
             try expect(try bytes(object(Data(text.utf8)))==output,"MCP text matches structured content")
+            let legacyArguments = args.filter { $0.key != "name" }
+            let legacy = try MioReadOwnerAdapter.respond(["jsonrpc":"2.0","id":3,"method":"tools/call",
+                "params":["name":"mio_nas_read_text","arguments":legacyArguments]], ownerCall:{ name, _ in
+                    try expect(name=="mio_nas_read_text","existing connector calls its original tool")
+                    return output
+                })
+            let legacyResult = legacy["result"] as! [String:Any]
+            try expect(legacyResult["isError"] as? Bool==failed,"compatibility preserves parser error")
+            try expect(try bytes(legacyResult["structuredContent"]!)==output,"compatibility retains document page")
             if failed {
                 try expect((reply["error"] as? [String:Any])?["code"] as? String=="invalid_pdf","original native parser error")
                 continue

@@ -73,6 +73,13 @@ enum NASCapability {
     /// Native has already admitted full scope/revision/result bounds. The public
     /// projection additionally binds the response type and request references.
     static func admit(_ value:[String:Any],request:Request)throws->Bool {
+        if request.operation=="read_text",value["operation"] as? String=="read_document" {
+            do {
+                let wire=try NASFileReaderContract.request(tool:request.tool,argumentsJSON:request.argumentsJSON)
+                try NASFileReaderContract.admit(value,request:wire)
+                return value["state"] as? String != "failed"
+            } catch {throw OwnerReadFault.invalid}
+        }
         guard integer(value["schema_version"])==1,value["operation"] as? String==request.operation else{throw OwnerReadFault.invalid}
         if value["state"] as? String=="failed" {
             guard Set(value.keys)==["schema_version","operation","state","error","automatic_replay"],
@@ -129,7 +136,7 @@ enum NASCapability {
 /// persistent scope issuer, mutation permit or platform artifact publisher.
 enum NASDownloadCapability {
     static let names:Set<String>=["mio_nas_download","mio_nas_transfer_read"]
-    static let chunkBytes=32768, fileBytes=9_007_199_254_740_991
+    static let chunkBytes=32768, sourceRangeBytes=131072, fileBytes=9_007_199_254_740_991
     static var common:Set<String> {["operation_id","source_ref","config_generation","connection_epoch"]}
     static var descriptors:[[String:Any]] {
         names.sorted().map { tool in
@@ -159,7 +166,7 @@ enum NASDownloadCapability {
                 properties["length"]=["type":"integer","minimum":1,"maximum":chunkBytes]
             }
             return ["name":tool,"description":download
-                ? "Use this to read a complete selected NAS file using the exact source, epoch, object_ref, revision and size from list/search. Reads 32KiB ranges into a private disk-backed spool; each range rechecks the selected scope and revision. Returns SHA256 and a 120-second ephemeral transfer_ref. Does not reconnect, create a URL, or publish a ChatGPT attachment. No automatic retry."
+                ? "Prepare a complete selected NAS file for byte transfer, using the exact source, epoch, object_ref, revision and size from list/search. Streams into a private disk spool without a small whole-file size cap. Returns SHA256 and a temporary transfer_ref; use mio_nas_transfer_read for delivery chunks. For document text or PDF OCR, use mio_nas_read_document or mio_nas_read_text."
                 : "Use this to read a verified 32KiB byte chunk from the original NAS download transfer_ref. Preserve operation_id, scope/epoch, size and whole-file SHA256 from the manifest. The native owner rechecks current saved scope and credential identity. Expiry/revocation never reconnects or rebinds the file. Bytes are not a downloadable ChatGPT artifact.",
                 "inputSchema":["type":"object","additionalProperties":false,"properties":properties,"required":properties.keys.sorted()],
                 "annotations":["readOnlyHint":true,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true],

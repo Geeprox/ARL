@@ -8,6 +8,10 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import stat
+import tempfile
+from html.parser import HTMLParser
 from pathlib import Path
 import posixpath
 import subprocess
@@ -15,13 +19,17 @@ import time
 import zipfile
 import xml.etree.ElementTree as ET
 
-from .attachment_bridge import VerifiedFile, collect_download
+from .attachment_bridge import VerifiedDownloadFile, VerifiedFile, basename, collect_download_file
 
 MAX_TEXT_BYTES = 65536
 MAX_UNITS = 128
 MAX_RESULT_BYTES = 180224  # Leave room for the authenticated owner envelope.
-MAX_XML_BYTES = 8 * 1024 * 1024
-MAX_DOCUMENT_BYTES = 32 * 1024 * 1024  # Parser-process memory budget, independent of upload limits.
+MAX_DOCUMENT_BYTES = 2**53 - 1  # Exact JSON integer range, matching NAS downloads.
+OFFICE_FORMATS = {"docx": "docx", "docm": "docx", "xlsx": "xlsx", "xlsm": "xlsx", "pptx": "pptx", "pptm": "pptx"}
+PLAIN_FORMATS = {"txt", "md", "markdown", "csv", "tsv", "log", "json", "jsonl", "xml", "yaml", "yml"}
+LEGACY_WORD_FORMATS = {"doc", "rtf", "odt"}
+CONVERTED_FORMATS = {"pdf", "html", "htm"} | OFFICE_FORMATS.keys() | LEGACY_WORD_FORMATS
+DOCUMENT_FORMATS = PLAIN_FORMATS | CONVERTED_FORMATS
 
 
 class DocumentFault(ValueError):
@@ -103,10 +111,15 @@ class Budget:
 
 
 
+class OfficeTree(ET.TreeBuilder):
+    def doctype(self, name, pubid, system):
+        fail("unsupported_xml_declaration")
+
+
 class Parts:
     def __init__(self, raw):
         try:
-            self.zip = zipfile.ZipFile(io.BytesIO(raw))
+            self.zip = zipfile.ZipFile(raw)
             entries = self.zip.infolist()
         except (zipfile.BadZipFile, ValueError):
             fail("invalid_office_package")
@@ -130,13 +143,8 @@ class Parts:
         if name not in self.names:
             fail("missing_document_part")
         try:
-            if self.zip.getinfo(name).file_size > MAX_XML_BYTES:
-                fail("office_part_memory_budget")
-            raw = self.zip.read(name)
-            text = raw.decode("utf-8-sig")
-            if "<!doctype" in text.casefold() or "<!entity" in text.casefold():
-                fail("unsupported_xml_declaration")
-            return ET.fromstring(text)
+            with self.zip.open(name) as part:
+                return ET.parse(part, parser=ET.XMLParser(target=OfficeTree())).getroot()
         except DocumentFault:
             raise
         except (ValueError, UnicodeError, ET.ParseError, zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError):
@@ -164,8 +172,9 @@ def relationship_id(node):
 
 
 def office(raw, kind, budget):
-    if raw.startswith(bytes.fromhex("d0cf11e0a1b11ae1")):
+    if raw.read(8) == bytes.fromhex("d0cf11e0a1b11ae1"):
         fail("encrypted_or_compound_office_unsupported")
+    raw.seek(0)
     parts = Parts(raw)
     try:
         if kind == "docx":
@@ -233,7 +242,8 @@ def pdf(raw, helper, budget):
     if helper is None or not Path(helper).is_absolute() or not Path(helper).is_file():
         fail("pdf_worker_unavailable")
     try:
-        response = subprocess.run([str(helper), str(budget.unit_offset), str(budget.text_offset)], input=raw, capture_output=True, timeout=45)
+        response = subprocess.run([str(helper), str(budget.unit_offset), str(budget.text_offset)],
+                                  stdin=raw, capture_output=True, timeout=45)
     except subprocess.TimeoutExpired:
         fail("document_parser_timeout")
     except OSError:
@@ -273,10 +283,96 @@ def pdf(raw, helper, budget):
 
 
 
+class HTMLText(HTMLParser):
+    def __init__(self, emit):
+        super().__init__(convert_charrefs=True)
+        self.emit = emit
+        self.hidden = None
+
+    def handle_starttag(self, tag, attrs):
+        if not self.hidden and tag in {"script", "style", "template"}:
+            self.hidden = tag
+        if not self.hidden and tag in {"br", "p", "li", "tr", "div", "h1", "h2", "h3"}:
+            self.emit("\n")
+        if not self.hidden and tag in {"td", "th"}:
+            self.emit("\t")
+
+    def handle_endtag(self, tag):
+        if self.hidden == tag:
+            self.hidden = None
+
+    def handle_data(self, text):
+        if not self.hidden:
+            self.emit(text)
+
+
+def text_encoding(file):
+    prefix = file.read(65536)
+    file.seek(0)
+    if prefix.startswith((b"\xff\xfe\0\0", b"\0\0\xfe\xff")):
+        return "utf-32"
+    if prefix.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return "utf-16"
+    try:
+        import codecs
+        codecs.getincrementaldecoder("utf-8-sig")().decode(prefix)
+        return "utf-8-sig"
+    except UnicodeError:
+        return "gb18030"
+
+
+def text_lines(file, budget, *, encoding=None):
+    reader = io.TextIOWrapper(file, encoding=encoding or text_encoding(file))
+    try:
+        for index, line in enumerate(reader, 1):
+            if "\0" in line:
+                fail("invalid_document_text")
+            if not budget.add("line", index, line.removesuffix("\n")):
+                break
+    except UnicodeError:
+        fail("invalid_document_text")
+    finally:
+        reader.detach()
+
+
+def html(file, budget):
+    with tempfile.TemporaryFile() as converted:
+        parser=HTMLText(lambda text: converted.write(text.encode("utf-8")))
+        reader=io.TextIOWrapper(file, encoding=text_encoding(file))
+        try:
+            while chunk := reader.read(65536):
+                parser.feed(chunk)
+            parser.close()
+        except UnicodeError:
+            fail("invalid_document_text")
+        finally:
+            reader.detach()
+        converted.seek(0)
+        text_lines(converted, budget, encoding="utf-8")
+    return "html_visible_text; scripts_styles_external_resources_not_loaded"
+
+
+def legacy_word(file, kind, budget):
+    with tempfile.TemporaryFile() as converted:
+        try:
+            response=subprocess.run(["/usr/bin/textutil","-convert","txt","-format",kind,"-stdin","-stdout",
+                                     "-noload","-nostore"], stdin=file, stdout=converted,
+                                    stderr=subprocess.DEVNULL, timeout=45)
+        except subprocess.TimeoutExpired:
+            fail("document_parser_timeout")
+        except OSError:
+            fail("document_parser_unavailable")
+        if response.returncode:
+            fail("invalid_document_text")
+        converted.seek(0)
+        text_lines(converted, budget, encoding="utf-8")
+    return "macos_text_conversion; layout_and_embedded_media_excluded"
+
+
 def bounded_result(artifact, kind, coverage, budget):
     def result():
         return dict(schema_version=1, operation="extract_document_text", format=kind,
-                    file_name=artifact.name, source_size=len(artifact.data), source_sha256=artifact.sha256,
+                    file_name=artifact.name, source_size=artifact.size, source_sha256=artifact.sha256,
                     state="extracted" if any(unit["text"] for unit in budget.units) else "no_extractable_text",
                     units=budget.units, text="\n".join(unit["text"] for unit in budget.units),
                     complete=not budget.reasons, truncated=bool(budget.reasons),
@@ -320,11 +416,38 @@ def extract_document(artifact, *, pdf_helper=None, unit_offset=1, text_offset=0)
     if type(artifact) is not VerifiedFile:
         fail("verified_file_required")
     artifact.check(max_bytes=MAX_DOCUMENT_BYTES)
+    with tempfile.TemporaryFile() as file:
+        file.write(artifact.data)
+        file.flush()
+        return extract_document_file(VerifiedDownloadFile(artifact.name, len(artifact.data), artifact.sha256, file.fileno()),
+                                     pdf_helper=pdf_helper, unit_offset=unit_offset, text_offset=text_offset)
+
+
+def extract_document_file(artifact, *, pdf_helper=None, unit_offset=1, text_offset=0):
+    """Parse an exact, already verified seekable spool without copying input to memory."""
+    if type(artifact) is not VerifiedDownloadFile:
+        fail("verified_file_required")
+    basename(artifact.name)
+    info = os.fstat(artifact.fd)
+    if not stat.S_ISREG(info.st_mode) or info.st_size != artifact.size:
+        fail("verified_file_required")
     kind = Path(artifact.name).suffix.lower().lstrip(".")
-    if kind not in {"pdf", "docx", "xlsx", "pptx"}:
+    if kind not in DOCUMENT_FORMATS:
         fail("unsupported_document_format")
     budget = Budget(unit_offset, text_offset)
-    coverage = pdf(artifact.data, pdf_helper, budget) if kind == "pdf" else office(artifact.data, kind, budget)
+    with os.fdopen(os.dup(artifact.fd), "rb") as file:
+        file.seek(0)
+        if kind == "pdf":
+            coverage = pdf(file, pdf_helper, budget)
+        elif kind in OFFICE_FORMATS:
+            coverage = office(file, OFFICE_FORMATS[kind], budget)
+        elif kind in LEGACY_WORD_FORMATS:
+            coverage = legacy_word(file, kind, budget)
+        elif kind in {"html", "htm"}:
+            coverage = html(file, budget)
+        else:
+            text_lines(file, budget)
+            coverage = "decoded_text_lines; data_preserved_as_text"
     return bounded_result(artifact, kind, coverage, budget)
 
 
@@ -335,8 +458,8 @@ def extract_download(result, *, expected, call, verify, pdf_helper=None, clock=t
     adapter. No retry, reconnect, NAS write, new scope or publication occurs.
     Revocation while parsing withholds the derived text.
     """
-    artifact = collect_download(result, expected=expected, call=call, verify=verify, clock=clock)
-    verify()
-    result = extract_document(artifact, pdf_helper=pdf_helper)
-    verify()
-    return result
+    with collect_download_file(result, expected=expected, call=call, verify=verify, clock=clock) as artifact:
+        verify()
+        result = extract_document_file(artifact, pdf_helper=pdf_helper)
+        verify()
+        return result

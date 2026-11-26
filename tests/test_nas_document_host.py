@@ -39,7 +39,8 @@ class DocumentHostTests(unittest.IsolatedAsyncioTestCase):
 
     async def prepare(self, raw, filename):
         self.raw = raw
-        found = await self.call(self.args())
+        self.filename = filename
+        found = await self.call(self.args(keyword=filename))
         entry = found["entries"][0]
         self.transport_calls.clear()
         return self.args("read_document", name=filename,
@@ -58,7 +59,7 @@ class DocumentHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["operation"], "read_document")
         self.assertTrue(result["complete"])
         self.assertFalse(result["downloadable_artifact"])
-        self.assertEqual(self.transport_calls, ["stat","read","stat"])
+        self.assertEqual(self.transport_calls, ["spool"])
         self.assertEqual(self.manager._file_bytes, len(raw))
         return args, result
 
@@ -84,12 +85,12 @@ class DocumentHostTests(unittest.IsolatedAsyncioTestCase):
     async def test_revocation_during_real_parser_withholds_text(self):
         import nas_document_host
         args = await self.prepare(samples.docx(), "fixture.docx")
-        actual = nas_document_host.extract_document
+        actual = nas_document_host.extract_document_file
         def revoke(*a, **kw):
             value = actual(*a, **kw)
             self.host.authority.revoked = True
             return value
-        with patch.object(nas_document_host, "extract_document", side_effect=revoke):
+        with patch.object(nas_document_host, "extract_document_file", side_effect=revoke):
             with self.assertRaises(NASConnectionError) as caught:
                 await self.call(args)
         self.assertEqual(caught.exception.code, "nas_source_changed")
@@ -103,22 +104,34 @@ class DocumentHostTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.manager._state, "online")
 
     async def test_unsupported_extension_is_not_a_range_read(self):
-        args = await self.prepare(b"legacy binary", "fixture.doc")
+        args = await self.prepare(b"legacy binary", "fixture.xls")
         result = await self.call(args)
         self.assertEqual(result["error"]["code"], "unsupported_document_format")
         self.assertEqual(self.transport_calls, [])
 
-    async def test_multichunk_uses_original_cumulative_budget(self):
+    async def test_large_office_file_spools_without_whole_file_budget(self):
         output = io.BytesIO()
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as target:
             with zipfile.ZipFile(io.BytesIO(samples.docx())) as source:
                 for name in source.namelist(): target.writestr(name, source.read(name))
-            target.writestr("synthetic-unused.bin", bytes(range(256)) * 512)
+            target.writestr("synthetic-unused.bin", bytes(range(256)) * (144 * 1024))
         raw = output.getvalue()
         result = await self.call(await self.prepare(raw, "fixture.docx"))
         self.assertEqual(result["state"], "extracted")
         self.assertEqual(self.manager._file_bytes, len(raw))
-        self.assertEqual(self.transport_calls.count("read"), (len(raw) + 32767) // 32768)
+        self.assertGreater(len(raw), 32 * 1024 * 1024)
+        self.assertEqual(self.transport_calls, ["spool"])
+
+    async def test_existing_read_text_gateway_automatically_extracts_pdf(self):
+        args = await self.prepare(samples.pdf(pages=2), "fixture.pdf")
+        args.pop("name")
+        args["operation"] = "read_text"
+        args["unit_offset"] = 2
+        result = await self.call(args)
+        self.assertEqual(result["operation"], "read_document")
+        self.assertIn("ARL PDF fixture page 2", result["text"])
+        self.assertNotIn("ARL PDF fixture page 1", result["text"])
+        self.assertEqual(self.transport_calls, ["spool"])
 
     async def test_private_frame_budget_remains_explicit(self):
         raw = samples.docx("<w:p><w:r><w:t>" + "中" * 30000 + "</w:t></w:r></w:p>")
@@ -133,12 +146,12 @@ class DocumentHostTests(unittest.IsolatedAsyncioTestCase):
     async def test_original_authority_deadline_still_fences_parser(self):
         import nas_document_host
         args = await self.prepare(samples.docx(), "fixture.docx")
-        actual = nas_document_host.extract_document
+        actual = nas_document_host.extract_document_file
         def expire(*a, **kw):
             result = actual(*a, **kw)
             self.host.authority.deadline = time.monotonic() - 1
             return result
-        with patch.object(nas_document_host, "extract_document", side_effect=expire):
+        with patch.object(nas_document_host, "extract_document_file", side_effect=expire):
             with self.assertRaises(NASConnectionError):
                 await self.call(args)
 

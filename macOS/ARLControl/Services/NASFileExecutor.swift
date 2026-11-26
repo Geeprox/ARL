@@ -151,7 +151,7 @@ import ARLCredentialOnboarding
             let data=try Spool(); var digest=SHA256()
             repeat {
                 try await context(args)
-                let length=max(1,min(NASDownloadCapability.chunkBytes,size-data.count)),offset=data.count
+                let length=max(1,min(NASDownloadCapability.sourceRangeBytes,size-data.count)),offset=data.count
                 var read:[String:Any]=[:]
                 for key in ["source_ref","config_generation","connection_epoch","object_ref","revision"] {read[key]=args[key]}
                 read["offset"]=offset;read["length"]=length

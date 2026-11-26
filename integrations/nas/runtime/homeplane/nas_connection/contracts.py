@@ -173,7 +173,6 @@ class NASConnectionCommand(Contract):
 # File consumers are distinct from the historical opaque metadata inventory.
 FILE_PAGE = 32
 FILE_READ = 128 * 1024
-FILE_SESSION_BYTES = 1024 * 1024
 FILE_OUTPUT = 192 * 1024
 
 

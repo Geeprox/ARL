@@ -1,4 +1,5 @@
 """Compose recursive names/UTF8 with the existing live private NAS host only."""
+from pathlib import Path
 import re
 import time
 from homeplane.nas_connection.contracts import NASConnectionError
@@ -16,7 +17,7 @@ def request(value):
         return document_request(value)
     operation=value['operation']; base=FENCE|{'operation'}
     required=base|({'keyword','recursive'} if operation=='search_recursive' else {'object_ref','revision','size'})
-    allowed=required|({'directory_ref','cursor','limit'} if operation=='search_recursive' else {'max_bytes','offset'})
+    allowed=required|({'directory_ref','cursor','limit'} if operation=='search_recursive' else {'max_bytes','offset','unit_offset','text_offset'})
     if not required<=set(value)<=allowed:
         raise NASConnectionError('nas_invalid_request')
     def hex64(v,n):return type(v) is str and len(v)==n and re.fullmatch('[0-9a-f]+',v) is not None
@@ -40,6 +41,9 @@ def request(value):
         result.setdefault('max_bytes',65536)
         if type(value.get('offset',0)) is not int or not 0<=value.get('offset',0)<=value['size']:
             raise NASConnectionError('nas_invalid_request')
+        if any(type(value.get(k, lower)) is not int or value.get(k, lower) < lower
+               for k, lower in (('unit_offset', 1), ('text_offset', 0))):
+            raise NASConnectionError('nas_invalid_request')
         result.setdefault('offset',0)
     return result
 
@@ -61,6 +65,21 @@ async def execute(host, value):
             raise NASConnectionError('nas_source_changed')
         return True
     await validate(*fence)
+    if value['operation']=='read_document':
+        from nas_document_host import execute as document_execute
+        return await document_execute(host, value, lambda: validate(*fence))
+    if value['operation']=='read_text':
+        from integrations.nas.document_text import CONVERTED_FORMATS
+        from nas_document_host import execute as document_execute, failure as document_failure
+        name = Path(manager._path(value['object_ref'])).name
+        if Path(name).suffix.lower().lstrip('.') in CONVERTED_FORMATS:
+            if value['offset'] != 0:
+                return document_failure('invalid_document_cursor')
+            document = {key: value[key] for key in FENCE | {'object_ref','revision','size','unit_offset','text_offset'} if key in value}
+            document.update(operation='read_document', name=name)
+            return await document_execute(host, document, lambda: validate(*fence))
+        if 'unit_offset' in value or 'text_offset' in value:
+            raise NASConnectionError('nas_invalid_request')
     reader=getattr(host,'file_reader',None)
     if reader is None:
         reader=ScopedFileReader(source_ref=fence[0],config_generation=fence[1],connection_epoch=fence[2],
@@ -68,9 +87,6 @@ async def execute(host, value):
         host.file_reader=reader
     elif reader.fence!=fence:
         raise NASConnectionError('nas_source_changed')
-    if value['operation']=='read_document':
-        from nas_document_host import execute as document_execute
-        return await document_execute(host,value,reader,lambda:validate(*fence))
     if value['operation']=='search_recursive':
         selected={k:value[k] for k in ('keyword','directory_ref','cursor','limit') if k in value}
         result=await reader.search_page(**selected,recursive=True)
