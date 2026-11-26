@@ -6,6 +6,17 @@ public enum NASDocumentContract {
     public enum Fault: Error { case invalidRequest, invalidReply }
     public static let name = "mio_nas_read_document"
     public static let names: Set<String> = [name]
+    private static let fileBytes: Int64 = 9_007_199_254_740_991
+    private static let unitsByFormat: [String: String] = [
+        "pdf": "page", "docx": "paragraph", "docm": "paragraph", "xlsx": "sheet",
+        "xlsm": "sheet", "pptx": "slide", "pptm": "slide", "txt": "line", "log": "line",
+        "md": "line", "markdown": "line", "csv": "line", "tsv": "line", "json": "line",
+        "jsonl": "line", "xml": "line", "yaml": "line", "yml": "line", "html": "line",
+        "htm": "line", "doc": "line", "rtf": "line", "odt": "line"
+    ]
+    public static func supports(filename: String) -> Bool {
+        unitsByFormat[URL(fileURLWithPath: filename).pathExtension.lowercased()] != nil
+    }
     private static let requestKeys: Set<String> = ["source_ref","config_generation","connection_epoch","object_ref","revision","size","name"]
     private static func integer(_ value: Any?) -> Int64? {
         guard let n=value as? NSNumber,CFGetTypeID(n) != CFBooleanGetTypeID(),
@@ -27,12 +38,12 @@ public enum NASDocumentContract {
             "connection_epoch":["type":"string","pattern":"^[0-9a-f]{32}$"],
             "object_ref":["type":"string","pattern":"^[0-9a-f]{64}$"],
             "revision":["type":"string","pattern":"^[0-9a-f]{64}$"],
-            "size":["type":"integer","minimum":0,"maximum":33554432],
+            "size":["type":"integer","minimum":0,"maximum":fileBytes],
             "unit_offset":["type":"integer","minimum":1],
             "text_offset":["type":"integer","minimum":0],
-            "name":["type":"string","minLength":1,"maxLength":255,"description":"Original file basename; selects PDF/DOCX/XLSX/PPTX parser, never a path or executable."]]
+            "name":["type":"string","minLength":1,"maxLength":255,"description":"Original file basename from NAS list or search."]]
         return [["name":name,
-            "description":"Read text from one exact PDF/DOCX/XLSX/PPTX NAS object through the existing live read-only scope. Document parser memory budget 32MiB, independent of upload limits. Use next_unit_offset and next_text_offset to continue on the same immutable revision. Checks revision and SHA before parsing. No reconnect, scope restore, formula execution, OCR or downloadable attachment. Image-only PDF returns no_extractable_text; encrypted/unsupported documents return the actual finite error. Text/unit/frame budgets page the result with a continuation.",
+            "description":"Extract text from a NAS document on the existing read-only connection. Supports PDF (including local OCR for scanned pages), Word DOC/DOCX/RTF/ODT, Excel XLSX, PowerPoint PPTX, HTML and common text/data formats including TXT, Markdown, CSV, TSV, JSON and XML. Macro-enabled Office variants are read as data. Files stream to a private disk spool, without a small whole-file size cap. Continue with next_unit_offset and next_text_offset on the same reference and revision. Encrypted or unsupported documents return an explicit error.",
             "inputSchema":["type":"object","additionalProperties":false,"properties":properties,"required":requestKeys.sorted()],
             "outputSchema":["type":"object","required":["schema_version","operation","state"],
                 "properties":["schema_version":["const":1],"operation":["const":"read_document"],
@@ -47,7 +58,7 @@ public enum NASDocumentContract {
               let generation=integer(args["config_generation"]),generation>0,
               matches(args["connection_epoch"],"^[0-9a-f]{32}$"),
               matches(args["object_ref"],"^[0-9a-f]{64}$"),matches(args["revision"],"^[0-9a-f]{64}$"),
-              let size=integer(args["size"]),(0...33554432).contains(size),
+              let size=integer(args["size"]),(0...fileBytes).contains(size),
               let filename=args["name"] as? String,(1...255).contains(filename.utf8.count),
               ![".",".."].contains(filename),!filename.contains("/"),!filename.contains("\\"),
               !filename.unicodeScalars.contains(where:{$0.value<32 || $0.value==127})
@@ -73,7 +84,7 @@ public enum NASDocumentContract {
               integer(value["source_size"])==integer(request["size"]),
               value["file_name"] as? String==request["name"] as? String,
               matches(value["source_sha256"],"^[0-9a-f]{64}$"),
-              let format=value["format"] as? String,["pdf","docx","xlsx","pptx"].contains(format),
+              let format=value["format"] as? String,let kind=unitsByFormat[format],
               (request["name"] as? String).map({URL(fileURLWithPath:$0).pathExtension.lowercased()==format})==true,
               boolean(value["snapshot_consistent"])==false,boolean(value["downloadable_artifact"])==false,
               let location=value["location"] as? [String:Any],Set(location.keys)==["host","port","share","root"],
@@ -85,6 +96,7 @@ public enum NASDocumentContract {
               entry["revision"] as? String==request["revision"] as? String,integer(entry["size"])==integer(request["size"]),
               let path=entry["path"] as? String,!path.hasPrefix("/"),!path.contains("\\"),
               !path.split(separator:"/",omittingEmptySubsequences:false).contains(where:{$0=="" || $0=="." || $0==".."}),
+              path.split(separator:"/").last.map(String.init)==request["name"] as? String,
               root.isEmpty || path.hasPrefix(root+"/"),
               let units=value["units"] as? [[String:Any]],units.count<=128,
               let text=value["text"] as? String,text.utf8.count<=65536,
@@ -93,17 +105,16 @@ public enum NASDocumentContract {
               Set(reasons).isSubset(of:["text_budget","unit_budget","output_budget","pdf_worker_budget","owner_frame_budget"]),
               complete==reasons.isEmpty,value["coverage"] is String
         else{throw Fault.invalidReply}
-        let kind=["pdf":"page","docx":"paragraph","xlsx":"sheet","pptx":"slide"][format]!
         let start=integer(value["unit_offset"]), textStart=integer(value["text_offset"])
         guard start==(integer(request["unit_offset"]) ?? 1),textStart==(integer(request["text_offset"]) ?? 0) else{throw Fault.invalidReply}
         if complete {guard value["next_unit_offset"] is NSNull,value["next_text_offset"] is NSNull else{throw Fault.invalidReply}}
         else {guard let next=integer(value["next_unit_offset"]),let nextText=integer(value["next_text_offset"]),next>start! || next==start! && nextText>textStart! else{throw Fault.invalidReply}}
         var previous:Int64=start!-1
         for unit in units {
-            let allowed:Set<String>=format=="xlsx" ? ["kind","index","text","text_offset","name","hidden"]:["kind","index","text","text_offset"]
+            let allowed:Set<String>=kind=="sheet" ? ["kind","index","text","text_offset","name","hidden"]:["kind","index","text","text_offset"]
             guard Set(unit.keys)==allowed,unit["kind"] as? String==kind,
                   let index=integer(unit["index"]),index>previous,unit["text"] is String,let offset=integer(unit["text_offset"]),offset>=0,
-                  format != "xlsx" || unit["name"] is String && boolean(unit["hidden"]) != nil
+                  kind != "sheet" || unit["name"] is String && boolean(unit["hidden"]) != nil
             else{throw Fault.invalidReply}
             previous=index
         }

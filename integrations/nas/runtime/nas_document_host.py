@@ -1,12 +1,11 @@
 """Document parsing within the existing live NAS read session; no new authority."""
-import hashlib
 import json
 from pathlib import Path
-import re
+import tempfile
 
 from homeplane.nas_connection.contracts import NASConnectionError, file_request
-from integrations.nas.attachment_bridge import VerifiedFile, BridgeFault, basename
-from integrations.nas.document_text import DocumentFault, extract_document, MAX_DOCUMENT_BYTES
+from integrations.nas.attachment_bridge import VerifiedDownloadFile, BridgeFault, basename
+from integrations.nas.document_text import DOCUMENT_FORMATS, DocumentFault, extract_document_file, MAX_DOCUMENT_BYTES
 
 FIELDS = {"operation","source_ref","config_generation","connection_epoch","object_ref","revision","size","name"}
 
@@ -38,26 +37,31 @@ def fit_frame(value):
     return value
 
 
-async def execute(host, value, reader, validate):
+async def execute(host, value, validate):
     value = request(value)
     reference = {k:value[k] for k in FIELDS - {"operation","name"}}
-    if Path(value["name"]).suffix.lower() not in {".pdf",".docx",".xlsx",".pptx"}:
+    if Path(value["name"]).suffix.lower().lstrip(".") not in DOCUMENT_FORMATS:
         return failure("unsupported_document_format")
-    raw, entry = await reader.read_complete(reference, max_bytes=MAX_DOCUMENT_BYTES)
-    await validate()
+    manager = host.connection.manager
+    if Path(manager._path(reference["object_ref"])).name != value["name"]:
+        return failure("nas_name_mismatch")
     helper = getattr(host, "document_pdf_helper",
                      Path(__file__).resolve().parent.parent / "Tools/NASPDFTextExtractor")
-    try:
-        result = extract_document(VerifiedFile(value["name"], raw, hashlib.sha256(raw).hexdigest()),
-                                  pdf_helper=helper, unit_offset=value.get("unit_offset",1), text_offset=value.get("text_offset",0))
-    except (DocumentFault, BridgeFault) as error:
+    with tempfile.TemporaryFile(prefix="arl-nas-document-") as file:
+        entry, sha256 = await manager.spool_file(reference, file)
         await validate()
-        return failure(error.code)
+        try:
+            result = extract_document_file(VerifiedDownloadFile(value["name"], value["size"], sha256, file.fileno()),
+                                           pdf_helper=helper, unit_offset=value.get("unit_offset",1),
+                                           text_offset=value.get("text_offset",0))
+        except (DocumentFault, BridgeFault) as error:
+            await validate()
+            return failure(error.code)
     await validate()
     result.update(operation="read_document", source_ref=value["source_ref"],
                   config_generation=value["config_generation"], connection_epoch=value["connection_epoch"],
                   object_ref=value["object_ref"], revision=value["revision"], entry=entry,
                   snapshot_consistent=False,
-                  location=host.connection.manager._file_envelope("read_document",
+                  location=manager._file_envelope("read_document",
                     (value["config_generation"],value["connection_epoch"]))["location"])
     return fit_frame(result)

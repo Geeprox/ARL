@@ -20,7 +20,7 @@ _FROM_NAS = {"nas_timeout": Failure.TRANSPORT_TIMEOUT, "nas_transport_failed": F
              "nas_missing": Failure.LOCATION_MISSING,
              "nas_host_key_mismatch": Failure.HOST_KEY_MISMATCH,
              "nas_dependency_missing": Failure.UNSUPPORTED}
-_OPERATIONS = {"health", "list", "stat", "read"}
+_OPERATIONS = {"health", "list", "stat", "read", "spool"}
 
 
 @dataclass(frozen=True, repr=False)
@@ -53,6 +53,12 @@ def _valid_payload(operation, payload):
             return (set(payload) == {"path", "cursor", "limit"}
                     and (payload["cursor"] is None or (type(payload["cursor"]) is str and len(payload["cursor"]) <= 4096))
                     and type(payload["limit"]) is int and 1 <= payload["limit"] <= MAX_PAGE)
+        if operation == "spool":
+            # Internal host payload only. Public file requests cannot supply a descriptor.
+            return (set(payload) == {"path", "revision", "size", "fd"}
+                    and isinstance(payload["revision"], str) and re.fullmatch(r"[0-9a-f]{64}", payload["revision"]) is not None
+                    and type(payload["size"]) is int and 0 <= payload["size"] <= 2**63 - 1
+                    and type(payload["fd"]) is int and payload["fd"] > 2)
         return (set(payload) == {"path", "revision", "offset", "length"}
                 and isinstance(payload["revision"], str) and re.fullmatch(r"[0-9a-f]{64}", payload["revision"]) is not None
                 and type(payload["offset"]) is int and 0 <= payload["offset"] <= 2**63 - 1

@@ -463,6 +463,33 @@ class SMBReader(Reader):
         finally:
             handle.close()
 
+    def spool_file(self, path, revision, size, sink, cancelled):
+        """Copy one verified SMB file to the host's private, seekable spool."""
+        if cancelled():
+            raise NASConnectionError("nas_source_changed")
+        handle = self._open(path)
+        try:
+            entry = self._stat_handle(path, handle)
+            if entry["kind"] != "file" or entry["revision"] != revision or entry["size"] != size:
+                raise NASConnectionError("nas_revision_changed")
+            digest = hashlib.sha256()
+            offset = 0
+            while offset < size:
+                if cancelled():
+                    raise NASConnectionError("nas_source_changed")
+                length = min(65536, size - offset)
+                data = handle.read(offset, length)
+                if not data or len(data) > length:
+                    raise NASConnectionError("nas_revision_changed")
+                sink.write(data)
+                digest.update(data)
+                offset += len(data)
+            if self._stat_handle(path, handle) != entry or self.stat(path) != entry:
+                raise NASConnectionError("nas_revision_changed")
+            return {"entry": entry, "sha256": digest.hexdigest()}
+        finally:
+            handle.close()
+
     def close(self):
         try:
             self.close_cursors()

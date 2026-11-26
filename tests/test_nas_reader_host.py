@@ -1,5 +1,5 @@
 """Actual private host -> actual manager -> synthetic transport; no NAS socket."""
-import asyncio,base64,hashlib,json,sys,tempfile,time,unittest
+import asyncio,base64,hashlib,json,os,sys,tempfile,time,unittest
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -14,17 +14,23 @@ from homeplane.nas_connection.manager import NASConnectionManager
 def ref(x):return hashlib.sha256(x.encode()).hexdigest()
 class HostReaderTests(unittest.IsolatedAsyncioTestCase):
  async def asyncSetUp(self):
-  directory=ROOT/'build/tmp';directory.mkdir(parents=True,exist_ok=True)
-  self.tmp=tempfile.TemporaryDirectory(prefix='reader-',dir=directory);self.raw='真实合同的合成正文🙂\n'.encode();self.transport_calls=[];self.checks=[]
+  self.tmp=tempfile.TemporaryDirectory(prefix='reader-');self.raw='真实合同的合成正文🙂\n'.encode();self.transport_calls=[];self.checks=[]
+  self.filename='note.txt'
   outer=self
   class Transport:
    async def request(self,op,payload):
     outer.transport_calls.append(op)
     if op=='list':
-     entries=[dict(path='sub',kind='directory',size=0,revision=ref('sub'))] if payload['path']=='' else [dict(path='sub/note.txt',kind='file',size=len(outer.raw),revision=ref('note'))]
+     entries=[dict(path='sub',kind='directory',size=0,revision=ref('sub'))] if payload['path']=='' else [dict(path='sub/'+outer.filename,kind='file',size=len(outer.raw),revision=ref('note'))]
      return dict(entries=entries,complete=True)
     if op=='stat':return dict(path=payload['path'],kind='file',size=len(outer.raw),revision=ref('note'))
     if op=='read':return dict(data=base64.b64encode(outer.raw[payload['offset']:payload['offset']+payload['length']]).decode())
+    if op=='spool':
+     if payload['revision'] != ref('note'):
+      raise NASConnectionError('nas_revision_changed')
+     with os.fdopen(os.dup(payload['fd']),'wb') as sink:
+      sink.write(outer.raw)
+     return dict(entry=dict(path=payload['path'],kind='file',size=len(outer.raw),revision=ref('note')),sha256=hashlib.sha256(outer.raw).hexdigest())
     raise AssertionError(op)
    async def close(self):pass
   self.manager=NASConnectionManager(Path(self.tmp.name)/'unused',credential_resolver=None)

@@ -30,12 +30,14 @@ public enum NASFileReaderContract {
                 properties["revision"] = ["type": "string", "pattern": "^[0-9a-f]{64}$"]
                 properties["size"] = ["type": "integer", "minimum": 0, "maximum": Int64.max]
                 properties["offset"] = ["type": "integer", "minimum": 0, "default": 0]
+                properties["unit_offset"] = ["type": "integer", "minimum": 1, "description": "Document continuation from next_unit_offset."]
+                properties["text_offset"] = ["type": "integer", "minimum": 0, "description": "Document continuation from next_text_offset."]
                 properties["max_bytes"] = ["type": "integer", "minimum": 1, "maximum": 65536, "default": 65536]
                 required = fence.sorted() + ["object_ref", "revision", "size"]
             }
             return ["name": tool, "description": search
                 ? "Search filenames recursively only within the existing live saved NAS scope and original source/configuration/epoch. No reconnect or scope restore. Preserve cursor and query for continuation. Bounded traversal reports partial results and reasons; zero partial results do not prove absence. Does not search file contents."
-                : "Read a page of an exact NAS file reference/revision as strict UTF-8, with original bytes and SHA256. Continue using next_offset with the same reference, revision and size. max_bytes bounds one delivery page. Binary or invalid UTF-8 is reported explicitly. No PDF/Office extraction or downloadable attachment is implied. No reconnect or scope restore.",
+                : "Read text from a NAS file. PDF, Word, Excel, PowerPoint, HTML and supported rich documents are detected from the original filename and extracted automatically, including OCR for scans. For document results, continue using next_unit_offset and next_text_offset. For plain UTF-8 files this returns original bytes and SHA256, and max_bytes bounds one delivery page; continue with next_offset.",
                 "inputSchema": ["type": "object", "additionalProperties": false, "properties": properties, "required": required],
                 "annotations": ["readOnlyHint": true, "destructiveHint": false, "idempotentHint": true, "openWorldHint": true],
                 "_meta": ["arl/capability": "mio_nas", "arl/version": 1, "arl/risk": "low", "arl/requiresConfirmation": false]]
@@ -48,7 +50,7 @@ public enum NASFileReaderContract {
               let args = (try? JSONSerialization.jsonObject(with: argumentsJSON)) as? [String: Any]
         else { throw Fault.invalidRequest }
         let search = tool == "mio_nas_search_recursive"
-        let extra: Set<String> = search ? ["keyword", "directory_ref", "cursor", "limit"] : ["object_ref", "revision", "size", "max_bytes", "offset"]
+        let extra: Set<String> = search ? ["keyword", "directory_ref", "cursor", "limit"] : ["object_ref", "revision", "size", "max_bytes", "offset", "unit_offset", "text_offset"]
         guard Set(args.keys).isSubset(of: fence.union(extra)), validFence(args) else { throw Fault.invalidRequest }
         var wire = args
         if search {
@@ -63,6 +65,8 @@ public enum NASFileReaderContract {
         } else {
             guard hex(args["object_ref"], 64), hex(args["revision"], 64), inRange(args["size"], 0, Int64.max),
                   (args["offset"] == nil || inRange(args["offset"], 0, integer(args["size"])!)),
+                  args["unit_offset"] == nil || inRange(args["unit_offset"], 1, Int64.max),
+                  args["text_offset"] == nil || inRange(args["text_offset"], 0, Int64.max),
                   args["max_bytes"] == nil || inRange(args["max_bytes"], 1, 65536)
             else { throw Fault.invalidRequest }
             wire["operation"] = "read_text"; wire["max_bytes"] = args["max_bytes"] ?? 65536; wire["offset"] = args["offset"] ?? 0
@@ -74,6 +78,22 @@ public enum NASFileReaderContract {
     public static func admit(_ value: [String: Any], request wire: [String: Any], expectedLocation: [String: Any]? = nil) throws {
         guard let operation = wire["operation"] as? String, ["search_recursive", "read_text"].contains(operation)
         else { throw Fault.invalidReply }
+        if operation == "read_text", value["operation"] as? String == "read_document" {
+            var document = wire
+            for key in ["operation", "max_bytes", "offset"] { document.removeValue(forKey: key) }
+            if value["state"] as? String == "failed" {
+                try NASDocumentContract.admit(value, request: document)
+                return
+            }
+            guard integer(wire["offset"]) == 0, let name = value["file_name"] as? String else {
+                throw Fault.invalidReply
+            }
+            document["name"] = name
+            let data = try JSONSerialization.data(withJSONObject: document)
+            let request = try NASDocumentContract.request(tool: NASDocumentContract.name, argumentsJSON: data)
+            try NASDocumentContract.admit(value, request: request, expectedLocation: expectedLocation)
+            return
+        }
         var args = wire; args.removeValue(forKey: "operation")
         if operation == "search_recursive" {
             guard boolean(args.removeValue(forKey: "recursive")) == true else { throw Fault.invalidReply }
@@ -129,7 +149,8 @@ public enum NASFileReaderContract {
     private static func admitText(_ value: [String: Any], wire: [String: Any], location: [String: Any]) throws {
         let fields: Set<String> = ["object_ref", "revision", "entry", "size", "bytes_read", "data_base64", "sha256_of_returned_bytes", "encoding", "text", "undecoded_tail_base64", "complete", "truncated", "next_offset", "stopped_reason", "downloadable_artifact"]
         let offset = integer(wire["offset"]) ?? 0
-        guard Set(value.keys).subtracting(["offset"]) == replyBase.union(fields),
+        guard wire["unit_offset"] == nil, wire["text_offset"] == nil,
+              Set(value.keys).subtracting(["offset"]) == replyBase.union(fields),
               integer(value["offset"] ?? 0) == offset,
               value["object_ref"] as? String == wire["object_ref"] as? String,
               value["revision"] as? String == wire["revision"] as? String,
