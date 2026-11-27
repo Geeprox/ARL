@@ -37,7 +37,7 @@ enum TestFailure: Error { case failed(String) }
         try expect((saver?["annotations"] as? [String:Bool])?["readOnlyHint"] == false,"save declared as write")
         try expect(tools.last?["name"] as? String==MioAttachmentInspection.name,"inspector appended")
         let baseline=try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:args[4]))) as! [[String:Any]]
-        let additions=NASFileReaderContract.names.union([MioAttachmentInspection.name])
+        let additions=NASFileReaderContract.names.union(NASMioSaveCapability.names).union([MioAttachmentInspection.name])
         let preserved=tools.filter{!additions.contains($0["name"] as? String ?? "")}
         try expect(try json(preserved)==json(baseline),"all original81 descriptors byte-equivalent as JSON")
         try validateMioPublishedDescriptors(tools)
