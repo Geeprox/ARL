@@ -454,7 +454,8 @@ class MacPlatform:
 READ_OWNER_OLD = frozenset({'travel_read','music_read','music_status','music_playlist_create','music_playlist_append','taobao_connection_metadata','taobao_search_read'})
 READ_OWNER_PRE_PRODUCT = frozenset({'travel_read','music_read','music_status','music_playlist_create','music_playlist_append','apple_reminders_task','nas_saved_scope_read'})
 READ_OWNER_PRE_COVER = READ_OWNER_PRE_PRODUCT | frozenset({'apple_product_v1'})
-READ_OWNER_NEW = READ_OWNER_PRE_COVER | frozenset({'music_playlist_cover'})
+READ_OWNER_PRE_NAS_SAVE = READ_OWNER_PRE_COVER | frozenset({'music_playlist_cover'})
+READ_OWNER_NEW = READ_OWNER_PRE_NAS_SAVE | frozenset({'mio_nas_save_new'})
 
 def reviewed_read_owner_transition(old_app, new_app):
     observations = []
@@ -469,7 +470,7 @@ def reviewed_read_owner_transition(old_app, new_app):
             require(set(value) == {'schema','executionAllowed','reviewID','owner','mio','capabilities'} and type(value['schema']) is int and value['schema'] == 2
                     and value['executionAllowed'] is True and type(value['capabilities']) is list
                     and all(type(capability) is str for capability in value['capabilities'])
-                    and len(value['capabilities']) in {7,8,9} and len(set(value['capabilities'])) == len(value['capabilities']), 'read_owner_transition_invalid')
+                    and len(value['capabilities']) in {7,8,9,10} and len(set(value['capabilities'])) == len(value['capabilities']), 'read_owner_transition_invalid')
             try:
                 require(type(value['reviewID']) is str, 'read_owner_transition_invalid')
                 uuid.UUID(value['reviewID'])
@@ -480,7 +481,7 @@ def reviewed_read_owner_transition(old_app, new_app):
                         and type(pin['certificateSHA1']) is str and re.fullmatch(r'[A-F0-9]{40}',pin['certificateSHA1']), 'read_owner_transition_invalid')
             pair.append((value,sha(raw)))
         old,new = pair[0][0],pair[1][0]
-        require(old['owner'] == new['owner'] and old['mio'] == new['mio'] and frozenset(old['capabilities']) in {READ_OWNER_OLD,READ_OWNER_PRE_PRODUCT,READ_OWNER_PRE_COVER,READ_OWNER_NEW}
+        require(old['owner'] == new['owner'] and old['mio'] == new['mio'] and frozenset(old['capabilities']) in {READ_OWNER_OLD,READ_OWNER_PRE_PRODUCT,READ_OWNER_PRE_COVER,READ_OWNER_PRE_NAS_SAVE,READ_OWNER_NEW}
                 and frozenset(new['capabilities']) == READ_OWNER_NEW, 'read_owner_transition_invalid')
         observations.append({'before_sha256':pair[0][1], 'after_sha256':pair[1][1]})
     require(observations[0] == observations[1], 'read_owner_pair_mismatch')

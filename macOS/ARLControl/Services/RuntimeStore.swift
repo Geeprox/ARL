@@ -536,6 +536,11 @@ final class RuntimeStore {
     }
     /// Local UI and authenticated Mio enter the exact same business boundary.
     func performNASFileCall(tool:String,argumentsJSON:Data,callID:UUID=UUID()) async throws -> Data {
+        if NASMioSaveCapability.names.contains(tool) {
+            guard !exitRequested, !nativeActionsHeld, !demo, !isolated,
+                  let owner = nasSettings.serverSetupOwner as? NASProductionController else { throw OwnerReadFault.held }
+            return try await owner.performMioSave(tool:tool,input:argumentsJSON)
+        }
         guard let executor=nasFileExecutor else{throw OwnerReadFault.held}
         return try await executor.execute(tool:tool,argumentsJSON:argumentsJSON,callID:callID)
     }

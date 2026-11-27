@@ -25,7 +25,7 @@ struct OwnerReadAuthority: Sendable {
     var peer: Pin { role == .owner ? mio : owner }
     var own: Pin { role == .owner ? owner : mio }
     static let capabilities: Set<String> = ["travel_read", "music_read", "music_status", "music_playlist_create", "music_playlist_append", "music_playlist_cover",
-        "apple_reminders_task", "apple_product_v1", "nas_saved_scope_read"]
+        "apple_reminders_task", "apple_product_v1", "nas_saved_scope_read", "mio_nas_save_new"]
     static let sealKey = "ARLCredentialReadOwnerAuthoritySHA256"
     static var directory: String { NSHomeDirectory() + "/Library/Application Support/ARL/read-owner-r1" }
     static var socketPath: String { directory + "/read.sock" }

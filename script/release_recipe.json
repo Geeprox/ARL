@@ -253,6 +253,6 @@
   },
   "read_owner_authority": {
     "path": "integrations/credential_read_owner/authority-v2.json",
-    "sha256": "5759ede58f97dea8a65f32a94a4da493dff897f92b7e0c9510585225442f7b25"
+    "sha256": "69c770c4ba3b655c029780591c3090ef224eab0ff75202031e283c887e7f2da5"
   }
 }

@@ -14,7 +14,7 @@ protocol NASUploadUIOwner: AnyObject {
 }
 
 @MainActor
-final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsumer, NASUploadUIOwner, NASDirectoryUIOwner, NASServerSetupOwner, NASFileUIOwner, NASArchivePickerOwner {
+final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsumer, NASUploadUIOwner, NASDirectoryUIOwner, NASServerSetupOwner, NASFileUIOwner, NASArchivePickerOwner, NASMioSaveSetupOwner {
     private struct Record: Codable {
         var schema = 1
         var configuration: NASConnectionConfiguration
@@ -29,6 +29,30 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         var originalAddress: String
         var identity: NASCredentialIdentity
         var revision: UInt64
+    }
+    private struct MioSaveGrant: Codable, Equatable, Sendable {
+        let id: UUID
+        let configuration: NASConnectionConfiguration
+        let identity: NASCredentialIdentity
+        let directory: String?
+    }
+    private struct MioSaveReceipt: Codable, Sendable {
+        let grant: UUID
+        let fileIDHash: String
+        let name: String
+        var state: String = "uncertain"
+        var code: String? = "check_original_operation"
+        var path: String?
+        var size: Int?
+        var sha256: String?
+    }
+    private var mioSaveGrant: MioSaveGrant?
+    private var mioSaveGrantPath: URL { path.deletingLastPathComponent().appendingPathComponent("mio-save-directory-v1.json") }
+    private var currentMioSaveGrant: MioSaveGrant? {
+        guard enabled, let grant = mioSaveGrant, grant.directory != nil,
+              grant.configuration == record?.configuration, grant.identity == record?.identity,
+              credentialMatchesScope() else { return nil }
+        return grant
     }
     private var savedAccount: String?
     private var nextServerCheck:TimeInterval = 0
@@ -79,6 +103,97 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
            let checked=try? NASServerEndpoint(sourceRef:saved.endpoint.sourceRef,host:saved.endpoint.host,port:saved.endpoint.port,timeoutSeconds:saved.endpoint.timeoutSeconds,generation:saved.endpoint.generation),checked==saved.endpoint {
             serverRecord=saved;revision=max(revision,saved.revision)
         }
+        if let data = try? Self.read(mioSaveGrantPath), let grant = try? JSONDecoder().decode(MioSaveGrant.self,from:data),
+           let directory = grant.directory, (try? NASDirectoryPage.validatePath(directory)) != nil {
+            mioSaveGrant = grant
+        }
+    }
+    var mioSaveLocation: String? {
+        guard let grant = currentMioSaveGrant, let subdirectory = grant.directory else { return nil }
+        return [grant.configuration.share,grant.configuration.root,subdirectory].filter{ !$0.isEmpty }.joined(separator:"/")
+    }
+    func browseMioSaveDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage {
+        if !state.connected { try await connectSavedReadScope() }
+        return try await browseDirectories(path:path,cursor:cursor)
+    }
+    func setMioSaveDirectory(_ directory: String?) async throws {
+        guard enabled, let record, let identity = record.identity, credentialMatchesScope()
+        else { throw ARLNASFault.configurationNotSaved }
+        if let directory, currentMioSaveGrant?.directory == directory { return }
+        if let directory {
+            try NASDirectoryPage.validatePath(directory)
+            _ = try await browseMioSaveDirectories(path:directory,cursor:nil)
+            guard self.record?.configuration == record.configuration, self.record?.identity == identity,
+                  fileOperationID == nil, serverIntentID == nil else { throw ARLNASFault.operationInProgress }
+        }
+        let grant = MioSaveGrant(id:UUID(),configuration:record.configuration,identity:identity,directory:directory)
+        try persist(grant,to:mioSaveGrantPath)
+        mioSaveGrant = grant
+        if directory == nil, fileOperationID != nil { await owner.stop() }
+    }
+    func performMioSave(tool: String, input: Data) async throws -> Data {
+        let request = try NASMioSaveCapability.request(tool,input)
+        guard let grant = currentMioSaveGrant, let directory = grant.directory else {
+            return try NASMioSaveCapability.reply(request,state:"failed",code:"choose_mio_save_folder_in_arl")
+        }
+        let base = mioSaveGrantPath.deletingLastPathComponent().appendingPathComponent("mio-save-receipts.noindex")
+        let receiptURL = base.appendingPathComponent(request.operationID.uuidString.lowercased() + ".json")
+        func reply(_ receipt: MioSaveReceipt) throws -> Data {
+            try NASMioSaveCapability.reply(request,state:receipt.state,code:receipt.code,
+                                           path:receipt.path,size:receipt.size,sha256:receipt.sha256)
+        }
+        let fileHash = request.fileID.map { SHA256.hash(data:Data($0.utf8)).map{String(format:"%02x",$0)}.joined() }
+        if FileManager.default.fileExists(atPath:receiptURL.path) {
+            let saved = try JSONDecoder().decode(MioSaveReceipt.self,from:Self.read(receiptURL))
+            guard saved.grant == grant.id, fileHash == nil || (fileHash == saved.fileIDHash && request.name == saved.name)
+            else { return try NASMioSaveCapability.reply(request,state:"failed",code:"operation_binding_mismatch") }
+            return try reply(saved)
+        }
+        guard let name = request.name, let fileHash, let attachment = request.attachment else {
+            return try NASMioSaveCapability.reply(request,state:"missing",code:"operation_not_recorded")
+        }
+        do { try await connectSavedReadScope() }
+        catch { return try NASMioSaveCapability.reply(request,state:"failed",code:NASFileExecutor.code(error)) }
+        guard currentMioSaveGrant == grant, fileOperationID == nil, !Task.isCancelled,
+              !FileManager.default.fileExists(atPath:receiptURL.path) else {
+            return try NASMioSaveCapability.reply(request,state:"failed",code:"nas_busy")
+        }
+        let operation = UUID()
+        fileOperationID = operation; polling?.cancel()
+        defer { if fileOperationID == operation { fileOperationID = nil; startPolling() } }
+        let target = [directory,name].filter{!$0.isEmpty}.joined(separator:"/")
+        let initial = MioSaveReceipt(grant:grant.id,fileIDHash:fileHash,name:name)
+        let result: NASAttachmentSaveResult
+        do {
+            result = try await owner.saveAttachment(attachment,operationID:request.operationID,target:target,
+                configuration:grant.configuration,identity:grant.identity,
+                stillAuthorized:{ [weak self] in
+                    try await MainActor.run {
+                        guard let self, self.currentMioSaveGrant == grant, self.fileOperationID == operation
+                        else { throw CancellationError() }
+                    }
+                }, beforeUpload:{ [weak self] in
+                    try await MainActor.run {
+                        guard let self, self.currentMioSaveGrant == grant, self.fileOperationID == operation,
+                              !FileManager.default.fileExists(atPath:receiptURL.path) else { throw CancellationError() }
+                        try self.persist(initial,to:receiptURL)
+                    }
+                })
+        } catch {
+            let code = (error as? NASAttachmentFailure)?.code ?? NASFileExecutor.code(error)
+            return try NASMioSaveCapability.reply(request,state:"failed",code:code)
+        }
+        var receipt = initial
+        if result.result.committed {
+            receipt.state = "saved"; receipt.code = nil
+            receipt.path = [grant.configuration.share,grant.configuration.root,target].filter{!$0.isEmpty}.joined(separator:"/")
+            receipt.size = result.size; receipt.sha256 = result.sha256
+        } else {
+            receipt.state = result.result.status == "uncertain" ? "uncertain" : "failed"
+            receipt.code = result.result.failure ?? "check_original_operation"
+        }
+        try persist(receipt,to:receiptURL)
+        return try reply(receipt)
     }
     private static func ownPins() -> ARLNASObservedCallerPins? {
         var code: SecCode?, staticCode: SecStaticCode?, requirement: SecRequirement?, text: CFString?

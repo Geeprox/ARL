@@ -19,8 +19,6 @@ from integrations.nas import file_params_importer as imp
 from integrations.nas import attachment_bridge as bridge
 from homeplane.nas_connection.file_operations import FileOperationJournal, ScopeFence
 from homeplane.nas_connection.file_transfer import FileTransfer
-OUT=ROOT/"build/audit/nas-attachment-bridge-20261022.noindex/fileparams"
-OUT.mkdir(parents=True,mode=0o700,exist_ok=True)
 
 
 def payload(**kw):
@@ -51,7 +49,7 @@ class FakeSocket:
 
 class Checks(unittest.TestCase):
     def setUp(self):
-        self.temp=tempfile.TemporaryDirectory(prefix="import-",dir=OUT);self.home=Path(self.temp.name);self.home.chmod(0o700)
+        self.temp=tempfile.TemporaryDirectory(prefix="arl-import-");self.home=Path(self.temp.name);self.home.chmod(0o700)
         self.fd=os.open(self.home,os.O_RDONLY|os.O_DIRECTORY);self.journal=FileOperationJournal(self.fd,verify_seal=lambda:None)
         self.transfers=[];self.sockets=[];self.connections=[];self.factory_calls=[]
     def tearDown(self):
@@ -115,6 +113,22 @@ class Checks(unittest.TestCase):
         v=payload();v["file"]={k:v["file"][k] for k in ("file_id","download_url")}
         with self.transport(response(b"raw")):a=self.fetch(v)
         self.assertEqual((a.name,a.data),("attachment.bin",b"raw"))
+
+    def test_save_path_streams_large_attachment_to_unlinked_source(self):
+        from arl_nas_upload_new.source import SealedSource
+        raw = b"\x89PNG\r\n\x1a\n" + (bytes(range(256)) * 8200)
+        for chunked in (False, True):
+            with self.subTest(chunked=chunked), tempfile.TemporaryFile(dir=self.home) as spool:
+                headers = [("Transfer-Encoding","chunked")] if chunked else None
+                with self.transport(response(raw,headers=headers,chunked=chunked)):
+                    size, sha = self.fetch(output=spool)
+                spool.flush()
+                source = SealedSource(spool.fileno(),verify_pin=lambda:None,unlinked=True)
+                try:
+                    self.assertEqual((size,sha),(len(raw),bridge.digest(raw)))
+                    self.assertEqual((source.size,source.sha256),(size,sha))
+                finally:
+                    source.close()
 
     def test_url_and_local_path_cannot_replace_platform_shape(self):
         for v in ({"url":"https://files.oaiusercontent.com/file_x"},{"local_path":"/tmp/file"},

@@ -42,7 +42,7 @@ def source_inputs():
         for path in sorted((ROOT/folder).rglob("*")):
             if path.is_file() and "__pycache__" not in path.parts and path.name not in {"FRIDAY-NAS-PROVENANCE.json", "friday_bridge.py"}:
                 names.append(str(path.relative_to(ROOT)))
-    names += ["integrations/nas/document_text.py", "integrations/nas/attachment_bridge.py",
+    names += ["integrations/nas/document_text.py", "integrations/nas/attachment_bridge.py", "integrations/nas/file_params_importer.py",
               "integrations/nas/native/NASPDFTextExtractor.swift"]
     return names
 
@@ -133,7 +133,7 @@ def stage(app, *, cache_pin, build_only, signing_identity, document_worker=None)
         shutil.copytree(ROOT/package,runtime/package,ignore=shutil.ignore_patterns("__pycache__", "FRIDAY-NAS-PROVENANCE.json", "friday_bridge.py"))
     components = runtime/"integrations/nas"
     components.mkdir(parents=True)
-    for name in ["attachment_bridge.py", "document_text.py"]:
+    for name in ["attachment_bridge.py", "document_text.py", "file_params_importer.py"]:
         shutil.copyfile(ROOT/"integrations/nas"/name,components/name)
     if document_worker is None or Path(document_worker).is_symlink() or not Path(document_worker).is_file():
         raise ValueError("NAS document worker missing")

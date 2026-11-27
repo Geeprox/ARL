@@ -155,6 +155,7 @@ protocol NASConnectionRuntime: Sendable {
     func fileOperation(_ request: NASFileRequest) async throws -> Data
     func browseDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage
     func uploadNew(_ proposal: NASUploadProposal) async throws -> NASUploadResult
+    func stageAttachment(_ attachment: Data, operationID: UUID) async throws -> NASAttachmentStage
     func fixedAcceptance(_ phase: NASAcceptancePhase) async throws -> Data
     func stop() async
     func authenticate(endpoint: NASServerEndpoint, identity: NASCredentialIdentity, secret: CredentialInput) async throws -> NASServerState
@@ -172,6 +173,7 @@ extension NASConnectionRuntime {
     func previewDirectories(share: String, path: String, cursor: String?) async throws -> NASDirectoryPage { throw CredentialError.deploymentNotApproved }
     func browseDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage { throw CredentialError.deploymentNotApproved }
     func uploadNew(_ proposal: NASUploadProposal) async throws -> NASUploadResult { throw CredentialError.deploymentNotApproved }
+    func stageAttachment(_ attachment: Data, operationID: UUID) async throws -> NASAttachmentStage { throw CredentialError.deploymentNotApproved }
 }
 
 /// Shares the existing login-Keychain repository, exact ACL, receipts and no-prompt
@@ -485,6 +487,44 @@ public actor NASCredentialService {
             await runtime.stop(); active = nil; activeConfiguration = nil
             // A lost response can never authorize a retry or imply no effect.
             return .init(status: "uncertain", failure: "io_uncertain")
+        }
+    }
+    public func saveAttachment(_ attachment: Data, operationID: UUID, target: String,
+                               configuration: NASConnectionConfiguration, identity: NASCredentialIdentity,
+                               stillAuthorized: @Sendable () async throws -> Void,
+                               beforeUpload: @Sendable () async throws -> Void) async throws -> NASAttachmentSaveResult {
+        guard enabled, let runtime, active == identity, activeConfiguration == configuration
+        else { throw CredentialError.staleReference }
+        guard !busy else { throw CredentialError.busy }
+        try NASUploadProposal.validateTarget(target)
+        busy = true; defer { busy = false }
+        let captured = operation
+        func check() async throws {
+            try await stillAuthorized()
+            try current(identity); try Task.checkCancellation()
+            guard captured == operation, active == identity, activeConfiguration == configuration
+            else { throw CancellationError() }
+        }
+        try await check()
+        let bytes = try await runtime.stageAttachment(attachment, operationID: operationID)
+        let proposal: NASUploadProposal
+        do {
+            try await check()
+            proposal = try NASUploadProposal(id: operationID, configuration: configuration, identity: identity,
+                                             target: target, bytes: bytes.size, sha256: bytes.sha256)
+            try await beforeUpload()
+        } catch {
+            if captured == operation { await stop() }
+            throw error
+        }
+        do {
+            let result = try await runtime.uploadNew(proposal)
+            try await check()
+            return NASAttachmentSaveResult(result: result, size: bytes.size, sha256: bytes.sha256)
+        } catch {
+            if captured == operation { await stop() }
+            return NASAttachmentSaveResult(result: .init(status: "uncertain", failure: "io_uncertain"),
+                                           size: bytes.size, sha256: bytes.sha256)
         }
     }
     public func stop() async {

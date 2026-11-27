@@ -169,13 +169,14 @@ enum OwnerReadWire {
     static func seconds(for tool: String) -> Double {
         if music.contains(tool) || musicLibraryNames.contains(tool) || tool == musicAggregate { return 35 }
         if NASCapability.names.contains(tool) { return 110 }
+        if NASMioSaveCapability.names.contains(tool) { return 175 }
         if tool == "mio_flyai_ai_search" { return 75 }
         if tool == AppleCapability.reminderCreate || AppleProductCapability.names.contains(tool) { return 210 }
         return (tool == MusicPlaylistCoverCapability.name || musicWrites.contains(tool) || tool == musicReconcile || tool == musicAppendRecovery || tool == musicCurrentCloudAppend) ? 180 : seconds }
     static let music: Set<String> = ["mio_netease_playlist_list", "mio_netease_playlist_describe", "mio_netease_song_search"]
     static func isReadTool(_ value: String) -> Bool { NASCapability.names.contains(value) || travel.contains(value) || musicLibraryNames.contains(value) || music.contains(value) || value == musicReconcile || value == musicAggregate }
     static func isTool(_ value: String) -> Bool {
-        AppleProductCapability.names.contains(value) || AppleCapability.names.contains(value) || isReadTool(value) || musicWrites.contains(value) || value == musicAppendRecovery || value == musicCurrentCloudAppend || value == musicStatus || value == MusicPlaylistCoverCapability.name
+        AppleProductCapability.names.contains(value) || AppleCapability.names.contains(value) || NASMioSaveCapability.names.contains(value) || isReadTool(value) || musicWrites.contains(value) || value == musicAppendRecovery || value == musicCurrentCloudAppend || value == musicStatus || value == MusicPlaylistCoverCapability.name
     }
     static func integer(_ value: Any?, _ expected: Int) -> Bool {
         guard let n = value as? NSNumber, CFGetTypeID(n) != CFBooleanGetTypeID() else { return false }

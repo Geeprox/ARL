@@ -228,12 +228,12 @@ def _addresses(host):
     return ips
 
 
-def fetch(source, *, verify, clock=time.monotonic, receipt_only=False):
+def fetch(source, *, verify, clock=time.monotonic, receipt_only=False, output=None):
     """One HTTPS GET, no redirects/retries/auth forwarding or decompression.
 
     verify is the original native caller/request verifier; no default grants.
     The native outer request deadline must also bound OS DNS resolution.
-    Socket operations and body consumption have a 20s remaining-time budget.
+    The private disk-backed path has its own download budget and returns size/SHA.
     No payload is returned before a complete bounded response and owner recheck.
     """
     if type(source) is not FileParam or not callable(verify):
@@ -245,14 +245,16 @@ def fetch(source, *, verify, clock=time.monotonic, receipt_only=False):
     if type(start) not in (int, float) or not math.isfinite(start):
         fail("attachment_expired")
     previous = start
+    budget = 50 if output is not None else DOWNLOAD_SECONDS
+    buffered = not receipt_only and output is None
     def live():
         nonlocal previous
         now = clock()
-        if type(now) not in (int, float) or not math.isfinite(now) or now < previous or now >= start+DOWNLOAD_SECONDS:
+        if type(now) not in (int, float) or not math.isfinite(now) or now < previous or now >= start+budget:
             fail("attachment_expired")
         previous = now
         verify()
-        return start+DOWNLOAD_SECONDS-now
+        return start+budget-now
     live()
     try:
         ips = _addresses(FILE_HOST)
@@ -286,30 +288,32 @@ def fetch(source, *, verify, clock=time.monotonic, receipt_only=False):
             fail("attachment_response_invalid")
         expected = None
         if lengths:
-            if re.fullmatch("[0-9]{1,10}", lengths[0]) is None:
+            if re.fullmatch("[0-9]{1,16}", lengths[0]) is None:
                 fail("attachment_response_invalid")
             expected = int(lengths[0])
-            if not receipt_only and expected > MAX_BYTES:
+            if buffered and expected > MAX_BYTES:
                 fail("attachment_too_large")
         data = bytearray(); received = 0; hasher = hashlib.sha256()
         while True:
             remaining = live()
             if body_socket is not None and not response.isclosed():
                 body_socket.settimeout(remaining)
-            raw = response.read(CHUNK_BYTES if receipt_only else min(CHUNK_BYTES, MAX_BYTES+1-len(data)))
+            raw = response.read(min(CHUNK_BYTES, MAX_BYTES+1-len(data)) if buffered else 131072 if output is not None else CHUNK_BYTES)
             live()
             if type(raw) is not bytes:
                 fail("attachment_response_invalid")
             if not raw:
                 break
             received += len(raw); hasher.update(raw)
-            if not receipt_only:data.extend(raw)
-            if not receipt_only and len(data) > MAX_BYTES:
+            if output is not None and output.write(raw) != len(raw):
+                fail("attachment_fetch_failed")
+            if buffered:data.extend(raw)
+            if buffered and len(data) > MAX_BYTES:
                 fail("attachment_too_large")
         if expected is not None and received != expected:
             fail("attachment_truncated")
         live()
-        if receipt_only:return received, hasher.hexdigest()
+        if not buffered:return received, hasher.hexdigest()
         artifact = VerifiedFile(source.file_name or "attachment.bin", bytes(data), digest(data))
         artifact.check()
         return artifact
