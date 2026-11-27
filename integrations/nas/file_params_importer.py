@@ -5,10 +5,9 @@ The owner must verify its original caller/request/scope before every IO phase;
 file_id, this schema and a CDN URL do not mint an owner permit. No cookies,
 API keys, proxy credentials, NAS credentials, upload/move/mkdir, or new service.
 
-Narrow first profile supports only https://files.oaiusercontent.com on port 443.
-The docs do not guarantee an exhaustive CDN list. A different platform origin
-is rejected, not guessed or followed; Library materialization is a separate host
-workflow. Signed URLs live only in this request and never appear in receipts.
+ChatGPT serves file uploads from oaiusercontent.com subdomains. Use the exact
+HTTPS origin of the signed URL, without following redirects or adding credentials.
+Signed URLs live only in this request and never appear in receipts.
 """
 from __future__ import annotations
 import base64
@@ -29,7 +28,6 @@ from integrations.nas.attachment_bridge import (
 )
 
 TOOL_NAME = "mio_nas_import_attachment"
-FILE_HOST = "files.oaiusercontent.com"
 MAX_URL_BYTES = 16384
 DOWNLOAD_SECONDS = 20.0
 
@@ -64,8 +62,10 @@ def file_param(value):
         port = parsed.port
     except (UnicodeError, ValueError):
         fail("attachment_origin_unsupported")
-    if (not valid_size or parsed.scheme != "https" or parsed.netloc != FILE_HOST
-            or parsed.hostname != FILE_HOST or port is not None or parsed.fragment
+    host = parsed.hostname or ""
+    if (not valid_size or parsed.scheme != "https" or port not in (None, 443)
+            or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+oaiusercontent\.com", host)
+            or parsed.netloc.lower() not in (host, host + ":443") or parsed.fragment
             or not parsed.path.startswith("/") or "\\" in url
             or any(ord(c) <= 32 or ord(c) == 127 for c in url)):
         fail("attachment_origin_unsupported")
@@ -259,17 +259,18 @@ def fetch(source, *, verify, clock=time.monotonic, receipt_only=False, output=No
         verify()
         return start+budget-now
     live()
+    parsed = urlsplit(source.download_url)
+    host = parsed.hostname
     try:
-        ips = _addresses(FILE_HOST)
+        ips = _addresses(host)
     except BridgeFault:
         raise
     except (OSError, ValueError):
         fail("attachment_dns_rejected")
     remaining = live()
-    connection = _PinnedHTTPS(FILE_HOST, ips[0], remaining)  # never retry another address
+    connection = _PinnedHTTPS(host, ips[0], remaining)  # never retry another address
     response = None
     try:
-        parsed = urlsplit(source.download_url)
         target = parsed.path + ("?"+parsed.query if parsed.query else "")
         connection.request("GET", target, headers={"Accept-Encoding": "identity", "Connection": "close"})
         remaining = live()

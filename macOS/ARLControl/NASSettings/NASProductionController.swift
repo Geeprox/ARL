@@ -3,6 +3,7 @@ import Darwin
 import SwiftUI
 import CryptoKit
 import Security
+import OSLog
 import ARLCredentialOnboarding
 
 /// Concrete in-process controller. UI intent, credential owner and manager scope
@@ -182,6 +183,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                 })
         } catch {
             let code = (error as? NASAttachmentFailure)?.code ?? NASFileExecutor.code(error)
+            if code == "attachment_origin_unsupported" { Self.reportUnsupportedAttachmentOrigin(attachment) }
             return try NASMioSaveCapability.reply(request,state:"failed",code:code)
         }
         var receipt = initial
@@ -195,6 +197,17 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         }
         try persist(receipt,to:receiptURL)
         return try reply(receipt)
+    }
+    private static func reportUnsupportedAttachmentOrigin(_ attachment: Data) {
+        let files = (try? JSONSerialization.jsonObject(with:attachment)) as? [String:Any]
+        let url = (files?["download_url"] as? String).flatMap { URLComponents(string:$0) }
+        let host = url?.host?.lowercased() ?? ""
+        let domains = ["oaiusercontent.com","chatgpt.com","openai.com","blob.core.windows.net","oaistatic.com"]
+        let family = domains.first { host == $0 || host.hasSuffix("." + $0) } ?? (host.isEmpty ? "missing" : "other")
+        let transport = url?.scheme == "https" ? "https" : "other"
+        let estuary = url?.path == "/backend-api/estuary/content"
+        Logger(subsystem:"local.arl.control",category:"nas-attachment")
+            .notice("attachment_origin_unsupported family=\(family, privacy:.public) transport=\(transport, privacy:.public) estuary=\(estuary, privacy:.public)")
     }
     private static func ownPins() -> ARLNASObservedCallerPins? {
         var code: SecCode?, staticCode: SecStaticCode?, requirement: SecRequirement?, text: CFString?
