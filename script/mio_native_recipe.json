@@ -93,7 +93,7 @@
     },
     {
       "path": "integrations/credential_read_owner/NASCapability.swift",
-      "sha256": "f84fbef2bbb5b7737e69d96cacc01d41fa2f5eb42615af805c6557d19463f169"
+      "sha256": "e3be7922761636596da40166d26d8a732a206160ccf0573f1b0036e70d237957"
     },
     {
       "path": "integrations/credential_read_owner/AppleProductCapability.swift",

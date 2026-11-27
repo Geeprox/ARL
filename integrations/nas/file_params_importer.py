@@ -52,7 +52,10 @@ def file_param(value):
             or not set(value) <= {"download_url", "file_id", "mime_type", "file_name"}):
         fail("attachment_reference_required")
     file_id, url = value["file_id"], value["download_url"]
-    if (type(file_id) is not str or re.fullmatch(r"file[-_][A-Za-z0-9_-]{1,128}", file_id) is None
+    # ChatGPT file IDs are opaque. The HTTPS URL is validated independently and
+    # the ID is never interpreted as a path or used to select a network origin.
+    if (type(file_id) is not str or file_id.startswith(("/", "\\"))
+            or re.fullmatch(r"[!-~]{1,134}", file_id) is None
             or type(url) is not str):
         fail("attachment_reference_required")
     try:

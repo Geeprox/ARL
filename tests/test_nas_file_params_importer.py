@@ -114,6 +114,16 @@ class Checks(unittest.TestCase):
         with self.transport(response(b"raw")):a=self.fetch(v)
         self.assertEqual((a.name,a.data),("attachment.bin",b"raw"))
 
+    def test_file_id_is_opaque_and_does_not_select_the_download_url(self):
+        original = payload()
+        original["file"]["file_id"] = "file-service://opaque_platform_reference"
+        value = {key: original[key] for key in ("operation_id", "file")}
+        with self.transport(response(b"raw")):
+            receipt = imp.inspect_attachment(value, verify=lambda: None)
+        self.assertEqual(receipt["file_id"], original["file"]["file_id"])
+        self.assertEqual(receipt["sha256"], bridge.digest(b"raw"))
+        self.assertIn(b"GET /file_synthetic?sig=synthetic ", self.sockets[0].sent[0])
+
     def test_save_path_streams_large_attachment_to_unlinked_source(self):
         from arl_nas_upload_new.source import SealedSource
         raw = b"\x89PNG\r\n\x1a\n" + (bytes(range(256)) * 8200)

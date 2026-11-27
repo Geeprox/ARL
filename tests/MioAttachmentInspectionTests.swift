@@ -35,6 +35,12 @@ enum TestFailure: Error { case failed(String) }
         let saver=tools.first { $0["name"] as? String == NASMioSaveCapability.save }
         try expect((saver?["_meta"] as? [String:Any])?["openai/fileParams"] as? [String] == ["file"],"platform file input")
         try expect((saver?["annotations"] as? [String:Bool])?["readOnlyHint"] == false,"save declared as write")
+        var opaqueInput = input
+        var opaqueFile = input["file"] as! [String: String]
+        opaqueFile["file_id"] = "file-service://opaque_platform_reference"
+        opaqueInput["file"] = opaqueFile
+        let save = try NASMioSaveCapability.request(NASMioSaveCapability.save, json(opaqueInput))
+        try expect(save.fileID == opaqueFile["file_id"], "save preserves the opaque platform ID")
         try expect(tools.last?["name"] as? String==MioAttachmentInspection.name,"inspector appended")
         let baseline=try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:args[4]))) as! [[String:Any]]
         let additions=NASFileReaderContract.names.union(NASMioSaveCapability.names).union([MioAttachmentInspection.name])
