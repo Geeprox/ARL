@@ -98,6 +98,13 @@ private actor Runtime: NASConnectionRuntime {
         try check(reselection.connected == .verified && reselection.readScope == reply.snapshot.readScope,
                   "reselecting_the_same_folder_keeps_the_existing_read_grant")
         try await run(.stop)
+        do {
+            try await controller.connectSavedReadScope()
+            throw CheckError.failed("paused_scope_was_reconnected")
+        } catch ARLNASFault.userCancelled {}
+        try await run(.restoreSaved)
+        try check(controller.cachedSnapshot().connected == .verified && !controller.serverSetupSnapshot().paused,
+                  "explicit_reconnect_restores_the_saved_scope")
         await runtime.arm()
         let intent=controller.beginServerAction(.login)!
         let pending=Task{@MainActor in await controller.performServerAction(intent,input:nil)}

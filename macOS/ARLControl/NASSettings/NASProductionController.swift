@@ -111,17 +111,23 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         }
     }
     var mioSaveDirectory: String? { currentMioSaveGrant?.directory }
-    func browseMioSaveDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage {
+    func browseMioSaveDirectories(path: String, cursor: String?, expectedScope: ARLNASReadScope) async throws -> NASDirectoryPage {
+        guard scope() == expectedScope else { throw ARLNASFault.bindingMismatch }
+        guard !userPausedServer else { throw ARLNASFault.userCancelled }
         if !state.connected { try await connectSavedReadScope() }
-        return try await browseDirectories(path:path,cursor:cursor)
+        guard scope() == expectedScope else { throw ARLNASFault.bindingMismatch }
+        let page = try await browseDirectories(path:path,cursor:cursor)
+        guard scope() == expectedScope else { throw ARLNASFault.bindingMismatch }
+        return page
     }
-    func setMioSaveDirectory(_ directory: String?) async throws {
+    func setMioSaveDirectory(_ directory: String?, expectedScope: ARLNASReadScope) async throws {
+        guard scope() == expectedScope else { throw ARLNASFault.bindingMismatch }
         guard enabled, let record, let identity = record.identity, credentialMatchesScope()
         else { throw ARLNASFault.configurationNotSaved }
         if let directory, currentMioSaveGrant?.directory == directory { return }
         if let directory {
             try NASDirectoryPage.validatePath(directory)
-            _ = try await browseMioSaveDirectories(path:directory,cursor:nil)
+            _ = try await browseMioSaveDirectories(path:directory,cursor:nil,expectedScope:expectedScope)
             guard self.record?.configuration == record.configuration, self.record?.identity == identity,
                   fileOperationID == nil, serverIntentID == nil else { throw ARLNASFault.operationInProgress }
         }
@@ -271,7 +277,8 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         return .init(address:serverRecord?.originalAddress ?? "",port:serverRecord?.endpoint.port ?? 445,
             timeoutSeconds:serverRecord?.endpoint.timeoutSeconds ?? 8,saved:serverRecord != nil,account:savedAccount,
             state:serverState,directory:serverDirectory,share:previewShare,authorizedScope:granted,
-            busy:serverIntentID != nil,paused:userPausedServer,fault:fault,diagnostic:failureDiagnostic ?? state.failure)
+            busy:serverIntentID != nil,paused:userPausedServer,fault:fault,diagnostic:failureDiagnostic ?? state.failure,
+            binding:serverRecord.map { NASServerSetupBinding(endpoint:$0.endpoint,identity:$0.identity) })
     }
     func maintainServerConnection() async {
         guard enabled,pins != nil,!userPausedServer,serverIntentID == nil,fileOperationID == nil,let saved=serverRecord,ProcessInfo.processInfo.systemUptime >= nextServerCheck else{return}
@@ -390,7 +397,10 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
                       previewShare==share,shareNames.contains(where:{$0.name==share}),
                       (!path.isEmpty && !wholeShare) || (path.isEmpty && wholeShare)
                 else{throw ARLNASFault.bindingMismatch}
-                if let record, credentialMatchesScope(),
+                if let record, record.identity == saved.identity, credentialMatchesScope(),
+                   record.configuration.sourceRef == saved.endpoint.sourceRef,
+                   record.configuration.host == saved.endpoint.host, record.configuration.port == saved.endpoint.port,
+                   record.configuration.timeoutSeconds == saved.endpoint.timeoutSeconds,
                    record.configuration.share == share, record.configuration.root == path {
                     await owner.stop(); try current()
                     let next=try await owner.connect(configuration:record.configuration,identity:saved.identity);try current()
@@ -563,6 +573,9 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
     }
     func browseDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage {
         guard enabled, state.connected, let epoch = state.epoch else { throw ARLNASFault.connectionFailed }
+        guard fileOperationID == nil, serverIntentID == nil else { throw ARLNASFault.operationInProgress }
+        let id = UUID(); fileOperationID = id
+        defer { if fileOperationID == id { fileOperationID = nil } }
         polling?.cancel(); serial = UUID(); let captured = serial
         do {
             let page = try await owner.browseDirectories(path: path, cursor: cursor)
@@ -571,7 +584,13 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
             startPolling()
             return page
         } catch {
-            if serial == captured { state = .init(); failure = mapped(error); revision += 1 }
+            if serial == captured {
+                state = .init(); revision += 1
+                if error is CancellationError {
+                    nextServerCheck = 0
+                    Task { await maintainServerConnection() }
+                } else { failure = mapped(error) }
+            }
             throw error
         }
     }
@@ -593,6 +612,7 @@ final class NASProductionController: ARLNASSetupBackend, ARLNASCredentialConsume
         return result
     }
     func connectSavedReadScope() async throws {
+        guard !userPausedServer else { throw ARLNASFault.userCancelled }
         guard enabled, serverIntentID == nil, fileOperationID == nil else { throw ARLNASFault.operationInProgress }
         guard let record else { throw ARLNASFault.configurationNotSaved }
         guard let identity = record.identity else { throw ARLNASFault.credentialNotSaved }

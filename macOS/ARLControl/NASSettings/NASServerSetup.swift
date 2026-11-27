@@ -16,6 +16,12 @@ struct NASServerSetupSnapshot {
     var paused = false
     var fault: ARLNASFault?
     var diagnostic: String?
+    var binding: NASServerSetupBinding?
+}
+
+struct NASServerSetupBinding: Equatable {
+    let endpoint: NASServerEndpoint
+    let identity: NASCredentialIdentity
 }
 
 enum NASServerSetupAction: Equatable {
@@ -52,8 +58,8 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
 
 @MainActor protocol NASMioSaveSetupOwner: AnyObject {
     var mioSaveDirectory: String? { get }
-    func browseMioSaveDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage
-    func setMioSaveDirectory(_ directory: String?) async throws
+    func browseMioSaveDirectories(path: String, cursor: String?, expectedScope: ARLNASReadScope) async throws -> NASDirectoryPage
+    func setMioSaveDirectory(_ directory: String?, expectedScope: ARLNASReadScope) async throws
 }
 
 private struct NASFolderLocation: Equatable {
@@ -66,6 +72,15 @@ private enum NASLocationPurpose: String, Identifiable {
     case read, mio
     var id: Self { self }
     var title: String { self == .read ? "读取位置" : "Mio 保存位置" }
+}
+
+private struct NASLocationSelection: Identifiable {
+    let id = UUID()
+    let purpose: NASLocationPurpose
+    let readLocation: NASFolderLocation?
+    let saveDirectory: String?
+    let scope: ARLNASReadScope?
+    let binding: NASServerSetupBinding?
 }
 
 @MainActor private struct NASFolderPicker: View {
@@ -112,8 +127,13 @@ private enum NASLocationPurpose: String, Identifiable {
             do { try await action() }
             catch is CancellationError {}
             catch {
-                failure = saving ? "无法更改位置，请检查 NAS 连接后重试。"
+                switch error as? ARLNASFault {
+                case .bindingMismatch, .sourceChanged: failure = "NAS 设置已更改，请关闭后重新打开选择器。"
+                case .userCancelled: failure = "NAS 已暂停，请先连接网络硬盘。"
+                case .operationInProgress: failure = "NAS 正在处理其他请求，请稍后重试。"
+                default: failure = saving ? "无法更改位置，请检查 NAS 连接后重试。"
                     : "暂时无法打开此位置，请检查 NAS 连接后重试。"
+                }
             }
         }
     }
@@ -236,7 +256,7 @@ private enum NASLocationPurpose: String, Identifiable {
     @State private var editingLogin=false
     @State private var loginFailure:String?
     @State private var editingDevice=false
-    @State private var locationPurpose: NASLocationPurpose?
+    @State private var locationSelection: NASLocationSelection?
     @State private var readPreviewNeedsRestore=false
     @State private var restoringLocation=false
     @StateObject private var discovery=NASDiscoveryModel()
@@ -253,7 +273,7 @@ private enum NASLocationPurpose: String, Identifiable {
         task=Task {
             let succeeded=await model.run(intent)
             if succeeded, !Task.isCancelled, action == .login, needsReadLocation {
-                locationPurpose = .read
+                chooseLocation(.read)
             }
             setup.refreshCachedStatus()
         }
@@ -318,7 +338,7 @@ private enum NASLocationPurpose: String, Identifiable {
             if model.snapshot.paused {
                 HStack {
                     Label("连接已暂停",systemImage:"pause.circle").foregroundStyle(.secondary)
-                    Spacer();Button("连接网络硬盘") {launch(.login)}
+                    Spacer();Button("连接网络硬盘") {launch(setup.snapshot.readScope == nil ? .login : .restoreSaved)}
                 }
             } else if !model.snapshot.busy,let fault=model.snapshot.fault,setup.snapshot.connected != .verified {
                 HStack(alignment:.top,spacing:12) {
@@ -329,8 +349,8 @@ private enum NASLocationPurpose: String, Identifiable {
                     }
                 }
             }
-            if needsReadLocation && locationPurpose == nil {
-                Button("选择读取位置…") { locationPurpose = .read }.disabled(model.snapshot.busy || restoringLocation)
+            if needsReadLocation && locationSelection == nil {
+                Button("选择读取位置…") { chooseLocation(.read) }.disabled(model.snapshot.busy || restoringLocation)
             }
             if model.snapshot.saved || editingDevice {
                 Divider()
@@ -369,9 +389,9 @@ private enum NASLocationPurpose: String, Identifiable {
         .onChange(of:setup.draft.address) {_ in username="";password=""}
         .onChange(of:setup.draft.port) {_ in username="";password=""}
         .onChange(of:needsReadLocation,initial:true) { _, needed in
-            if needed && locationPurpose == nil && !restoringLocation && !editingDevice { locationPurpose = .read }
+            if needed && locationSelection == nil && !restoringLocation && !editingDevice { chooseLocation(.read) }
         }
-        .sheet(item:$locationPurpose) { purpose in folderPicker(purpose) }
+        .sheet(item:$locationSelection) { selection in folderPicker(selection) }
         .onDisappear {
             username="";password="";discovery.cancel()
         }
@@ -388,10 +408,12 @@ private enum NASLocationPurpose: String, Identifiable {
                     .font(.callout).lineLimit(2).truncationMode(.middle).textSelection(.enabled)
                     .help(location?.display ?? "未设置")
                 Spacer(minLength:0)
-                Button(location == nil ? "选择位置…" : "更改位置…") { locationPurpose = purpose }
+                Button(location == nil ? "选择位置…" : "更改位置…") { chooseLocation(purpose) }
                     .accessibilityLabel((location == nil ? "选择" : "更改") + purpose.title)
                     .controlSize(.small).fixedSize()
-                    .disabled(model.snapshot.busy || restoringLocation || setup.isPerforming)
+                    .disabled(model.snapshot.busy || restoringLocation || setup.isPerforming ||
+                              (purpose == .read && model.snapshot.paused) ||
+                              (purpose == .mio && setup.snapshot.readScope == nil))
             }
         }
     }
@@ -425,14 +447,17 @@ private enum NASLocationPurpose: String, Identifiable {
             setup.refreshCachedStatus()
         }
     }
-    private func closeReadPicker(_ previous: Task<Void,Never>?) {
+    private func closeReadPicker(_ previous: Task<Void,Never>?, binding: NASServerSetupBinding?) {
         guard readPreviewNeedsRestore && !restoringLocation else { return }
         readPreviewNeedsRestore=false
         restoringLocation=true
         task=Task {
             await previous?.value
-            let action:NASServerSetupAction=setup.snapshot.configuration == nil ? .stop : .restoreSaved
-            if let restore=model.begin(action) {await model.run(restore)}
+            model.refresh()
+            if model.snapshot.binding == binding {
+                let action:NASServerSetupAction=setup.snapshot.configuration == nil ? .stop : .restoreSaved
+                if let restore=model.begin(action) {await model.run(restore)}
+            }
             setup.refreshCachedStatus()
             restoringLocation=false
         }
@@ -449,40 +474,48 @@ private enum NASLocationPurpose: String, Identifiable {
     private func joinPath(_ root: String, _ path: String) -> String {
         [root,path].filter { !$0.isEmpty }.joined(separator:"/")
     }
-    @ViewBuilder private func folderPicker(_ purpose: NASLocationPurpose) -> some View {
-        let readLocation = setup.snapshot.configuration.map { NASFolderLocation(share:$0.share,path:$0.root) }
+    private func chooseLocation(_ purpose: NASLocationPurpose) {
+        guard locationSelection == nil else { return }
+        let read = setup.snapshot.configuration.map { NASFolderLocation(share:$0.share,path:$0.root) }
         let saveOwner = model.owner as? any NASMioSaveSetupOwner
-        let saveDirectory = saveOwner?.mioSaveDirectory
-        if purpose == .mio, let boundary = readLocation, let saveOwner {
+        locationSelection = NASLocationSelection(purpose:purpose,readLocation:read,saveDirectory:saveOwner?.mioSaveDirectory,
+                                                 scope:setup.snapshot.readScope,binding:model.snapshot.binding)
+    }
+    @ViewBuilder private func folderPicker(_ selection: NASLocationSelection) -> some View {
+        let purpose = selection.purpose
+        let saveDirectory = selection.saveDirectory
+        let saveOwner = model.owner as? any NASMioSaveSetupOwner
+        if purpose == .mio, let boundary = selection.readLocation, let saveOwner, let scope = selection.scope {
             let initial = NASFolderLocation(share:boundary.share,path:joinPath(boundary.path,saveDirectory ?? ""))
             NASFolderPicker(purpose:purpose,initial:initial,boundary:boundary,hasMioSaveDirectory:saveDirectory != nil,
                 listShares:{ _ in throw ARLNASFault.bindingMismatch },
                 listFolders:{ location, cursor in
                     let relative = try relativePath(location, within:boundary)
-                    let page = try await saveOwner.browseMioSaveDirectories(path:relative,cursor:cursor)
+                    let page = try await saveOwner.browseMioSaveDirectories(path:relative,cursor:cursor,expectedScope:scope)
                     return (page.directories.map { joinPath(boundary.path,$0) }, page.nextCursor)
                 },
                 select:{ location in
-                    try await saveOwner.setMioSaveDirectory(relativePath(location,within:boundary))
+                    try await saveOwner.setMioSaveDirectory(relativePath(location,within:boundary),expectedScope:scope)
                     model.refresh(); setup.refreshCachedStatus()
                 },
-                disableSave:{ try await saveOwner.setMioSaveDirectory(nil); model.refresh(); setup.refreshCachedStatus() },
+                disableSave:{ try await saveOwner.setMioSaveDirectory(nil,expectedScope:scope); model.refresh(); setup.refreshCachedStatus() },
                 close:{ _ in })
         } else if purpose == .read {
-            NASFolderPicker(purpose:purpose,initial:readLocation,boundary:nil,hasMioSaveDirectory:saveDirectory != nil,
-                listShares:readShares,listFolders:{ location, cursor in
-                    let page = try await readFolders(location,cursor)
+            let binding = selection.binding
+            NASFolderPicker(purpose:purpose,initial:selection.readLocation,boundary:nil,hasMioSaveDirectory:saveDirectory != nil,
+                listShares:{ try await readShares($0,binding:binding) },listFolders:{ location, cursor in
+                    let page = try await readFolders(location,cursor,binding:binding)
                     return (page.directories,page.nextCursor)
                 },
                 select:{ location in
                     if model.snapshot.share != location.share || model.snapshot.directory?.path != location.path {
-                        _ = try await readFolders(location,nil)
+                        _ = try await readFolders(location,nil,binding:binding)
                     }
-                    try await readAction(.authorize(share:location.share,path:location.path,wholeShare:location.path.isEmpty))
+                    try await readAction(.authorize(share:location.share,path:location.path,wholeShare:location.path.isEmpty),binding:binding)
                     readPreviewNeedsRestore=false
                     setup.refreshCachedStatus()
                 },
-                disableSave:{},close:closeReadPicker)
+                disableSave:{},close:{ closeReadPicker($0,binding:binding) })
         }
     }
     private func relativePath(_ location: NASFolderLocation, within boundary: NASFolderLocation) throws -> String {
@@ -493,26 +526,28 @@ private enum NASLocationPurpose: String, Identifiable {
         guard location.path.hasPrefix(prefix) else { throw ARLNASFault.bindingMismatch }
         return String(location.path.dropFirst(prefix.count))
     }
-    private func readAction(_ action: NASServerSetupAction) async throws {
+    private func readAction(_ action: NASServerSetupAction, binding: NASServerSetupBinding?) async throws {
         try Task.checkCancellation()
+        model.refresh()
+        guard binding != nil, model.snapshot.binding == binding else { throw ARLNASFault.bindingMismatch }
         guard let intent = model.begin(action) else { throw model.snapshot.fault ?? ARLNASFault.operationInProgress }
         readPreviewNeedsRestore=true
         guard await model.run(intent) else { throw model.snapshot.fault ?? ARLNASFault.connectionFailed }
         try Task.checkCancellation()
     }
-    private func readShares(_ cursor: String?) async throws -> (names:[String], nextCursor:String?) {
-        if !model.snapshot.state.authenticated { try await readAction(.login) }
-        try await readAction(.shares(cursor:cursor))
+    private func readShares(_ cursor: String?, binding: NASServerSetupBinding?) async throws -> (names:[String], nextCursor:String?) {
+        if !model.snapshot.state.authenticated { try await readAction(.login,binding:binding) }
+        try await readAction(.shares(cursor:cursor),binding:binding)
         return (model.snapshot.state.shares.map(\.name), model.snapshot.state.nextCursor)
     }
-    private func readFolders(_ location: NASFolderLocation, _ cursor: String?) async throws -> NASDirectoryPage {
+    private func readFolders(_ location: NASFolderLocation, _ cursor: String?, binding: NASServerSetupBinding?) async throws -> NASDirectoryPage {
         if !model.snapshot.state.authenticated || !model.snapshot.state.shares.contains(where: { $0.name == location.share }) {
-            var shares = try await readShares(nil)
+            var shares = try await readShares(nil,binding:binding)
             while !shares.names.contains(location.share), let next = shares.nextCursor {
-                shares = try await readShares(next)
+                shares = try await readShares(next,binding:binding)
             }
         }
-        try await readAction(.directory(share:location.share,path:location.path,cursor:cursor))
+        try await readAction(.directory(share:location.share,path:location.path,cursor:cursor),binding:binding)
         guard let page = model.snapshot.directory else { throw ARLNASFault.locationMissing }
         return page
     }
