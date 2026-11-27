@@ -6,7 +6,7 @@ from .contracts import CHUNK_BYTES, MAX_BYTES, UploadFault
 
 
 class SealedSource:
-    def __init__(self, owned_fd, *, verify_pin):
+    def __init__(self, owned_fd, *, verify_pin, unlinked=False):
         self.fd = -1
         try:
             if type(owned_fd) is not int or owned_fd < 0 or not callable(verify_pin):
@@ -15,7 +15,7 @@ class SealedSource:
             self._verify_pin = verify_pin
             record = os.fstat(self.fd)
             if (not stat.S_ISREG(record.st_mode) or record.st_uid != os.getuid()
-                    or record.st_mode & 0o022 or record.st_nlink != 1):
+                    or record.st_mode & 0o022 or record.st_nlink != (0 if unlinked else 1)):
                 raise UploadFault('source_changed')
             if not 0 <= record.st_size <= MAX_BYTES:
                 raise UploadFault('source_too_large')

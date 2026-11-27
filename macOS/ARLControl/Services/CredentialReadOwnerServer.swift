@@ -126,11 +126,13 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
                     (error as? MusicReadRuntimeFailure) == .cleanupUnproven ? .cleanupUnproven :
                     (error as? CredentialError) == .busy ? .busy :
                     error is CancellationError ? .cancelled : (error as? OwnerReadFault) ?? .provider
-                do {
-                    let body = try JSONSerialization.data(withJSONObject: ["state":"owner_failed","failure_stage":"owner","error":fault.rawValue])
-                    try await service.recordMusicBoundary(tool: request.tool, callID: UUID(uuidString:request.callID)!,
-                                                          argumentsJSON: request.argumentsJSON, responseJSON: body, elapsedMS: max(0,Int((ProcessInfo.processInfo.systemUptime-started)*1000)))
-                } catch { fault = .businessLogUnavailable }
+                if !NASMioSaveCapability.names.contains(request.tool) {
+                    do {
+                        let body = try JSONSerialization.data(withJSONObject: ["state":"owner_failed","failure_stage":"owner","error":fault.rawValue])
+                        try await service.recordMusicBoundary(tool: request.tool, callID: UUID(uuidString:request.callID)!,
+                                                              argumentsJSON: request.argumentsJSON, responseJSON: body, elapsedMS: max(0,Int((ProcessInfo.processInfo.systemUptime-started)*1000)))
+                    } catch { fault = .businessLogUnavailable }
+                }
                 result.complete(.failure(fault))
             }
         }
@@ -196,7 +198,7 @@ final class CredentialReadOwnerServer: @unchecked Sendable {
     // Decoding and projection stay native. The socket cannot select a key,
     // credential reference, purpose, API path or vendor command.
     private static func dispatch(_ request: OwnerReadRequest, service: CredentialOnboarding, appleCall: AppleCall?, nasCall: NASCall?) async throws -> Data {
-        if NASCapability.names.contains(request.tool) {
+        if NASCapability.names.contains(request.tool) || NASMioSaveCapability.names.contains(request.tool) {
             guard let nasCall else { throw OwnerReadFault.held }
             return try await nasCall(request)
         }

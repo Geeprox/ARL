@@ -8,7 +8,8 @@
     "apple_reminders_task",
     "nas_saved_scope_read",
     "apple_product_v1",
-    "music_playlist_cover"
+    "music_playlist_cover",
+    "mio_nas_save_new"
   ],
   "executionAllowed": true,
   "mio": {

@@ -256,6 +256,7 @@ class NativeRuntimeHost:
         self.last_health = 0.
         self.file_sequence, self.file_calls = 1, 0
         self.file_reader = None
+        self.upload_source = None
 
     async def connect(self, bootstrap):
         if set(bootstrap) != {"kind", "id", "nonce", "caller", "config", "credential_generation", "config_generation"}:
@@ -363,6 +364,9 @@ class NativeRuntimeHost:
             if len(json.dumps(result, ensure_ascii=False).encode()) > FILE_OUTPUT:
                 raise NASConnectionError("nas_budget_exceeded")
             return result
+        if frame.get("kind") == "stage_attachment":
+            from nas_upload_host import stage_attachment
+            return await stage_attachment(self, frame)
         if frame.get("kind") == "upload_new":
             from nas_upload_host import upload_new
             return await upload_new(self, frame)
@@ -425,6 +429,9 @@ class NativeRuntimeHost:
             self.monitor.cancel()
             self.monitor = None
         self.file_reader = None
+        if self.upload_source is not None:
+            self.upload_source[3].close()
+            self.upload_source = None
         connection, self.connection = self.connection, None
         if connection is not None:
             connection.credentials.cancel()

@@ -131,6 +131,88 @@ enum NASCapability {
     }
 }
 
+enum NASMioSaveCapability {
+    static let save = "mio_nas_save_attachment"
+    static let status = "mio_nas_save_status"
+    static let names: Set<String> = [save, status]
+    static var descriptors: [[String: Any]] {
+        [save, status].map { tool in
+            let saving = tool == save
+            var fields: [String: Any] = ["operation_id": ["type":"string", "format":"uuid"]]
+            var metadata: [String: Any] = ["arl/capability":"mio_nas_save_new","arl/version":1]
+            if saving {
+                fields["file"] = ["type":"object","additionalProperties":false,
+                    "required":["download_url","file_id"],
+                    "properties":["download_url":["type":"string"],"file_id":["type":"string"],
+                                  "file_name":["type":"string"],"mime_type":["type":"string"]]]
+                fields["name"] = ["type":"string","maxLength":255,"description":"Optional new basename when requested by the user. Defaults to the original attachment name."]
+                metadata["openai/fileParams"] = ["file"]
+            }
+            return ["name":tool,"title":saving ? "Save attachment to NAS" : "Check NAS save",
+                "description":saving
+                    ? "Use only when the user asks to save a selected ChatGPT attachment. Creates one new file in the only folder authorized in ARL. Preserves original bytes. Never overwrites. Use a new UUID for a new user request. After a timeout, check mio_nas_save_status with the original operation_id; do not automatically resubmit."
+                    : "Use to look up the original NAS save operation_id after an interruption. This does not write or retry. An unconfirmed result does not prove the file is absent.",
+                "inputSchema":["type":"object","additionalProperties":false,"properties":fields,
+                               "required":saving ? ["operation_id","file"] : ["operation_id"]],
+                "annotations":["readOnlyHint": !saving,"destructiveHint":false,"idempotentHint":true,"openWorldHint":true],
+                "_meta":metadata]
+        }
+    }
+    struct Request: Sendable {
+        let operationID: UUID
+        let name: String?
+        let fileID: String?
+        let attachment: Data?
+    }
+    static func request(_ tool: String, _ input: Data) throws -> Request {
+        let args = try OwnerReadJSON.object(input, limit: 32768)
+        guard names.contains(tool), let operation = args["operation_id"] as? String,
+              let id = UUID(uuidString: operation), id.uuidString.lowercased() == operation
+        else { throw OwnerReadFault.invalid }
+        if tool == status {
+            guard Set(args.keys) == ["operation_id"] else { throw OwnerReadFault.invalid }
+            return Request(operationID:id,name:nil,fileID:nil,attachment:nil)
+        }
+        guard Set(args.keys).isSubset(of:["operation_id","file","name"]),
+              let file = args["file"] as? [String:Any],
+              Set(file.keys).isSubset(of:["download_url","file_id","file_name","mime_type"]),
+              let idText = file["file_id"] as? String, NASCapability.matches(idText, "^file[-_][A-Za-z0-9_-]{1,128}$"),
+              let url = file["download_url"] as? String, (1...16384).contains(url.utf8.count),
+              ["file_name","mime_type"].allSatisfy({file[$0] == nil || file[$0] is String}),
+              args["name"] == nil || args["name"] is String,
+              let name = (args["name"] ?? file["file_name"]) as? String,
+              (1...255).contains(name.utf8.count), !name.contains("/"), !name.contains("\\"),
+              !name.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
+        else { throw OwnerReadFault.invalid }
+        return Request(operationID:id,name:name,fileID:idText,attachment:try OwnerReadWire.encode(file,limit:32768))
+    }
+    static func reply(_ request: Request, state: String, code: String? = nil,
+                      path: String? = nil, size: Int? = nil, sha256: String? = nil) throws -> Data {
+        var value: [String:Any] = ["operation_id":request.operationID.uuidString.lowercased(),"state":state]
+        if let code { value["code"] = NASCapability.matches(code, "^[a-z_]{1,80}$") ? code : "nas_unavailable" }
+        if let path, let size, let sha256 {
+            value["path"] = path; value["size"] = size; value["sha256"] = sha256
+        }
+        return try OwnerReadWire.encode(value,limit:8192)
+    }
+    static func admit(_ value:[String:Any], request:Request) throws -> Bool {
+        guard value["operation_id"] as? String == request.operationID.uuidString.lowercased(),
+              let state = value["state"] as? String else { throw OwnerReadFault.invalid }
+        if state == "saved" {
+            guard Set(value.keys) == ["operation_id","state","path","size","sha256"],
+                  let path = value["path"] as? String, !path.isEmpty,
+                  request.name == nil || path.split(separator:"/").last.map(String.init) == request.name,
+                  let size = NASCapability.integer(value["size"]), (0...NASDownloadCapability.fileBytes).contains(size),
+                  NASCapability.matches(value["sha256"], "^[a-f0-9]{64}$")
+            else { throw OwnerReadFault.invalid }
+            return true
+        }
+        guard Set(value.keys) == ["operation_id","state","code"],
+              ["failed","uncertain","missing"].contains(state), NASCapability.matches(value["code"], "^[a-z_]{1,80}$")
+        else { throw OwnerReadFault.invalid }
+        return false
+    }
+}
 
 /// Two read-only tools over the existing native read scope. No URL importer,
 /// persistent scope issuer, mutation permit or platform artifact publisher.

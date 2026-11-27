@@ -3,6 +3,7 @@ import Foundation
 // Unused catalog membership only. The test compiles the real wire, authority,
 // peer verifier, transport and logger; it never loads an installed authority.
 enum NASCapability { static let names: Set<String> = ["mio_nas_read_text"] }
+enum NASMioSaveCapability { static let names: Set<String> = ["mio_nas_save_attachment","mio_nas_save_status"] }
 enum AppleCapability {
     static let reminderCreate = "mio_reminders_create"
     static let names: Set<String> = [reminderCreate]

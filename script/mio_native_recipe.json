@@ -9,7 +9,7 @@
   "sources": [
     {
       "path": "integrations/mio_apple/Consumer.swift",
-      "sha256": "660dda8c31a05a17963b8f9a37725305c731841b2644b3afa0bd76e1f77fe94b"
+      "sha256": "c3436644a79cb1aa12b8736ce52fdb5aa1185faff7fb758fa85da616e998d4b6"
     },
     {
       "path": "integrations/mio_apple/Host.swift",
@@ -21,7 +21,7 @@
     },
     {
       "path": "integrations/mio_apple/MioReadOwnerAdapter.swift",
-      "sha256": "da2c6edb25b0f1857a3ea37993b8f524443471c75e05cbda3c733e5496427faf"
+      "sha256": "19be93b88705fb5407b9b67795d0b911c0dda027eb7bb8b3973bad73eeec49a3"
     },
     {
       "path": "integrations/mio_apple/NativeSetupReview.swift",
@@ -77,7 +77,7 @@
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadAuthority.swift",
-      "sha256": "9da0380ea1c036eec6030beeb7eab4b24966e2fd20eb2b8ae415e31d8fd41fb2"
+      "sha256": "1cfbf345cd965c45a27f14358b7f438eaf7e624a155b9926d29d0a9562b2876d"
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadTransport.swift",
@@ -85,7 +85,7 @@
     },
     {
       "path": "integrations/credential_read_owner/OwnerReadWire.swift",
-      "sha256": "981f1db5cb838077868f1f3c0211c7d2d3c3b34a5762911154d584cfd7d20961"
+      "sha256": "2aec4e6c7ee620e8c8456a6a761ff89de60d85d9fddcd7421e023b2e6c46278d"
     },
     {
       "path": "integrations/credential_read_owner/AppleCapability.swift",
@@ -93,7 +93,7 @@
     },
     {
       "path": "integrations/credential_read_owner/NASCapability.swift",
-      "sha256": "480c402a530d8bd87ff8d13b032133aa7a1d548dc52f5aab0fdf0e5d69f38ebb"
+      "sha256": "f84fbef2bbb5b7737e69d96cacc01d41fa2f5eb42615af805c6557d19463f169"
     },
     {
       "path": "integrations/credential_read_owner/AppleProductCapability.swift",

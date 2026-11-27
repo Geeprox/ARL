@@ -10,13 +10,14 @@ func identifier(_ text: String) -> Bool { text.utf8.count <= 64 && text.range(of
 func uuid(_ text: String) -> Bool { UUID(uuidString: text)?.uuidString.lowercased() == text }
 
 public final class NASUploadProposal: Sendable, Identifiable {
-    public let id = UUID()
+    public let id: UUID
     public let configuration: NASConnectionConfiguration
     public let identity: NASCredentialIdentity
     public let target: String
     public let text: String
-    public var bytes: Int { text.utf8.count }
-    public var sha256: String { digest(Data(text.utf8)) }
+    public let bytes: Int
+    public let sha256: String
+    let staged: Bool
     let expires = ProcessInfo.processInfo.systemUptime + 120
     init(configuration: NASConnectionConfiguration, identity: NASCredentialIdentity, directory: String) throws {
         guard !directory.isEmpty, directory.utf8.count <= 900 else { throw CredentialError.invalidInput }
@@ -26,9 +27,32 @@ public final class NASUploadProposal: Sendable, Identifiable {
                   part.range(of: #"^[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil,
                   !reserved.contains(part.split(separator: ".").first?.uppercased() ?? "") else { throw CredentialError.invalidInput }
         }
+        id = UUID()
         self.configuration = configuration; self.identity = identity
         target = directory + "/arl-test-" + id.uuidString.lowercased() + ".txt"
         text = "ARL NAS connection test\nOperation: " + id.uuidString.lowercased() + "\n"
+        bytes = text.utf8.count; sha256 = digest(Data(text.utf8)); staged = false
+    }
+    static func validateTarget(_ target: String) throws {
+        let reserved = ["CON","PRN","AUX","NUL"] + (1...9).flatMap { ["COM\($0)","LPT\($0)"] }
+        guard (1...1024).contains(target.utf8.count),
+              target.split(separator: "/", omittingEmptySubsequences: false).allSatisfy({ part in
+                  (1...255).contains(part.utf8.count) && part != "." && part != ".."
+                      && !part.hasSuffix(".") && !part.hasSuffix(" ")
+                      && !part.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 })
+                      && !part.contains(where: { "\\:*?\"<>|".contains($0) })
+                      && !reserved.contains(String(part.prefix(while: { $0 != "." })).uppercased())
+              }) else { throw CredentialError.invalidInput }
+    }
+    init(id: UUID, configuration: NASConnectionConfiguration, identity: NASCredentialIdentity,
+         target: String, bytes: Int, sha256: String) throws {
+        try Self.validateTarget(target)
+        guard (0...9_007_199_254_740_991).contains(bytes),
+              sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil
+        else { throw CredentialError.invalidInput }
+        self.id = id; self.configuration = configuration; self.identity = identity
+        self.target = target; self.bytes = bytes; self.sha256 = sha256
+        text = ""; staged = true
     }
 }
 
@@ -37,6 +61,19 @@ public struct NASUploadResult: Sendable {
     public let failure: String?
     public var committed: Bool { status == "committed" && failure == nil }
     public init(status: String, failure: String?) { self.status = status; self.failure = failure }
+}
+
+struct NASAttachmentStage: Sendable {
+    let size: Int
+    let sha256: String
+}
+
+public struct NASAttachmentFailure: Error, Sendable { public let code: String }
+
+public struct NASAttachmentSaveResult: Sendable {
+    public let result: NASUploadResult
+    public let size: Int
+    public let sha256: String
 }
 
 final class NASUploadAuthorization: @unchecked Sendable {
@@ -62,7 +99,11 @@ final class NASUploadAuthorization: @unchecked Sendable {
         plan = ["operation_id": proposal.id.uuidString.lowercased(), "permit_id": UUID().uuidString.lowercased(),
             "scope_hash": digest(bytes), "namespace_hash": namespace, "credential_generation": generation,
             "registration_epoch": epoch, "target": proposal.target, "size": proposal.bytes, "sha256": proposal.sha256]
-        planDigest = digest(try JSONSerialization.data(withJSONObject: plan, options: [.sortedKeys, .withoutEscapingSlashes]))
+        let planJSON = try JSONSerialization.data(withJSONObject: plan, options: [.sortedKeys, .withoutEscapingSlashes])
+        let canonical = String(decoding: planJSON, as: UTF8.self).utf16.map {
+            $0 > 127 ? String(format: "\\u%04x", $0) : String(UnicodeScalar($0)!)
+        }.joined()
+        planDigest = digest(Data(canonical.utf8))
         // Created only after exact native user confirmation; never at construction/status.
         let parent = try MusicRuntimeResources.directory(directory.deletingLastPathComponent().path)
         defer { Darwin.close(parent) }

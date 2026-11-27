@@ -50,6 +50,95 @@ enum NASServerSetupAction: Equatable {
 
 extension NASServerSetupOwner { func maintainServerConnection() async {} }
 
+@MainActor protocol NASMioSaveSetupOwner: AnyObject {
+    var mioSaveLocation: String? { get }
+    func browseMioSaveDirectories(path: String, cursor: String?) async throws -> NASDirectoryPage
+    func setMioSaveDirectory(_ directory: String?) async throws
+}
+
+@MainActor private struct NASMioSaveFolderSheet: View {
+    let owner: any NASMioSaveSetupOwner
+    let root: String
+    let onChange: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var path = ""
+    @State private var directories: [String] = []
+    @State private var cursor: String?
+    @State private var busy = false
+    @State private var loaded = false
+    @State private var failure: String?
+
+    private func load(_ path: String, cursor: String? = nil) async {
+        busy = true; failure = nil
+        defer { busy = false }
+        do {
+            let page = try await owner.browseMioSaveDirectories(path:path,cursor:cursor)
+            try Task.checkCancellation()
+            self.path = page.path
+            directories = cursor == nil ? page.directories : directories + page.directories.filter{!directories.contains($0)}
+            self.cursor = page.nextCursor; loaded = true
+        } catch is CancellationError {} catch { failure = "暂时无法读取文件夹，请检查 NAS 连接后重试。" }
+    }
+
+    var body: some View {
+        VStack(alignment:.leading,spacing:16) {
+            Text("Mio 保存位置").font(.headline)
+            Text("Mio 可以在所选文件夹中新建文件。已有文件不会被覆盖。").foregroundStyle(.secondary)
+            HStack {
+                if !path.isEmpty {
+                    Button("上一级",systemImage:"chevron.up") {
+                        let parent = path.split(separator:"/").dropLast().joined(separator:"/")
+                        Task { await load(parent) }
+                    }
+                }
+                Label([root,path].filter{!$0.isEmpty}.joined(separator:"/"),systemImage:"folder")
+                    .lineLimit(2).truncationMode(.head)
+                Spacer()
+                if busy { ProgressView().controlSize(.small).accessibilityLabel("正在读取网络硬盘") }
+            }
+            if let failure { Text(failure).foregroundStyle(.secondary) }
+            if failure != nil && !loaded {
+                Button("重试") { Task { await load(path) } }.disabled(busy)
+            }
+            if loaded && !directories.isEmpty {
+                List(directories,id:\.self) { folder in
+                    Button {
+                        Task { await load(folder) }
+                    } label: {
+                        HStack {
+                            Label(String(folder.split(separator:"/").last ?? ""),systemImage:"folder")
+                            Spacer()
+                            Image(systemName:"chevron.right").foregroundStyle(.secondary).accessibilityHidden(true)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }.frame(minHeight:110,maxHeight:220)
+            }
+            if let cursor { Button("显示更多文件夹") { Task { await load(path,cursor:cursor) } }.disabled(busy) }
+            HStack {
+                if owner.mioSaveLocation != nil {
+                    Button("关闭 Mio 保存") { apply(nil) }.disabled(busy)
+                }
+                Spacer()
+                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button("选定此文件夹") { apply(path) }
+                    .keyboardShortcut(.defaultAction).disabled(busy || !loaded)
+            }
+        }
+        .padding(24).frame(minWidth:420,idealWidth:500,maxWidth:640)
+        .task { await load("") }
+    }
+
+    private func apply(_ directory: String?) {
+        busy = true; failure = nil
+        Task {
+            defer { busy = false }
+            do { try await owner.setMioSaveDirectory(directory); onChange(); dismiss() }
+            catch { failure = "无法更新 Mio 保存位置，请检查 NAS 连接后重试。" }
+        }
+    }
+}
+
 @MainActor protocol NASArchivePickerOwner: NASServerSetupOwner {
     func archiveDestination() async throws -> NASArchiveDestination
     func connectArchive(_ destination: NASArchiveDestination) async throws -> NASArchiveMount
@@ -81,6 +170,7 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
     @State private var editingDevice=false
     @State private var choosingLocation=false
     @State private var restoringLocation=false
+    @State private var choosingMioSaveFolder=false
     @StateObject private var discovery=NASDiscoveryModel()
     @State private var task:Task<Void,Never>?
     @State private var taskIsPreview=false
@@ -142,6 +232,24 @@ extension NASServerSetupOwner { func maintainServerConnection() async {} }
                                 Label(configuration.share+(configuration.root.isEmpty ? " / 全部文件夹":" / "+configuration.root),systemImage:"folder").lineLimit(2).textSelection(.enabled)
                                 Spacer()
                                 Button("更改位置") {choosingLocation=true;launch(.login)}.controlSize(.small).disabled(model.snapshot.busy || restoringLocation)
+                            }
+                        }
+                        if let saveOwner = model.owner as? any NASMioSaveSetupOwner {
+                            GridRow {
+                                rowTitle("Mio 保存位置")
+                                HStack(spacing:10) {
+                                    Text(saveOwner.mioSaveLocation ?? "未设置").font(.callout).lineLimit(2)
+                                    Spacer()
+                                    Button(saveOwner.mioSaveLocation == nil ? "选取文件夹" : "管理") {
+                                        choosingMioSaveFolder = true
+                                    }
+                                    .controlSize(.small).disabled(model.snapshot.busy || restoringLocation)
+                                }
+                                .sheet(isPresented:$choosingMioSaveFolder) {
+                                    NASMioSaveFolderSheet(owner:saveOwner,
+                                        root:[configuration.share,configuration.root].filter{!$0.isEmpty}.joined(separator:"/"),
+                                        onChange:{model.refresh();setup.refreshCachedStatus()})
+                                }
                             }
                         }
                     }

@@ -217,7 +217,8 @@ private final class NASOwnedPipe: @unchecked Sendable {
     }
     func exchange(_ action: String, upload: NASUploadProposal? = nil, journalDirectory: URL? = nil,
                   directoryPath: String? = nil, directoryCursor: String? = nil, serverShare: String? = nil,
-                  fileRequest: NASFileRequest? = nil, acceptancePhase: NASAcceptancePhase? = nil) throws -> [String: Any] {
+                  fileRequest: NASFileRequest? = nil, acceptancePhase: NASAcceptancePhase? = nil,
+                  attachment: Data? = nil, operationID: UUID? = nil) throws -> [String: Any] {
         try exchangeLock.withLock {
             try verify()
             if endpoint != nil {
@@ -250,7 +251,7 @@ private final class NASOwnedPipe: @unchecked Sendable {
             let id = sequence
             // A file request composes several separately timed SMB calls and native
             // authorization callbacks. Its total budget never extends this pipe lease.
-            let requestSeconds = ["files", "connect", "acceptance"].contains(action) ? 90.0 : Double((config?.timeoutSeconds ?? endpoint?.timeoutSeconds ?? 8) + 10)
+            let requestSeconds = ["files", "connect", "acceptance", "stage_attachment", "upload_new"].contains(action) ? 90.0 : Double((config?.timeoutSeconds ?? endpoint?.timeoutSeconds ?? 8) + 10)
             let until = min(deadline, ProcessInfo.processInfo.systemUptime + requestSeconds)
             var frame: [String: Any] = ["kind": action, "id": id, "nonce": nonce]
             if let acceptanceAuthorization {
@@ -262,6 +263,12 @@ private final class NASOwnedPipe: @unchecked Sendable {
                 guard config != nil, endpoint == nil, action == "files", upload == nil else { throw CredentialError.wrongPurpose }
                 frame["request"] = try MusicStrictJSON.object(fileRequest.wireJSON, limit: 16384)
             }
+            if let attachment, let operationID {
+                guard config != nil, endpoint == nil, action == "stage_attachment", upload == nil
+                else { throw CredentialError.wrongPurpose }
+                frame["file"] = try MusicStrictJSON.object(attachment, limit: 32768)
+                frame["operation_id"] = operationID.uuidString.lowercased()
+            }
             if let directoryPath {
                 guard action == "directories" || action == "preview_directories" else { throw CredentialError.invalidInput }
                 try NASDirectoryPage.validatePath(directoryPath)
@@ -272,7 +279,8 @@ private final class NASOwnedPipe: @unchecked Sendable {
             }
             if let uploadAuthorization {
                 frame["plan"] = uploadAuthorization.plan
-                frame["source"] = Data(uploadAuthorization.proposal.text.utf8).base64EncodedString()
+                if uploadAuthorization.proposal.staged { frame["staged"] = true }
+                else { frame["source"] = Data(uploadAuthorization.proposal.text.utf8).base64EncodedString() }
                 frame["journal"] = uploadAuthorization.journalDescriptor
             }
             if action == "connect" {
@@ -480,6 +488,25 @@ final class NASRuntimeClient: NASConnectionRuntime, @unchecked Sendable {
                       value["content_sha256"] as? String == proposal.sha256 else { throw CredentialError.uncertainLocalState }
             }
             return .init(status: status, failure: value["failure"] as? String)
+        } onCancel: { current.stop() }
+    }
+    func stageAttachment(_ attachment: Data, operationID: UUID) async throws -> NASAttachmentStage {
+        guard let current = lock.withLock({ pipe }) else { throw CredentialError.missing }
+        return try await withTaskCancellationHandler {
+            try await Task.detached {
+                let result = try current.exchange("stage_attachment", attachment: attachment, operationID: operationID)
+                if Set(result.keys) == ["error"], let code = result["error"] as? String,
+                   code.range(of: "^(attachment_[a-z_]+|invalid_import_request)$", options: .regularExpression) != nil {
+                    throw NASAttachmentFailure(code: code)
+                }
+                guard Set(result.keys) == ["size","sha256"],
+                      let size = MusicRuntimeResources.integer(result["size"]),
+                      (0...9_007_199_254_740_991).contains(size),
+                      let sha = result["sha256"] as? String,
+                      sha.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+                else { throw CredentialError.uncertainLocalState }
+                return NASAttachmentStage(size: size, sha256: sha)
+            }.value
         } onCancel: { current.stop() }
     }
     func fixedAcceptance(_ phase: NASAcceptancePhase) async throws -> Data {

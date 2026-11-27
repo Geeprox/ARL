@@ -31,10 +31,13 @@ enum TestFailure: Error { case failed(String) }
         try expect(try json(MioAttachmentInspection.descriptor)==json(descriptor),"Python canonical descriptor preserved")
         let list=try MioReadOwnerAdapter.respond(["jsonrpc":"2.0","id":1,"method":"tools/list"])
         let tools=(list["result"] as! [String:Any])["tools"] as! [[String:Any]]
-        try expect(tools.count==84,"81 preserved plus three reviewed new tools")
+        try expect(tools.count==86,"84 preserved plus the NAS save and status tools")
+        let saver=tools.first { $0["name"] as? String == NASMioSaveCapability.save }
+        try expect((saver?["_meta"] as? [String:Any])?["openai/fileParams"] as? [String] == ["file"],"platform file input")
+        try expect((saver?["annotations"] as? [String:Bool])?["readOnlyHint"] == false,"save declared as write")
         try expect(tools.last?["name"] as? String==MioAttachmentInspection.name,"inspector appended")
         let baseline=try JSONSerialization.jsonObject(with:Data(contentsOf:URL(fileURLWithPath:args[4]))) as! [[String:Any]]
-        let additions=NASFileReaderContract.names.union([MioAttachmentInspection.name])
+        let additions=NASFileReaderContract.names.union(NASMioSaveCapability.names).union([MioAttachmentInspection.name])
         let preserved=tools.filter{!additions.contains($0["name"] as? String ?? "")}
         try expect(try json(preserved)==json(baseline),"all original81 descriptors byte-equivalent as JSON")
         try validateMioPublishedDescriptors(tools)

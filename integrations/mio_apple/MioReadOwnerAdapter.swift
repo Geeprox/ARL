@@ -62,6 +62,7 @@ enum MioReadOwnerAdapter {
             for descriptor in AppleCapability.descriptors { try registry.append(descriptor) }
             for descriptor in AppleProductCapability.descriptors {try registry.append(descriptor)}
             for descriptor in NASCapability.descriptors { try registry.append(descriptor) }
+            for descriptor in NASMioSaveCapability.descriptors { try registry.append(descriptor) }
             try registry.append(MioAttachmentInspection.descriptor)
             result = ["tools": registry.tools]
         case "tools/call":
@@ -70,6 +71,19 @@ enum MioReadOwnerAdapter {
             else { return invalidParams(id) }
             if name == MioAttachmentInspection.name {
                 return try MioAttachmentInspection.respond(id: id, arguments: arguments, cancelled: cancelled, execute: attachmentCall)
+            }
+            if NASMioSaveCapability.names.contains(name) {
+                let input = try OwnerReadWire.encode(arguments,limit:32768)
+                guard let request = try? NASMioSaveCapability.request(name,input) else { return invalidParams(id) }
+                let bytes: Data
+                do { bytes = try callOwner(name,input) }
+                catch {
+                    bytes = try NASMioSaveCapability.reply(request,state:"uncertain",code:"check_original_operation")
+                }
+                let value = try OwnerReadJSON.object(bytes,limit:8192)
+                let saved = try NASMioSaveCapability.admit(value,request:request)
+                return ["jsonrpc":"2.0","id":id,"result":["content":[["type":"text","text":String(decoding:bytes,as:UTF8.self)]],
+                        "structuredContent":value,"isError":!saved]]
             }
             if AppleProductCapability.names.contains(name) {
                 return try respondAppleProduct(name:name,arguments:arguments,id:id,callOwner:callOwner)

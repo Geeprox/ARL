@@ -298,8 +298,8 @@ def preflight(args, root=ROOT):
     require(set(read_owner) == {'schema','executionAllowed','reviewID','owner','mio','capabilities'}
             and read_owner['schema'] == 2 and read_owner['executionAllowed'] is True
             and read_owner['owner'] == original_read_owner['owner'] and read_owner['mio'] == original_read_owner['mio']
-            and set(read_owner['capabilities']) == {'travel_read','music_read','music_status','music_playlist_create','music_playlist_append','music_playlist_cover','apple_reminders_task','nas_saved_scope_read','apple_product_v1'}
-            and len(read_owner['capabilities']) == 9, 'read-owner 有限能力迁移不匹配')
+            and set(read_owner['capabilities']) == {'travel_read','music_read','music_status','music_playlist_create','music_playlist_append','music_playlist_cover','apple_reminders_task','nas_saved_scope_read','apple_product_v1','mio_nas_save_new'}
+            and len(read_owner['capabilities']) == 10, 'read-owner 有限能力迁移不匹配')
     import uuid
     require(type(read_owner['reviewID']) is str, 'read-owner reviewID 无效')
     try: uuid.UUID(read_owner['reviewID'])

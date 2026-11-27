@@ -28,6 +28,14 @@ func validateMioPublishedDescriptors(_ published: [[String: Any]]) throws {
     }
     guard !tools.contains(where: { $0["name"] as? String == MioAttachmentInspection.name })
     else { throw ReviewFault("capability_schema_changed") }
+    let saves = NASMioSaveCapability.descriptors
+    if let name = tools.last?["name"] as? String, NASMioSaveCapability.names.contains(name) {
+        guard tools.count >= saves.count, try jsonBytes(Array(tools.suffix(saves.count))) == jsonBytes(saves)
+        else { throw ReviewFault("capability_schema_changed") }
+        tools.removeLast(saves.count)
+    }
+    guard !tools.contains(where: { NASMioSaveCapability.names.contains($0["name"] as? String ?? "") })
+    else { throw ReviewFault("capability_schema_changed") }
     if let last=tools.last?["name"] as? String,NASCapability.names.contains(last) {
         let count=NASCapability.descriptors.count
         guard tools.count>=count,try jsonBytes(Array(tools.suffix(count)))==jsonBytes(NASCapability.descriptors)
