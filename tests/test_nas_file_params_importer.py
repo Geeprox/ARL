@@ -114,6 +114,16 @@ class Checks(unittest.TestCase):
         with self.transport(response(b"raw")):a=self.fetch(v)
         self.assertEqual((a.name,a.data),("attachment.bin",b"raw"))
 
+    def test_file_id_is_opaque_and_does_not_select_the_download_url(self):
+        original = payload()
+        original["file"]["file_id"] = "file-service://opaque_platform_reference"
+        value = {key: original[key] for key in ("operation_id", "file")}
+        with self.transport(response(b"raw")):
+            receipt = imp.inspect_attachment(value, verify=lambda: None)
+        self.assertEqual(receipt["file_id"], original["file"]["file_id"])
+        self.assertEqual(receipt["sha256"], bridge.digest(b"raw"))
+        self.assertIn(b"GET /file_synthetic?sig=synthetic ", self.sockets[0].sent[0])
+
     def test_save_path_streams_large_attachment_to_unlinked_source(self):
         from arl_nas_upload_new.source import SealedSource
         raw = b"\x89PNG\r\n\x1a\n" + (bytes(range(256)) * 8200)
@@ -137,7 +147,7 @@ class Checks(unittest.TestCase):
             with self.assertRaises(bridge.BridgeFault):imp.file_param(v)
         for ref in ("https://example.com/f","http://files.oaiusercontent.com/f","file:///tmp/f",
                     "https://files.oaiusercontent.com.evil/f","https://user@files.oaiusercontent.com/f",
-                    "https://files.oaiusercontent.com:443/f","https://files.oaiusercontent.com./f",
+                    "https://files.oaiusercontent.com:444/f","https://files.oaiusercontent.com./f",
                     "https://127.0.0.1/f","https://files.oaiusercontent.com/f#fragment",
                     "https://files.oaiusercontent.com/a\r\nb","https://files.oaiusercontent.com/ü"):
             with self.subTest(ref=ref):self.fault("attachment_origin_unsupported",lambda:imp.file_param(dict(file_id="file_x",download_url=ref)))
@@ -147,6 +157,13 @@ class Checks(unittest.TestCase):
             value=payload()["file"];value[k]=v
             with self.assertRaises(bridge.BridgeFault):imp.file_param(value)
         self.assertNotIn("sig=",repr(imp.file_param(payload()["file"])))
+
+    def test_uses_the_platform_file_subdomain_with_standard_https_port(self):
+        value = payload()
+        value["file"]["download_url"] = "https://files-example.oaiusercontent.com:443/f"
+        with self.transport(response(b"raw")):
+            self.assertEqual(self.fetch(value).data, b"raw")
+        self.assertEqual(self.connections[0].host, "files-example.oaiusercontent.com")
 
     def test_original_owner_request_rejects_extra_or_wrong_fence(self):
         for changes in ({"local_path":"/tmp/f"},{"config_generation":True},{"connection_epoch":"bad"},{"operation_id":"bad"},{"name":"../f"}):
@@ -243,7 +260,8 @@ class Checks(unittest.TestCase):
         self.assertTrue(self.sockets[-1].closed)
 
     def test_real_pinned_socket_uses_original_sni_and_tls_verification(self):
-        source=imp._PinnedHTTPS(imp.FILE_HOST,"8.8.8.8",3)
+        host="files.oaiusercontent.com"
+        source=imp._PinnedHTTPS(host,"8.8.8.8",3)
         raw=FakeSocket(b"");tls=FakeSocket(b"")
         class TLSContext:
             def wrap_socket(self,sock,server_hostname):
@@ -252,7 +270,7 @@ class Checks(unittest.TestCase):
         with patch.object(imp.socket,"create_connection",return_value=raw) as connect:
             source.connect()
         connect.assert_called_once_with(("8.8.8.8",443),timeout=3)
-        self.assertEqual(self_hostname,[imp.FILE_HOST]);self.assertEqual(self_sock,[raw])
+        self.assertEqual(self_hostname,[host]);self.assertEqual(self_sock,[raw])
         source.close()
 
     def test_revocation_before_dns_and_missing_verifier_are_closed(self):

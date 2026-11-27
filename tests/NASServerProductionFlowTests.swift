@@ -91,7 +91,20 @@ private actor Runtime: NASConnectionRuntime {
         let request=ARLNASActionRequest(action:.testConnection,configuration:configuration,expectedSnapshotRevision:snapshot.revision,expectedConfigurationGeneration:snapshot.currentConfigurationGeneration,readScope:snapshot.readScope)
         let reply=await controller.perform(request,manualIntent:.init(request:request))
         try check(reply.outcome == .applied && reply.snapshot.connected == .verified,"final_scoped_connection_consumes_v2_envelope")
+        try await run(.login);try await run(.shares(cursor:nil))
+        try await run(.directory(share:"Data",path:"selected",cursor:nil))
+        try await run(.authorize(share:"Data",path:"selected",wholeShare:false))
+        let reselection=controller.cachedSnapshot()
+        try check(reselection.connected == .verified && reselection.readScope == reply.snapshot.readScope,
+                  "reselecting_the_same_folder_keeps_the_existing_read_grant")
         try await run(.stop)
+        do {
+            try await controller.connectSavedReadScope()
+            throw CheckError.failed("paused_scope_was_reconnected")
+        } catch ARLNASFault.userCancelled {}
+        try await run(.restoreSaved)
+        try check(controller.cachedSnapshot().connected == .verified && !controller.serverSetupSnapshot().paused,
+                  "explicit_reconnect_restores_the_saved_scope")
         await runtime.arm()
         let intent=controller.beginServerAction(.login)!
         let pending=Task{@MainActor in await controller.performServerAction(intent,input:nil)}
