@@ -24,11 +24,19 @@ class ValidationTests(unittest.TestCase):
                 self.assertEqual(parse_configuration(strict_json(encode(c.wire())), m), c)
 
     def test_json_duplicate_nonfinite_depth_encoding_and_size(self):
-        for raw in (b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":Infinity}', b'\xff',
-                    b'[]', b'{"a":1.0}', b'{"a":"\\ud800"}', b' ' * 65537,
-                    ('{"a":' * 20 + '1' + '}' * 20).encode()):
+        for raw, code in (
+            (b'{"a":1,"a":2}', "duplicate_field"),
+            (b'{"a":NaN}', "invalid_json"),
+            (b'{"a":Infinity}', "invalid_json"),
+            (b'\xff', "invalid_json"),
+            (b'[]', "invalid_object"),
+            (b'{"a":1.0}', "invalid_type"),
+            (b'{"a":"\\ud800"}', "invalid_json"),
+            (b' ' * 65537, "input_too_large"),
+            (('{"a":' * 20 + '1' + '}' * 20).encode(), "input_too_deep"),
+        ):
             with self.subTest(raw_type=type(raw).__name__, bytes=len(raw)):
-                self.rejected(strict_json, raw)
+                self.rejected(strict_json, raw, code)
 
     def test_strict_field_types_and_unknown_fields(self):
         base = fixture()["manifests"][0]

@@ -2,19 +2,14 @@
 import hashlib,json,re
 from dataclasses import dataclass
 from .contracts import Fault
+from .friday_planning import MODEL
 from .friday_planning_client import ReviewedRemoval
-MODEL='gpt-6.1-sol'
+from .wire import decode_json
 def digest(value):
  return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False,allow_nan=False).encode()).hexdigest()
 def strict(raw):
- def pairs(items):
-  result={}
-  for k,v in items:
-   if k in result:raise Fault('invalid_friday_review')
-   result[k]=v
-  return result
  if len(raw)>12000:raise Fault('invalid_friday_review')
- try:return json.loads(raw,object_pairs_hook=pairs,parse_constant=lambda _: (_ for _ in ()).throw(Fault('invalid_friday_review')))
+ try:return decode_json(raw)
  except (ValueError,TypeError):raise Fault('invalid_friday_review') from None
 @dataclass(frozen=True,init=False)
 class FridayReviewBinding:

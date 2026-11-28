@@ -8,6 +8,7 @@ Metadata versions detect observed changes, not same-metadata content substitutio
 import base64
 import hashlib
 import hmac
+import socket
 import stat as statmod
 import time
 import uuid
@@ -15,6 +16,43 @@ from collections import deque
 from datetime import UTC, datetime
 
 from .contracts import MAX_PAGE, MAX_RANGE, NASConnectionError, relative_path
+
+
+def connect_smb(host, port, timeout):
+    """Try resolved SMB addresses within one connection budget."""
+    from smbprotocol.connection import Connection
+
+    deadline = time.monotonic() + timeout
+    rows = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP)
+    # Dual-stack NAS hosts may advertise an IPv6 address with no working SMB
+    # route. Prefer IPv4 while allowing pure IPv6 and fallback in either case.
+    rows.sort(key=lambda row: row[0] != socket.AF_INET)
+    addresses = list(dict.fromkeys(
+        socket.getnameinfo(row[4], socket.NI_NUMERICHOST | socket.NI_NUMERICSERV)[0] for row in rows
+    ))
+    for index, address in enumerate(addresses):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        connection = Connection(uuid.uuid4(), address, port, require_signing=True)
+        try:
+            connection.connect(timeout=min(remaining, timeout / (len(addresses) - index)))
+        except BaseException as error:
+            if connection.transport is not None:
+                try:
+                    connection.disconnect(close=False)
+                except Exception:
+                    pass  # Keep the connection failure that caused cleanup.
+            # The pinned SMB transport wraps socket connection errors this way.
+            # Once negotiation begins its error is authoritative.
+            if (not isinstance(error, ValueError) or not isinstance(error.__cause__, OSError)
+                    or index == len(addresses) - 1):
+                raise
+        else:
+            # Preserve the configured identity for NTLM and subsequent UNC paths.
+            connection.server_name = host
+            return connection
+    raise TimeoutError("NAS connection deadline")
 
 
 def signature(*values):
@@ -272,14 +310,12 @@ class SMBReader(Reader):
         self.connection = self.session = self.tree = None
         self.root = config.root
         try:
-            from smbprotocol.connection import Connection
             from smbprotocol.session import Session
             from smbprotocol.tree import TreeConnect
         except ImportError:
             raise NASConnectionError("nas_dependency_missing") from None
         try:
-            self.connection = Connection(uuid.uuid4(), config.host, config.effective_port, require_signing=True)
-            self.connection.connect(timeout=config.connect_timeout_seconds)
+            self.connection = connect_smb(config.host, config.effective_port, config.connect_timeout_seconds)
             self.session = Session(self.connection, **credentials.payload(),
                                    require_encryption=config.require_encryption, auth_protocol="ntlm")
             self.session.connect()

@@ -11,7 +11,9 @@ from pathlib import Path
 
 from arl.client import Client
 from arl.contracts import Fault, Tool, AppPolicy, object_schema
-from arl.host import MetadataLog, PeerComposition, make_runtime
+from arl.diagnostics import MetadataLog
+from arl.host import make_runtime
+from arl.identity import PeerComposition
 from arl.storage import Store
 from deployment.manage import Manager, DeploymentError, verify
 from deployment.package import package
@@ -159,8 +161,10 @@ class DeploymentTests(unittest.TestCase):
             self.assertTrue(client.connect(timeout=5)['ready'])
             self.manager.await_ready(timeout=1)
             result=client.rpc('overview'); self.assertFalse(result['policy']['local_inference_enabled'])
-            self.assertEqual({b['app']:b['max_calls'] for b in result['budgets']},{'settings':0,'tisra':0,'friday':0,'mio':0})
-            with self.assertRaises(Fault): Client(self.manager.home,'tisra').submit('runtime.ping',{},'forged')
+            self.assertEqual({b['app']: b['max_calls'] for b in result['budgets']}, {'settings': 0})
+            for app in ('tisra', 'friday', 'mio'):
+                with self.subTest(app=app), self.assertRaises(Fault):
+                    Client(self.manager.home, app).submit('runtime.ping', {}, 'forged')
             with self.assertRaises(Fault): client.rpc('stop')
             self.manager.disable(); stdout,stderr=process.communicate(timeout=5)
             self.assertEqual(process.returncode,0); self.assertEqual(stdout,b''); self.assertEqual(stderr,b'')

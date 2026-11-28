@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import socket
 import struct
 import sys
 import tempfile
@@ -16,7 +17,33 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/'integrations/nas/runtime'),str(ROOT)]
 from nas_server_host import ServerBridge
 from nas_host import CredentialFault,Failure
+from homeplane.nas_connection.adapters import connect_smb
 from smb_server_metadata import enum_request,enum_response,body,pdu,NASConnectionError
+
+class SMBAddressTests(unittest.TestCase):
+    def test_dual_stack_connect_keeps_the_configured_smb_identity(self):
+        rows = [
+            (socket.AF_INET6, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("::1", 445, 0, 0)),
+            (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", 445)),
+        ]
+        for ipv4_fails in (False, True):
+            attempts = []
+            class Connection:
+                transport = None
+                def __init__(self, client, address, port, require_signing):
+                    self.server_name = address
+                    assert port == 445 and require_signing
+                def connect(self, *, timeout):
+                    attempts.append((self.server_name, timeout))
+                    if self.server_name == "127.0.0.1" and ipv4_fails:
+                        raise ValueError("fixture transport") from TimeoutError()
+            with self.subTest(ipv4_fails=ipv4_fails), patch(
+                 "homeplane.nas_connection.adapters.socket.getaddrinfo", return_value=list(rows)), patch(
+                 "smbprotocol.connection.Connection", Connection):
+                self.assertEqual(connect_smb("fixture.local", 445, 8).server_name, "fixture.local")
+            self.assertEqual([address for address, _ in attempts],
+                             ["127.0.0.1", "::1"] if ipv4_fails else ["127.0.0.1"])
+            self.assertLessEqual(attempts[0][1], 4)
 
 class Wire:
     nonce=None

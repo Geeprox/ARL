@@ -65,4 +65,35 @@ check('direct_projection_has_same_sanitizer_and_frame_bound',()=>{
  for(let i=0;i<200;i++)d.response('effect',200,{code:400,message:i%2?'first safe reason':'second safe reason'});
  assert.equal(rows.length,128);
 });
+check('refresh_transport_failure_preserves_the_last_session_for_recovery',()=>{
+  for(const [status,body,expected,kept] of [
+    [429,{code:429},'provider_unavailable',true],
+    [502,{code:401},'provider_unavailable',true],
+    [403,{code:403},'provider_rejected',true],
+    [401,{code:401},'refresh_rejected',false],
+    [400,{error:'invalid_grant'},'refresh_rejected',false],
+  ]) {
+    const frames=[];
+    const fixtureFS={...fs,writeSync(_fd,bytes,offset,length){
+      frames.push(bytes.subarray(offset,offset+length).toString());return length;
+    }};
+    const run=new Function('require','__dirname',setup+`
+      return (status,body)=>{
+        const state=refreshFailure(status,body);
+        files.set('.netease_mcp_device.json',Buffer.from(JSON.stringify({deviceId:'00000000-0000-4000-8000-000000000001'})));
+        const sealed=JSON.stringify({iv:'0'.repeat(32),data:'1'.repeat(32)});
+        files.set('.config/ncm-cli/credentials.enc.json',Buffer.from(sealed));
+        readContext={operation:'search',results:{},priorToken:Buffer.from(sealed),refreshRejected:state==='refresh_rejected'};
+        readFailure(state,{httpStatus:status});
+        finish({operation:'search',call_id:'00000000-0000-4000-8000-000000000001'});
+        return sealed;
+      };
+    `)(name=>name==='node:fs'?fixtureFS:require(name),path.dirname(process.argv[2]));
+    const sealed=run(status,body);
+    const result=JSON.parse(frames.join(''));
+    assert.equal(result.result.state,expected);
+    const stored=JSON.parse(Buffer.from(result.credential,'base64')).files;
+    assert.equal(stored['.config/ncm-cli/tokens.enc.json'],kept?Buffer.from(sealed).toString('base64'):undefined);
+  }
+});
 process.stdout.write(JSON.stringify({status:'PASS',groups:results,real_network:0,real_credentials:0})+'\n');

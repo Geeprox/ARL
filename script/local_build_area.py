@@ -5,12 +5,19 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 
+
+def project_cache_root(project):
+    source = Path(project).resolve()
+    digest = hashlib.sha256(os.fsencode(source)).hexdigest()[:12]
+    return Path.home() / 'Library/Caches/CodexBuilds.noindex' / f'{source.name}-{digest}'
+
+
 @contextmanager
 def build_area(task,*,toolchain='python3-macos-arm64',configuration='verification',reproduce=()):
     for value in (task,toolchain,configuration):
         if type(value) is not str or re.fullmatch(r'[A-Za-z0-9_.-]{1,100}',value) is None:raise ValueError('invalid_build_area_label')
-    source=ROOT.resolve();project=source.name+'-'+hashlib.sha256(os.fsencode(str(source))).hexdigest()[:12]
-    path=Path.home()/'Library/Caches/CodexBuilds.noindex'/project/toolchain/configuration/(task+'-'+uuid.uuid4().hex[:8])
+    source=ROOT.resolve()
+    path=project_cache_root(source)/toolchain/configuration/(task+'-'+uuid.uuid4().hex[:8])
     if any(p.is_symlink() for p in (path,*path.parents)):raise ValueError('build_area_symlink')
     path.mkdir(parents=True,mode=0o700)
     lock=os.open(path/'active.lock',os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)

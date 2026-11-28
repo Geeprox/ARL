@@ -6,12 +6,34 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
-from script import stage_core_runtime as packager
+from script import export_public_core, stage_core_runtime as packager
 
 from script.stage_core_runtime import ROOT, inputs
 
 
 class CoreImportClosureTests(unittest.TestCase):
+    def test_public_closure_traverses_imports_in_package_initializers(self):
+        sources = {
+            'arl/__init__.py': 'from arl.root_dependency import value',
+            'arl/host.py': 'import arl.nested.entry',
+            'arl/client.py': '',
+            'arl/__main__.py': '',
+            'arl/supervisor.py': '',
+            'arl/application_platform.py': '',
+            'arl/root_dependency.py': 'value = 1',
+            'arl/nested/__init__.py': 'from .dependency import value',
+            'arl/nested/entry.py': '',
+            'arl/nested/dependency.py': 'value = 2',
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, contents in sources.items():
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(contents)
+            with patch.object(export_public_core, 'ROOT', root):
+                self.assertEqual(export_public_core.closure(), {Path(name) for name in sources})
+
     def test_private_research_entry_imports_from_the_actual_package_inputs(self):
         with tempfile.TemporaryDirectory(prefix='arl-core-import-', dir=tempfile.gettempdir()) as directory:
             target = Path(directory)
@@ -32,7 +54,9 @@ class CoreImportClosureTests(unittest.TestCase):
                     destination = target / name
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copyfile(ROOT / name, destination)
-            code = 'import sys; sys.path.insert(0, sys.argv[1]); import arl.host; from arl.extension_contracts import compatibility; assert compatibility is None'
+            code = ('import sys; sys.path.insert(0, sys.argv[1]); import arl.host; '
+                    'from arl.application_platform import ApplicationPlatform; '
+                    'from arl.extension_contracts import compatibility; assert compatibility is None')
             result = subprocess.run([sys.executable, '-I', '-B', '-c', code, str(target)], capture_output=True, timeout=15)
             self.assertEqual(result.returncode, 0, result.stderr.decode())
 

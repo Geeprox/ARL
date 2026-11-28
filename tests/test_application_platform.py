@@ -1,7 +1,7 @@
 """Real local SDK handshake/queue with synthetic provider processes, no account calls."""
 import json,os,sys,tempfile,threading,time,unittest,uuid
 from pathlib import Path
-from arl.application_platform import ApplicationPlatform,scenarios,kernel_peer
+from arl.application_platform import ApplicationPlatform
 from arl.application_session import ApplicationSession
 from arl.client import Client
 from arl.codex_server import CodexService,CodexTextAdapter
@@ -89,6 +89,25 @@ class ApplicationPlatformTests(unittest.TestCase):
         registry=self.runtime.control.apps;clock=registry.monotonic;registry.monotonic=lambda:clock()+31000
         with self.assertRaises(Fault):s.client.ping_app_session()
         s.register();self.assertTrue(s.connected);self.assertTrue(s.client.ping_app_session()['connected'])
+    def test_scenarios_default_and_validation_preserve_the_confirmed_session(self):
+        s = self.session(priority='explicit', package='very_high')
+        entry = self.runtime.control.apps.entries[s.client.app]
+        scenario = entry['scenarios'][0]
+        self.assertEqual(scenario['deadline_ms'], 180000)
+        self.assertEqual(scenario['max_output_bytes'], 4096)
+        for invalid in (
+            [scenario, scenario],
+            [dict(scenario, package_id='xhigh')],
+            [dict(scenario, priority='urgent')],
+            [dict(scenario, deadline_ms=True)],
+            [dict(scenario, max_output_bytes=32769)],
+            [dict(scenario, extra='unknown')],
+        ):
+            with self.subTest(scenarios=invalid), self.assertRaises(Fault) as failure:
+                s.client.open_app_session(s.name, scenarios=invalid)
+            self.assertEqual(failure.exception.code, 'invalid_application_scenarios')
+        self.assertTrue(s.client.ping_app_session()['connected'])
+        self.assertEqual(entry['scenarios'], [scenario])
     def test_reserved_identity_and_challenge_and_revoked_session_rejected(self):
         with self.assertRaises(Fault):Client(self.home,'settings').open_app_session('Forged settings')
         s=self.session();sid=s.client.app_session;s.client.close_app_session()
@@ -110,6 +129,30 @@ class ApplicationPlatformTests(unittest.TestCase):
         self.assertEqual(a.submit('summarize','synthetic input',request_id=key)['id'],job['id'])
         with self.assertRaises(Fault) as error:b.submit('summarize','synthetic input')
         self.assertEqual(error.exception.code,'call_budget_exceeded')
+    def test_intent_write_failure_rolls_back_job_and_budget_before_retry(self):
+        session = self.session('atomic-application-task')
+        first = session.submit('summarize', 'first input')
+        self.assertEqual(session.wait(first, timeout=15)['state'], 'succeeded')
+        store = self.runtime.store
+        request_id = str(uuid.uuid4())
+        with store.lock:
+            store.db.execute('''CREATE TEMP TRIGGER reject_intent
+                BEFORE INSERT ON application_task_intents
+                BEGIN SELECT RAISE(ABORT, 'synthetic intent write failure'); END''')
+        try:
+            with self.assertRaises(Fault) as failure:
+                session.submit('summarize', 'retry input', request_id=request_id)
+            self.assertEqual(failure.exception.code, 'internal_error')
+            with store.lock:
+                self.assertEqual(store.db.execute('SELECT COUNT(*) FROM jobs').fetchone()[0], 1)
+                self.assertEqual(store.db.execute('SELECT calls FROM budget WHERE owner=?',
+                                                  (session.client.app,)).fetchone()[0], 1)
+        finally:
+            with store.lock:
+                store.db.execute('DROP TRIGGER reject_intent')
+        job = session.submit('summarize', 'retry input', request_id=request_id)
+        self.assertEqual(session.submit('summarize', 'retry input', request_id=request_id)['id'], job['id'])
+        self.assertEqual(session.wait(job, timeout=15)['state'], 'succeeded')
     def test_registration_remains_available_with_model_service_disabled(self):
         self.runtime.codex_service=None
         try:

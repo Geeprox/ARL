@@ -10,7 +10,7 @@ import uuid
 from contextlib import contextmanager, nullcontext
 
 from .contracts import Fault, encode
-from .scheduling import resolve, select
+from .scheduling import BANDS, resolve, select
 from . import priority as priorities
 
 TERMINAL = {"succeeded", "failed", "cancelled", "needs_review"}
@@ -20,6 +20,7 @@ class Store:
     """One transaction lock per process; the service lifetime lock excludes other writers."""
     def __init__(self, path):
         self.lock = threading.RLock()
+        self._application_intents_ready = False
         self.publication_admission = None
         fd = os.open(str(path), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
         os.close(fd)
@@ -84,6 +85,69 @@ class Store:
         self.db.execute("INSERT INTO audit(at,owner,job,event) VALUES(?,?,?,?)",
                         (time.time(), owner, job, event))
         self.db.execute("DELETE FROM audit WHERE seq <= (SELECT COALESCE(MAX(seq),0)-10000 FROM audit)")
+
+    def _prepare_application_intents(self):
+        # Called under the store lock, before entering a write transaction.
+        if self._application_intents_ready:
+            return
+        self.db.execute('''CREATE TABLE IF NOT EXISTS application_task_intents(
+            owner TEXT NOT NULL, key TEXT NOT NULL, digest TEXT NOT NULL, job_id TEXT NOT NULL,
+            package_id TEXT NOT NULL, scenario_id TEXT NOT NULL, resolved TEXT NOT NULL,
+            PRIMARY KEY(owner,key))''')
+        self._application_intents_ready = True
+
+    def lookup_application_task(self, owner, key, digest):
+        with self.lock:
+            self._prepare_application_intents()
+            row = self.db.execute('SELECT * FROM application_task_intents WHERE owner=? AND key=?',
+                                  (owner, key)).fetchone()
+            if row is None:
+                return None
+            if row['digest'] != digest:
+                raise Fault('idempotency_conflict')
+            return dict(self.get(owner, row['job_id']), package_id=row['package_id'],
+                        scenario_id=row['scenario_id'], resolved=json.loads(row['resolved']))
+
+    def submit_application_task(self, owner, key, digest, tool, args, policy, *,
+                                schedule, selection, max_calls):
+        """Commit a job, its budget charge and frozen selection in one transaction."""
+        with self.lock:
+            self._prepare_application_intents()
+            with self.transaction():
+                previous = self.lookup_application_task(owner, key, digest)
+                if previous is not None:
+                    return previous, False
+                if self.db.execute('SELECT 1 FROM jobs WHERE owner=? AND key=?', (owner, key)).fetchone():
+                    raise Fault('idempotency_conflict')
+                # The host's finite scope is shared by all registered SDK apps.
+                if max_calls is not None:
+                    calls = self.db.execute('SELECT COUNT(*) FROM jobs WHERE tool=?', (tool.name,)).fetchone()[0]
+                    if calls >= max_calls:
+                        raise Fault('call_budget_exceeded')
+                job = self.submit(owner, key, tool, args, policy, verified=True,
+                                  schedule=schedule, in_transaction=True)
+                self.db.execute('''INSERT INTO application_task_intents
+                    (owner,key,digest,job_id,package_id,scenario_id,resolved) VALUES(?,?,?,?,?,?,?)''',
+                    (owner, key, digest, job['id'], selection['package_id'],
+                     selection['scenario_id'], encode(selection['resolved']).decode()))
+                return dict(job, **selection), True
+
+    def has_active_jobs(self, owner):
+        with self.lock:
+            return self.db.execute(
+                "SELECT 1 FROM jobs WHERE owner=? AND state IN ('queued','running') LIMIT 1",
+                (owner,)).fetchone() is not None
+
+    def task_activity(self, tool_name):
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT state,priority,COUNT(*) AS n FROM jobs WHERE tool=? "
+                "AND state IN ('queued','running') GROUP BY state,priority",
+                (tool_name,)).fetchall() if tool_name is not None else ()
+        running = sum(row['n'] for row in rows if row['state'] == 'running')
+        queued = {row['priority']: row['n'] for row in rows if row['state'] == 'queued'}
+        return {'running': running, 'queued': sum(queued.values()),
+                'queues': {priority: queued.get(priority, 0) for priority in sorted(BANDS)}}
 
     def submit(self, owner, key, tool, args, policy, verified=False, schedule=None, *, in_transaction=False, priority_request=None, priority_route=None):
         band,span=resolve(policy,schedule)
@@ -240,6 +304,11 @@ class Store:
                 self.db.execute('DELETE FROM resource_leases')
             else:
                 self.db.execute('DELETE FROM resource_leases WHERE job IN (SELECT id FROM jobs WHERE 1' + clause + ')', values)
+
+    def running_jobs(self, tool_name):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM jobs WHERE state='running' AND tool=?",
+                                   (tool_name,)).fetchone()[0]
 
     def claim(self, *, scope=None):
         clause, values = self._scope_clause(scope)

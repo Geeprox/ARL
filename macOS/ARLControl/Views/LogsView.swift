@@ -190,8 +190,7 @@ struct LogsView: View {
     private func refreshRecent() async {
         guard !store.demo,!compatibility else{return}
         do {
-            let result=try await ARLClient(home:store.service.home,app:"settings").rpc("settings.logs.recent.v1",params:["limit":.number(500)],timeout:3)
-            let next=try RecentLogPage.decode(JSONEncoder().encode(result))
+            let next = try await store.service.readRecentLogs()
             guard !Task.isCancelled else{return}
             recent=next;lastRead=Date();recentError=nil
         } catch {
@@ -206,8 +205,7 @@ struct LogsView: View {
         contextLoading=true
         defer { if !Task.isCancelled && contextRequest == request {contextLoading=false} }
         do {
-            let reply=try await ARLClient(home:store.service.home,app:"settings").rpc("settings.log_details.v1",params:["sequence":.number(Double(request.sequence)),"session_id":.string(request.session)],timeout:3)
-            let next=try LogTaskContext.decode(JSONEncoder().encode(reply),sequence:request.sequence,session:request.session)
+            let next = try await store.service.readLogDetails(sequence: request.sequence, sessionID: request.session)
             guard !Task.isCancelled,contextRequest==request else{return};context=next
         } catch { /* Legacy events remain readable with their finite explanation. */ }
     }

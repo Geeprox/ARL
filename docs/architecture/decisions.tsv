@@ -1,0 +1,17 @@
+ts	phase	decision	why	evidence	result
+2026-11-28T00:34:00+08:00	基线	从 fec8f2a 建立治理 worktree	从已提交源码建立基线并隔离现有本地材料	fec8f2a	分支 codex/architecture-governance-20261128
+2026-11-28T00:37:00+08:00	验证	在同一基线运行测试清单和 portable	把实际失败、缺前提与此次变更区分开	script/check.py	885 项 portable 通过，全清单有 260 项前提阻断
+2026-11-27T16:43:52Z	依赖与打包	公开闭包和循环检测共用导入解析并遍历包初始化文件	同一导入关系应由一个解析器解释，包初始化依赖也需要随包发布	script/check_architecture.py; tests/test_core_import_closure.py	独立复审后补包初始化回归，公开闭包仍为 39 项，4 项闭包测试通过，新增循环注入被检测
+2026-11-27T16:49:11Z	应用契约	将场景校验迁到 application_contract 并复用套餐及调度规则	SDK 与服务共享校验，装配入口保持可导入，旧发现接口保留既有标签	arl/application_contract.py, tests/test_application_platform.py	复审与 socket 测试查出并修正预检旧调用，最终 83 项通过，删除 4 条循环边
+2026-11-27T16:55:59Z	宿主装配	统一路径、peer 组合、生命周期日志与三种设置策略的公共部分	移除从业务装配反向导入 host 的路径，保留不同 profile 的方法和权限	arl/control.py, arl/identity.py, tests/test_deployment.py	独立比对策略等值，127 项 portable 与 14 项隔离旧部署通过，删除 12 条循环边。旧统计断言在 88d973e 复现后更新
+2026-11-27T16:57:29Z	Codex	将 sourced 线程参数交给发送请求的 Codex adapter 持有	研究回执和底层调用复用同一控制值，传输层不导入研究装配	arl/codex_server.py, arl/codex_sourced_research.py	对比三份审查与 wire 摘要均不变，137 项定向测试通过，删除 4 条循环边
+2026-11-27T17:06:16Z	Friday	将固定规划模型与精确审核准入放回规划模块，并检查可选兼容导入	优先级层只需业务准入定义，源码导入图可以约束完整宿主装配方向	arl/friday_planning.py, arl/extension_contracts.py, script/check_architecture.py	88 项定向测试、独立复审和反向边注入均通过，108 模块 0 循环
+2026-11-27T17:09:43Z	解码	让六个入口共享 wire 的重复键与非 JSON 常量规则	各协议依然掌握输入编码、帧尺寸和公开错误码	arl/wire.py, tests/service_deployment/test_validation.py	111 项定向测试通过，独立对照六入口 510 组输入，现有打包路径包含 wire
+2026-11-27T17:26:37Z	任务持久化	将场景意图事务、队列查询和运行任务计数移入 Store	应用层拥有准入，Store 持有原 SQLite v4 格式、幂等、配额和回滚	arl/storage.py, tests/test_application_platform.py, script/check_architecture.py	事务故障基线通过，内存 SQLite、旧表并发回放及核验 kernel peer 的 socketpair 通过。复审恢复锁内采样。文件 socket 复跑自动审批两次超时
+2026-11-27T17:39:41Z	原生套餐	将四处 Swift 套餐 ID 和默认标题迁到同一原生类型	设置、应用场景和日志对套餐使用同一份顺序、校验和显示映射	macOS/ARLControl/Models/CodexExecutionOptions.swift, tests/test_codex_package_settings.py	原生/复审发现并修正集合类型，跨语言 round-trip 对照、32 项连接检查、源码编译 5 步通过。上批文件 socket 12 项亦通过
+2026-11-27T17:45:00Z	构建	统一工作树缓存根推导与 Core 包内源码指纹	制作和核验使用相同算法，各工具仍持有原输入输出边界	script/local_build_area.py, script/stage_core_runtime.py, tests/test_unified_runtime_package.py	实际缓存根与既有地址一致，独立对照旧指纹算法一致，30 项构建、导出和包内运行回归通过
+2026-11-27T17:57:09Z	构建隔离	将指纹实现按待打包 worktree 的绝对路径加载	复审复现同一 Python 进程复用另一 worktree 的旧模块，构建输入必须按来源绑定	arl/source_fingerprint.py, tests/test_unified_runtime_package.py	旧算法对照一致，复审用真实两个 worktree 重验，30 项打包、导出与运行回归通过
+2026-11-27T17:59:38Z	原生日志	将四条日志读取的 RPC 和解码迁到 SettingsService，删除旧滚动 modifier 与写入后从未读取的时间字段	页面和运行时状态继续各自管理更新代次，原生服务集中持有读协议	macOS/ARLControl/Services/SettingsService.swift, macOS/ARLControl/Tests/control_legacy_race_check.py	原生 harness 的四种端点、旧分页迟到响应、明确断连和超时缓存通过。更新基线已过时的权限标签断言
+2026-11-27T18:16:21Z	验证工具	根据已筛选测试计划准备可解除阻断的旧 Core helper	各 native 模块按自己实际前提执行，独立任务无需生成历史夹具	script/check.py, tests/test_test_profiles.py	15 项计划回归及 1 项真实原生套餐测试通过，确认未生成四个旧 helper 或准备日志
+2026-11-27T18:54:16Z	集成	在治理 worktree 合入 3502ae8 后执行最终集成验收	NAS 和 Mio 新提交与本工作路径不重叠，验收覆盖合并后的实际源码	e0ccb2a, script/check.py, script/check_native_source.py	890 项 portable 与 29 项 CI 所选 native 通过，Control/SDK/Mio 源码编译通过，另有 262 项缺前提
+2026-11-27T18:56:21Z	收尾	用明确产物清单退役编译副本并检查空夹具目录	首次整目录审批要求更明确的归属证据，按工具实际生成路径缩小范围	retired-compiled-artifacts.json, docs/architecture/PROGRESS.md	清理回读验证 62 项编译或夹具产物和 7 个空目录，保留测试回执与 manifest

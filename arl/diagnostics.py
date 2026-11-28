@@ -1,6 +1,7 @@
 """Finite metadata events only. No free-text input or file import/export."""
 from __future__ import annotations
 
+import fcntl
 import json
 import secrets
 import threading
@@ -12,6 +13,8 @@ import tempfile
 from pathlib import Path
 from collections import deque
 
+from . import VERSION
+from .codex_execution_options import PACKAGE_IDS
 from .contracts import Fault, object_schema, string, validate
 
 EVENTS = ('runtime_starting', 'runtime_ready', 'runtime_stopping', 'app_verified',
@@ -35,7 +38,7 @@ def diagnostic_context(value):
     result={}
     for key,item in value.items():
         if key=='task_id' and type(item) is str and re.fullmatch(r'[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}',item):result[key]=item
-        elif key=='package_id' and item in ('low','medium','high','very_high','highest'):result[key]=item
+        elif key=='package_id' and type(item) is str and item in PACKAGE_IDS:result[key]=item
         elif key=='model' and type(item) is str and re.fullmatch(r'(?:gpt|o[1-9])[a-z0-9._-]{0,60}',item):result[key]=item
         elif key=='reasoning_effort' and item in ('none','minimal','low','medium','high','xhigh','max','ultra'):result[key]=item
         elif key=='method' and type(item) is str and item in DETAIL_METHODS:result[key]=item
@@ -55,6 +58,33 @@ def log_v3_schema():
     return object_schema({**log_schema()['properties'],
         'mode': {'type':'string', 'enum':['checkpoint','page']},
         'session_id': {**string(32), 'pattern': r'[a-f0-9]{32}'}}, ['mode'])
+
+
+class MetadataLog:
+    """Bounded 64 KiB private lifecycle log with fixed, redacted fields."""
+    def __init__(self, home):
+        self.path = home / 'host.log'
+
+    def event(self, event, code=None):
+        if event not in {'starting', 'ready', 'stopped', 'disabled', 'error'}:
+            raise ValueError('unknown_log_event')
+        record = {'at': int(time.time()), 'event': event, 'version': VERSION}
+        if code and re.fullmatch(r'[a-z_]{1,80}', code):
+            record['code'] = code
+        raw = (json.dumps(record, sort_keys=True) + '\n').encode()
+        fd = os.open(self.path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+                raise Fault('unsafe_log')
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            if os.fstat(fd).st_size + len(raw) > 65536:
+                os.ftruncate(fd, 0)
+            os.lseek(fd, 0, os.SEEK_END)
+            os.write(fd, raw)
+        finally:
+            os.close(fd)
+
 
 class Diagnostics:
     def __init__(self, app_ids, clock=None, path=None):

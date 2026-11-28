@@ -26,7 +26,7 @@ import AppKit
                     Text("思考强度").frame(width:100,alignment:.leading)
                     Text("加速").frame(width:44).accessibilityLabel("加速")
                 }.font(.caption).foregroundStyle(.secondary)
-                ForEach(CodexPackageSettingsStore.ids,id:\.self) { id in
+                ForEach(CodexModelPackage.ids,id:\.self) { id in
                     if let row = settings.draft[id] {
                         HStack(spacing:12) {
                             TextField("套餐名称",text:Binding(get:{ settings.draft[id]?.display_name ?? "" },set:{ settings.draft[id]?.display_name = $0 }))

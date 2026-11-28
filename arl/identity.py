@@ -18,6 +18,33 @@ from pathlib import Path
 from .contracts import Fault
 
 
+class PeerComposition:
+    """Try the verifiers supplied by the host. The default grants no identities."""
+    def __init__(self, verifiers=(), *, settings_metadata_only=True):
+        self.verifiers = tuple(verifiers)
+        self.settings_metadata_only = settings_metadata_only
+
+    def __call__(self, connection, app):
+        if app == 'settings' and self.settings_metadata_only:
+            return None
+        for verifier in self.verifiers:
+            try:
+                accepted = verifier(connection, app)
+            except Exception:
+                continue
+            if accepted == app:
+                return accepted
+        return None
+
+    def session_binding(self, connection, app):
+        for verifier in self.verifiers:
+            if verifier(connection, app) == app:
+                binder = getattr(verifier, 'session_binding', None)
+                if binder is not None:
+                    return binder(connection, app)
+        raise Fault('app_identity_unverified')
+
+
 class BSDInfo(ctypes.Structure):
     _fields_ = [(name, ctypes.c_uint32) for name in (
         "flags", "status", "xstatus", "pid", "ppid", "uid", "gid", "ruid", "rgid", "svuid", "svgid", "reserved")]

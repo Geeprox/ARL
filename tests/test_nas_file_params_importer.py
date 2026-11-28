@@ -165,6 +165,21 @@ class Checks(unittest.TestCase):
             self.assertEqual(self.fetch(value).data, b"raw")
         self.assertEqual(self.connections[0].host, "files-example.oaiusercontent.com")
 
+    def test_reads_azure_blob_with_signed_read_url_and_no_extra_credentials(self):
+        host = "fixtureuploads.blob.core.windows.net"
+        signed = "sv=2023-01-03&sp=r&sr=b&se=2030-01-01T00%3A00Z&sig=synthetic%2Bvalue"
+        value = payload()
+        value["file"]["download_url"] = f"https://{host}/fixture/old.pdf?{signed}"
+        with self.transport(response(b"raw")):
+            self.assertEqual(self.fetch(value).data, b"raw")
+        self.assertEqual(self.connections[0].host, host)
+        self.assertIn(("GET /fixture/old.pdf?" + signed + " ").encode(), self.sockets[0].sent[0])
+        self.assertNotIn(b"Authorization:", self.sockets[0].sent[0])
+        for query in ("", signed.replace("sp=r", "sp=rw"), signed.replace("sr=b", "sr=c"), signed + "&sig="):
+            invalid = dict(value["file"], download_url=f"https://{host}/fixture/old.pdf?{query}")
+            with self.subTest(query=query):
+                self.fault("attachment_origin_unsupported", lambda: imp.file_param(invalid))
+
     def test_original_owner_request_rejects_extra_or_wrong_fence(self):
         for changes in ({"local_path":"/tmp/f"},{"config_generation":True},{"connection_epoch":"bad"},{"operation_id":"bad"},{"name":"../f"}):
             with self.assertRaises(bridge.BridgeFault):imp.request(payload(**changes))

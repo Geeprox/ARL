@@ -1,5 +1,6 @@
 """Isolated package/consumer evidence; no live state, keys, TCC or deployment."""
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,7 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
-from script.stage_core_runtime import stage
+from unittest.mock import patch
 from script.bundled_runtime_entry import verify
 from script.prepare_mio_migration import candidates
 from arl.client import Client
@@ -23,7 +24,13 @@ class CorePackageTests(unittest.TestCase):
         self.root=Path(self.temp.name);self.app=self.root/'package'
         (self.app/'Contents').mkdir(parents=True)
         (self.app/'Contents/Info.plist').write_bytes(plistlib.dumps({'CFBundleIdentifier':'test.package.only'}))
-        self.record=stage(self.app,private=False)
+        # Build preflight loads this file by path, even after another checkout's
+        # runtime modules have been imported into the same Python process.
+        with patch.dict(sys.modules, {'arl.runtime_description': None, 'arl.source_fingerprint': None}):
+            spec = importlib.util.spec_from_file_location('fixture_core_packager', ROOT/'script/stage_core_runtime.py')
+            packager = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(packager)
+            self.record = packager.stage(self.app, private=False)
         self.package=self.app/'Contents/Resources/CoreRuntime'
     def tearDown(self):self.temp.cleanup()
     def test_complete_inventory_source_identity_and_private_exclusion(self):

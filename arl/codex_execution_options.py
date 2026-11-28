@@ -3,6 +3,15 @@ from .contracts import Fault
 import re
 import time
 
+DEFAULT_PACKAGES = (
+    ('low', '低', 'low'),
+    ('medium', '中', 'medium'),
+    ('high', '高', 'high'),
+    ('very_high', '很高', 'xhigh'),
+    ('highest', '最高', 'max'),
+)
+PACKAGE_IDS = frozenset(package_id for package_id, _, _ in DEFAULT_PACKAGES)
+
 def identifier(value, maximum=150):
  if type(value) is not str or len(value)>maximum or re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._/-]*',value) is None:
   raise Fault('provider_catalog_invalid')

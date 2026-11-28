@@ -15,6 +15,20 @@ import SwiftUI
                 output=["ok":true,"count":page.entries.count,"more":page.hasMore,"cursor":page.nextCursor ?? "","truncated":page.truncated,"events":page.entries.map(\.event)]
             } else if mode=="export" {
                 let e=try await service.exportLogs();output=["ok":true,"count":e.count,"bytes":e.content.count,"more":e.more,"truncated":e.truncated]
+            } else if mode == "versioned-logs" {
+                let checkpoint = try await service.readLogCheckpoint()
+                let page = try await service.readLogPage(sessionID: checkpoint.sessionID, cursor: nil, level: "info")
+                let recent = try await service.readRecentLogs()
+                guard let entry = recent.entries.last(where: { $0.event == "model_task_queued" }) else {
+                    throw ARLError(code: "missing_fixture_event")
+                }
+                let detail = try await service.readLogDetails(sequence: entry.sequence, sessionID: recent.sessionID)
+                output = [
+                    "ok": page.sessionID == checkpoint.sessionID && recent.sessionID == checkpoint.sessionID,
+                    "page_has_event": page.page.entries.contains { $0.sequence == entry.sequence },
+                    "package": detail?.package_id ?? "",
+                    "package_title": detail?.packageTitle ?? "",
+                ]
             } else if mode == "legacy-race" {
                 let store=RuntimeStore(arguments:["harness","--runtime-home",home.path])
                 await store.refresh()

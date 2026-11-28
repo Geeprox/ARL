@@ -3,7 +3,6 @@ import Observation
 import Darwin
 
 @MainActor @Observable final class CodexPackageSettingsStore {
-    static let ids = ["low", "medium", "high", "very_high", "highest"]
     let home: URL
     let enabled: Bool
     private(set) var catalog: CodexPackagesCatalog?
@@ -13,7 +12,7 @@ import Darwin
     private(set) var message: String?
     var changed: Bool { saved.map { $0.packages != draft } ?? false }
     var valid: Bool {
-        guard let catalog, catalog.isFresh(), Set(draft.keys) == Set(Self.ids) else { return false }
+        guard let catalog, catalog.isFresh(), Set(draft.keys) == CodexModelPackage.idSet else { return false }
         return draft.values.allSatisfy { row in
             (1...40).contains(row.display_name.unicodeScalars.count) && catalog.execution.permits(row.selection)
         }
@@ -31,14 +30,14 @@ import Darwin
             let c = try read(CodexPackagesCatalog.self, name:"catalog-v2.json")
             let p = try read(CodexPackagesFile.self, name:"packages-v2.json")
             guard c.schema_version == 2, c.execution.isValid, p.schema_version == 2,
-                  p.revision > 0, Set(p.packages.keys) == Set(Self.ids) else { throw ARLError(code:"package_configuration_invalid") }
+                  p.revision > 0, Set(p.packages.keys) == CodexModelPackage.idSet else { throw ARLError(code:"package_configuration_invalid") }
             let keepDraft = preservingDraft && changed
             catalog = c
             if !keepDraft { saved = p; draft = p.packages; message = nil }
             else if let baseline=saved,baseline.revision != p.revision {
                 // Rebase untouched rows on the latest revision. Keep intentional
                 // local edits visible and save them against the observed base.
-                for id in Self.ids where draft[id] == baseline.packages[id] {draft[id]=p.packages[id]}
+                for id in CodexModelPackage.ids where draft[id] == baseline.packages[id] {draft[id]=p.packages[id]}
                 saved=p
                 message="已同步其他位置的修改，你的草稿已保留。"
             }

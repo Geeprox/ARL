@@ -181,7 +181,9 @@ public struct CredentialConnectionPanel: View {
         if snapshot.reference == nil {return purpose == .neteaseMusic ? "配置应用密钥后，扫码连接你的网易云音乐账号。":"连接后，支持 ARL 的应用即可使用此服务。"}
         switch snapshot.state {
         case .verified:return purpose == .neteaseMusic ? "登录有效，歌单服务可用。":"服务密钥已通过验证。"
-        case .loginRequired,.loginExpired,.invalidOrExpired:return purpose == .neteaseMusic ? "登录已失效，请重新扫码。":"服务密钥失效，请更新密钥。"
+        case .loginRequired:return purpose == .neteaseMusic ? "请扫码连接网易云音乐。":"服务密钥失效，请更新密钥。"
+        case .loginExpired:return purpose == .neteaseMusic ? "二维码已过期，请重新扫码。":"服务密钥失效，请更新密钥。"
+        case .invalidOrExpired:return purpose == .neteaseMusic ? "请重新扫码连接网易云音乐。":"服务密钥失效，请更新密钥。"
         case .revalidationRequired,.savedUnverified,.credentialUnconfirmed:return purpose == .neteaseMusic ? "登录信息已保存；下次使用时会重新核验。":"密钥已保存；使用时核验，后台不发送计费查询。"
         case .sessionPresentUnverified:return "登录信息已保存，最近尚无成功的服务调用。"
         default:return snapshot.state.title+"。状态会自动更新。"

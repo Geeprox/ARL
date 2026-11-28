@@ -4,7 +4,7 @@ struct RegisteredModelScenario: Codable, Identifiable, Sendable {
     let id: String; let name: String; let task_kind: String; let priority: String; let package_id: String
     let deadline_ms: Int; let max_output_bytes: Int
     var priorityTitle: String { priority == "interactive" ? "交互":priority == "background" ? "后台":"用户任务" }
-    var packageTitle: String { ["low":"低","medium":"中","high":"高","very_high":"很高","highest":"最高"][package_id] ?? package_id }
+    var packageTitle: String { CodexModelPackage(rawValue: package_id)?.defaultTitle ?? package_id }
 }
 
 /// Presentation contracts. Wire decoding is added only for a confirmed service schema.
@@ -161,7 +161,7 @@ struct LogTaskContext:Decodable,Sendable {
     let reason:String?
     let duration_ms:Int?
     var isEmpty:Bool {task_id == nil && package_id == nil && model == nil && reasoning_effort == nil && method == nil && reason == nil && duration_ms == nil}
-    var packageTitle:String? {package_id.flatMap{["low":"低","medium":"中","high":"高","very_high":"很高","highest":"最高"][$0]}}
+    var packageTitle: String? { package_id.flatMap { CodexModelPackage(rawValue: $0)?.defaultTitle } }
     var reasonTitle:String? {
         guard let reason else{return nil}
         switch reason {
@@ -189,7 +189,7 @@ struct LogTaskContext:Decodable,Sendable {
                 let text=try WireSchema.string(value,maximum:80)
                 guard text.range(of:"^[a-zA-Z0-9_.-]+$",options:.regularExpression) != nil else{throw ARLError(code:"invalid_response")}
                 if key == "task_id", UUID(uuidString:text)?.uuidString.lowercased() != text {throw ARLError(code:"invalid_response")}
-                if key == "package_id", !["low","medium","high","very_high","highest"].contains(text) {throw ARLError(code:"invalid_response")}
+                if key == "package_id", CodexModelPackage(rawValue: text) == nil {throw ARLError(code:"invalid_response")}
                 if key == "reasoning_effort", !["none","minimal","low","medium","high","xhigh","max","ultra"].contains(text) {throw ARLError(code:"invalid_response")}
                 if key == "model", text.range(of:"^(gpt|o[1-9])[a-z0-9._-]{0,60}$",options:.regularExpression) == nil {throw ARLError(code:"invalid_response")}
             }

@@ -8,14 +8,17 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 import uuid
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from script.local_build_area import project_cache_root
 
 def main():
  parser=argparse.ArgumentParser();parser.add_argument('--output',type=Path);args=parser.parse_args()
  output=(args.output or ROOT/'build'/('source-check-'+datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%S')+'-'+uuid.uuid4().hex[:8])).absolute()
- cache=Path.home()/'Library/Caches/CodexBuilds.noindex'/(ROOT.name+'-'+hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:12])
+ cache=project_cache_root(ROOT)
  if not any(base in output.parents for base in ((ROOT/'build').absolute(),cache)) or output.exists() or any(p.is_symlink() for p in (output,*output.parents)):
   raise ValueError('new_output_under_build_required')
  output.mkdir(parents=True)

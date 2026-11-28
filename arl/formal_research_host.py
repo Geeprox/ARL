@@ -20,6 +20,7 @@ from .codex_sourced_research import CONTRACT_SHA256, NAME
 from .codex_sourced_execution import CodexExecutionAdapter as CodexSourcedAdapter, CodexExecutionEngine as CodexSourcedResearchEngine
 from .contracts import AppPolicy, Fault, encode
 from .formal_peer import FormalTisraPeer, exact_file, HELPER_SHA256, TISRA_EXECUTABLE, TISRA_EXECUTABLE_SHA256
+from .extension_contracts import metadata_policies
 from .identity import RegisteredPeerVerifier
 from .priority_host import PriorityHostConfig, RegisteredRouteProducer
 from .service import Runtime
@@ -263,7 +264,6 @@ def compose_formal_research(home, activation: FormalResearchActivation, *, servi
             super().external_admission(run)
 
     engine = AdmittedEngine({'tisra': grant}, {'codex_app_server': native})
-    from .host import metadata_policies
     policies = metadata_policies()
     policies['tisra'] = AppPolicy(
         frozenset({NAME}), frozenset(), 0, 16, 100,

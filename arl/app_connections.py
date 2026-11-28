@@ -1,5 +1,6 @@
 """Identity-bound bidirectional app sessions. Never enrolls or grants tools."""
 import secrets
+from .application_contract import validate_scenarios
 from .contracts import Fault
 from .control import AppDescriptor
 
@@ -37,8 +38,7 @@ class AppConnections:
             if method == 'connection.open':
                 if set(params) not in ({'client_nonce','name','icon_ref','version','capabilities'}, {'client_nonce','name','icon_ref','version','capabilities','scenarios'}) or not token(params['client_nonce']):
                     raise Fault('invalid_arguments')
-                from .application_platform import scenarios
-                declared = scenarios(params.get("scenarios", []))
+                declared = validate_scenarios(params.get("scenarios", []))
                 caps = params['capabilities']
                 if type(caps) is not list:
                     raise Fault('invalid_arguments')

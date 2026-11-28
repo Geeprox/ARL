@@ -41,7 +41,6 @@ final class RuntimeStore {
     private var logSessionReading = false
     private(set) var legacyLogs = false
     private(set) var logReadError: String?
-    private(set) var lastLogSuccess: Date?
     private var lastSuccessfulLogPage: RedactedLogPage?
     private var legacyLogGeneration = 0
     private var legacyLogReadingGeneration: Int?
@@ -414,7 +413,7 @@ final class RuntimeStore {
         legacyLogs = false
         errorCode = code; snapshot = nil; lastUpdated = nil
         control = .unavailable; controlError = nil
-        lastSuccessfulLogPage = nil; lastLogSuccess = nil; logReadError = code
+        lastSuccessfulLogPage = nil; logReadError = code
         modules = .unavailable(code); permissions = .unavailable(code); remindersFirst = .unavailable(code)
         mioCalendarPermission = .unavailable(code)
     }
@@ -722,10 +721,7 @@ final class RuntimeStore {
         let filter = logLevel
         logTask = Task {
             do {
-                var params: [String: ARLJSON] = ["mode": .string("page"), "session_id": .string(sessionID), "limit": .number(100)]
-                if let cursor = request.cursor { params["cursor"] = .string(cursor) }
-                if let filter { params["level"] = .string(filter) }
-                let decoded: (sessionID: String, latestSequence: Int, scannedThroughSequence: Int, page: RedactedLogPage)
+                let decoded: LogSessionReply.Page
                 if demo {
                     let fixture = try await service.readLogs(cursor: request.cursor, level: filter)
                     let head = fixture.entries.last?.sequence ?? 0
@@ -733,14 +729,13 @@ final class RuntimeStore {
                         truncated: fixture.truncated, sourceDescription: fixture.sourceDescription)
                     decoded = (sessionID, head, head, page)
                 } else {
-                    let reply = try await ARLClient(home: service.home, app: "settings").rpc("settings.logs.v3", params: params, timeout: 3)
-                    decoded = try LogSessionReply.page(JSONEncoder().encode(reply))
+                    decoded = try await service.readLogPage(sessionID: sessionID, cursor: request.cursor, level: filter)
                 }
                 guard !Task.isCancelled else { return }
                 if logPaging.complete(decoded.page, sessionID: decoded.sessionID, latestSequence: decoded.latestSequence,
                                       scannedThroughSequence: decoded.scannedThroughSequence, for: request), let loaded = logPaging.page {
                     control.logs = .available(loaded)
-                    lastSuccessfulLogPage = loaded; lastLogSuccess = Date(); logReadError = nil
+                    lastSuccessfulLogPage = loaded; logReadError = nil
                 }
             } catch {
                 guard !Task.isCancelled, logPaging.inFlight == request else { return }
@@ -779,7 +774,7 @@ final class RuntimeStore {
             guard !Task.isCancelled, generation == legacyLogGeneration else { return }
             let page = RedactedLogPage(entries: rows, hasMore: more, nextCursor: cursor,
                 truncated: truncated || more, sourceDescription: "重启保留 · 最近 24 小时 · 服务端脱敏")
-            lastSuccessfulLogPage = page; lastLogSuccess = Date()
+            lastSuccessfulLogPage = page
             control.logs = .available(page); logReadError = nil
         } catch {
             guard !Task.isCancelled, generation == legacyLogGeneration else { return }
@@ -799,8 +794,7 @@ final class RuntimeStore {
         defer { logSessionReading = false }
         let generation = logPaging.generation
         do {
-            let reply = try await ARLClient(home: service.home, app: "settings").rpc("settings.logs.v3", params: ["mode": .string("checkpoint")], timeout: 3)
-            let checkpoint = try LogSessionReply.checkpoint(JSONEncoder().encode(reply))
+            let checkpoint = try await service.readLogCheckpoint()
             guard generation == logPaging.generation else { return false }
             if logPaging.observeSession(checkpoint.sessionID, latestSequence: checkpoint.latestSequence) {
                 // Confirmed restart: old rows belong to another stream. Keep

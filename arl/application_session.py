@@ -5,9 +5,9 @@ A client must keep this session alive while its declared tasks are executing.
 """
 from __future__ import annotations
 import copy,threading,time,uuid
+from .application_contract import TASK_CANCEL, TASK_GET, TASK_SUBMIT, validate_scenarios
 from .client import Client
 from .contracts import Fault
-from .application_platform import scenarios as validate_scenarios
 
 class ApplicationSession:
     def __init__(self,home,app_id,name,scenarios=(),*,icon_ref='sf:app',version=None,icon=None,client_factory=Client):
@@ -51,13 +51,13 @@ class ApplicationSession:
         with self._lock:
             if not self.connected:self.register()
             key=request_id or str(uuid.uuid4())
-            return self.client.rpc('application.tasks.submit.v1',{'schema_version':1,'session_id':self.client.app_session,'scenario_id':scenario_id,'request_id':key,'input':text})
+            return self.client.rpc(TASK_SUBMIT,{'schema_version':1,'session_id':self.client.app_session,'scenario_id':scenario_id,'request_id':key,'input':text})
     def get(self,job_id):
         with self._lock:
-            return self.client.rpc('application.tasks.get.v1',{'schema_version':1,'session_id':self.client.app_session,'job_id':job_id})
+            return self.client.rpc(TASK_GET,{'schema_version':1,'session_id':self.client.app_session,'job_id':job_id})
     def cancel(self,job_id):
         with self._lock:
-            return self.client.rpc('application.tasks.cancel.v1',{'schema_version':1,'session_id':self.client.app_session,'job_id':job_id})
+            return self.client.rpc(TASK_CANCEL,{'schema_version':1,'session_id':self.client.app_session,'job_id':job_id})
     def wait(self,job,*,timeout=180):
         deadline=time.monotonic()+timeout
         while job['state'] in {'queued','running'}:
