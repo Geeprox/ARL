@@ -176,6 +176,12 @@ def filter_modules(test_plan, names):
     return result
 
 
+def needs_native_fixture_build(test_plan):
+    buildable = {'core_native_fixtures', 'eventkit_status_fixture', 'swift_smoke', 'tisra_opt_in_fixture'}
+    return any(case['profile'] == 'native' and buildable.issuperset(case['unmet_requirements'])
+               for case in test_plan['blocked'])
+
+
 def worker(module, selectors, output, spec=None):
     """Internal isolated worker. Called only for a catalog-validated module."""
     sys.path[:0] = [str(ROOT), str(ROOT/'tests')]
@@ -295,16 +301,15 @@ def main(argv=None):
         args.output.mkdir(parents=True, exist_ok=True)
         if not args.list and (args.output/'result.json').exists():
             raise InventoryError('test_output_exists: choose a new output directory to preserve receipts')
-        if not args.list and 'native' in profiles and sys.platform == 'darwin':
-            fixtures = [ROOT/'build'/name for name in ('EventKitHelper', 'SwiftSmoke', 'TisraIntegrationSmoke', 'PeerSignatureHelper')]
-            if not all(p.is_file() for p in fixtures) and shutil.which('xcrun'):
-                with (args.output/'prepare-native.log').open('w') as log:
-                    subprocess.run(['/bin/bash', str(ROOT/'script/build_and_run.sh'), '--build-only'],
-                        cwd=ROOT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
-                        stdout=log, stderr=subprocess.STDOUT, timeout=240, check=True)
-                selected = plan(catalog, files, profiles)
-                if args.module:
-                    selected = filter_modules(selected, set(args.module))
+        if (not args.list and sys.platform == 'darwin' and needs_native_fixture_build(selected)
+                and shutil.which('xcrun')):
+            with (args.output/'prepare-native.log').open('w') as log:
+                subprocess.run(['/bin/bash', str(ROOT/'script/build_and_run.sh'), '--build-only'],
+                    cwd=ROOT, env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'),
+                    stdout=log, stderr=subprocess.STDOUT, timeout=240, check=True)
+            selected = plan(catalog, files, profiles)
+            if args.module:
+                selected = filter_modules(selected, set(args.module))
         (args.output/'plan.json').write_text(json.dumps(selected, ensure_ascii=False, sort_keys=True, indent=2)+'\n')
         if args.list:
             print(json.dumps({'profiles': selected['profiles'], 'modules': selected['module_inventory_count'],

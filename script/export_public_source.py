@@ -15,6 +15,7 @@ import sys
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+from script.local_build_area import project_cache_root
 from script.privacy_audit import scan,write_report
 
 OMIT_PREFIXES=(
@@ -58,7 +59,7 @@ def scoped_output(output):
  if any(p.is_symlink() for p in (output,*output.parents)):raise ValueError('export_output_symlink')
  output=output.resolve()
  project=ROOT.resolve()
- cache=Path.home()/'Library/Caches/CodexBuilds.noindex'/(project.name+'-'+hashlib.sha256(str(project).encode()).hexdigest()[:12])
+ cache=project_cache_root(project)
  if not ((ROOT/'build').resolve() in output.parents or cache in output.parents) or output.exists():raise ValueError('new_build_output_required')
  return output
 

@@ -15,7 +15,7 @@ import secrets
 import time
 import uuid
 from .app_connections import token
-from .codex_execution_options import selection, identifier
+from .codex_execution_options import DEFAULT_PACKAGES, selection, identifier
 from .contracts import Fault
 from .scheduling import BANDS, resolve
 
@@ -24,8 +24,6 @@ ICON_METHOD = 'application.icon.register.v1'
 METHODS = MODEL_METHODS | {ICON_METHOD}
 ICON_MAX_BYTES = 8192
 ICON_SOURCE = 'CFBundleIconFile:icp6'
-PACKAGES = (('low', '低', 'low'), ('medium', '中', 'medium'),
-            ('high', '高', 'high'), ('very_high', '极高', 'xhigh'), ('highest', '最高', 'max'))
 # Only known ordered efforts can be degraded; catalog-defined unknown IDs remain
 # selectable explicitly when provided by a trusted package mapping in future.
 EFFORT_ORDER = ('none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max')
@@ -167,10 +165,13 @@ class ApplicationModels:
             except (Fault, TypeError, KeyError, AttributeError):
                 raise Fault('application_models_catalog_unavailable')
         configured = self.package_configuration(app) if self.package_configuration else None
-        mapping = {key:row['model'] for key,row in configured.items()} if configured is not None else self.package_models(app) if self.package_models else {p[0]: current for p in PACKAGES}
+        mapping = {key:row['model'] for key,row in configured.items()} if configured is not None else self.package_models(app) if self.package_models else {p[0]: current for p in DEFAULT_PACKAGES}
         policy = self.policies[app]
         offers = []
-        for package_id, name, target in PACKAGES:
+        for package_id, name, target in DEFAULT_PACKAGES:
+            # The v1 discovery catalog already published this label.
+            if package_id == 'very_high':
+                name = '极高'
             if configured is not None:
                 name = configured[package_id]['display_name']; target = configured[package_id]['reasoning_effort']
             model = mapping.get(package_id)

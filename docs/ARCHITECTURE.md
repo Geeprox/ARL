@@ -1,5 +1,7 @@
 # 架构和执行边界
 
+当前模块、状态归属和打包入口见[架构地图](architecture/README.md)。下文记录早期 Core 的设计与部署边界。
+
 一个无 UI 用户进程包含本地 RPC、持久调度和单个执行 worker；不是一组微服务。文件以能力职责拆分：`contracts` 严格 schema / tool / provider / app policy，`storage` 事务与审计，`service` RPC 与队列，`lifecycle` 私有文件 / peer UID / 单实例，`identity` 可选受控进程验证，`wake` 注册 ID inbox，`providers` 本地 HTTP / 路由，`apple` helper transport，`travel` 兼容 schema，`client` SDK。
 
 ```mermaid

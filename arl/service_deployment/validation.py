@@ -1,12 +1,12 @@
 """Strict bounded parsing only. Paths, images and credentials are never resolved."""
 from __future__ import annotations
 
-import json
 import re
 from urllib.parse import urlsplit
 
 from ..contracts import Fault, encode
 from ..control import bounded_text, identifier
+from ..wire import DuplicateJSONField, decode_json
 from .models import (Backend, Configuration, CredentialRequirement, Dependency,
                      EndpointSpec, EvidenceSource, HealthSpec, Manifest, Mount,
                      MountBinding, Parameter, Port, PortBinding, ReservedPort,
@@ -39,20 +39,11 @@ def strict_json(raw: bytes | str) -> dict:
         if len(raw) > MAX_INPUT_BYTES:
             fail("input_too_large", "input")
 
-        def pairs(items):
-            result = {}
-            for key, value in items:
-                if key in result:
-                    fail("duplicate_field", "input")
-                result[key] = value
-            return result
-
-        def constant(_):
-            fail("invalid_json", "input")
-
-        value = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_constant=constant)
+        value = decode_json(raw.decode("utf-8"))
         check_document(value)
         return value
+    except DuplicateJSONField:
+        fail("duplicate_field", "input")
     except (UnicodeError, ValueError, RecursionError, OverflowError):
         fail("invalid_json", "input")
 

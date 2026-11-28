@@ -3,12 +3,21 @@ from __future__ import annotations
 import ctypes
 import fcntl
 import os
+import pwd
 import socket
 import stat
 import sys
 from pathlib import Path
 
 from .contracts import Fault
+
+
+def account_home():
+    return Path(pwd.getpwuid(os.geteuid()).pw_dir)
+
+
+def state_home():
+    return account_home() / 'Library/Application Support/ARL'
 
 
 def private_home(home):

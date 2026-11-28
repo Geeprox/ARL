@@ -1,5 +1,26 @@
 import Foundation
 
+enum CodexModelPackage: String, CaseIterable, Sendable {
+    case low
+    case medium
+    case high
+    case veryHigh = "very_high"
+    case highest
+
+    static let ids = allCases.map(\.rawValue)
+    static let idSet = Set(ids)
+
+    var defaultTitle: String {
+        switch self {
+        case .low: "低"
+        case .medium: "中"
+        case .high: "高"
+        case .veryHigh: "很高"
+        case .highest: "最高"
+        }
+    }
+}
+
 struct CodexExecutionSelection: Codable, Equatable, Sendable {
     let model: String
     var reasoning_effort: String

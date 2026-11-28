@@ -146,9 +146,10 @@ def compose_codex_application(home, *, service, peer_verifier, policy, isolated=
     Existing finite/unlimited call limits and the one-pending route are preserved.
     """
     from pathlib import Path
-    from .compat_host import CodexCallerPeer, PeerComposition, metadata_policies, state_home
-    from .control import AppDescriptor
-    from .identity import RegisteredPeerVerifier
+    from .control import AppDescriptor, metadata_policies
+    from .formal_peer import CodexCallerPeer
+    from .identity import PeerComposition, RegisteredPeerVerifier
+    from .lifecycle import state_home
     if (type(isolated) is not bool or type(service) is not CodexService or service.runtime is not None or not service.current()
             or not service.allow_model_selection or type(policy) is not AppPolicy
             or type(policy.tools) is not frozenset or policy.tools != frozenset({service.name})
@@ -168,12 +169,12 @@ def compose_codex_application(home, *, service, peer_verifier, policy, isolated=
     registered = peer_verifier if isolated else peer_verifier.registered
     if service.caller not in registered.app_ids or (not isolated and peer_verifier.caller != service.caller):
         raise Fault('codex_caller_unverified')
-    policies = metadata_policies()
+    policies = metadata_policies(local_status=True)
     if service.caller in policies:
         raise Fault('codex_caller_conflict')
     policies[service.caller] = policy
     runtime = CodexApplicationRuntime(home, policies=policies, providers={}, local_enabled=False,
-        extra_tools=[service.tool()], identity_verifier=PeerComposition((peer_verifier,)),
+        extra_tools=[service.tool()], identity_verifier=PeerComposition((peer_verifier,), settings_metadata_only=False),
         execute_jobs=True, codex_service=service, admission=service.admit,
         work_scope=frozenset({(service.caller, service.name)}), service_portal=service_portal,
         application_catalog=lambda app: service.status()['execution_catalog'])

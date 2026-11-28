@@ -3,6 +3,9 @@ import Foundation
 /// Consumer for the settings.logs.v3 read-only contract.
 /// Cursor contents remain opaque. Session IDs are compared only for equality.
 enum LogSessionReply {
+    typealias Checkpoint = (sessionID: String, latestSequence: Int)
+    typealias Page = (sessionID: String, latestSequence: Int, scannedThroughSequence: Int, page: RedactedLogPage)
+
     private static func session(_ value: Any?) throws -> String {
         let token = try WireSchema.string(value, maximum: 32)
         guard token.range(of: "^[a-f0-9]{32}$", options: .regularExpression) != nil else {
@@ -10,14 +13,14 @@ enum LogSessionReply {
         }
         return token
     }
-    static func checkpoint(_ data: Data) throws -> (sessionID: String, latestSequence: Int) {
+    static func checkpoint(_ data: Data) throws -> Checkpoint {
         let raw = try WireSchema.object(JSONSerialization.jsonObject(with: data), ["schema_version", "redaction_version", "mode", "session_id", "latest_sequence"])
         try WireSchema.constantInt(raw["schema_version"], 3)
         try WireSchema.constantInt(raw["redaction_version"], 1)
         try WireSchema.choice(raw["mode"], ["checkpoint"])
         return (try session(raw["session_id"]), try WireSchema.integer(raw["latest_sequence"]))
     }
-    static func page(_ data: Data) throws -> (sessionID: String, latestSequence: Int, scannedThroughSequence: Int, page: RedactedLogPage) {
+    static func page(_ data: Data) throws -> Page {
         var raw = try WireSchema.object(JSONSerialization.jsonObject(with: data), ["schema_version", "redaction_version", "mode", "session_id", "latest_sequence", "scanned_through_sequence", "records", "next_cursor", "more", "truncated"])
         try WireSchema.constantInt(raw["schema_version"], 3)
         try WireSchema.constantInt(raw["redaction_version"], 1)

@@ -163,6 +163,29 @@ actor SettingsService {
         let reply = try await ARLClient(home:home,app:"settings").settingsMetadata(.logs,params:params,timeout:3)
         return try ControlLogResponse.decode(JSONEncoder().encode(reply)).presentation
     }
+    func readLogCheckpoint() async throws -> LogSessionReply.Checkpoint {
+        let reply = try await ARLClient(home: home, app: "settings").rpc(
+            "settings.logs.v3", params: ["mode": .string("checkpoint")], timeout: 3)
+        return try LogSessionReply.checkpoint(JSONEncoder().encode(reply))
+    }
+    func readLogPage(sessionID: String, cursor: String?, level: String?) async throws -> LogSessionReply.Page {
+        var params: [String: ARLJSON] = ["mode": .string("page"), "session_id": .string(sessionID), "limit": .number(100)]
+        if let cursor { params["cursor"] = .string(cursor) }
+        if let level { params["level"] = .string(level) }
+        let reply = try await ARLClient(home: home, app: "settings").rpc("settings.logs.v3", params: params, timeout: 3)
+        return try LogSessionReply.page(JSONEncoder().encode(reply))
+    }
+    func readRecentLogs() async throws -> RecentLogPage {
+        let reply = try await ARLClient(home: home, app: "settings").rpc(
+            "settings.logs.recent.v1", params: ["limit": .number(500)], timeout: 3)
+        return try RecentLogPage.decode(JSONEncoder().encode(reply))
+    }
+    func readLogDetails(sequence: Int, sessionID: String) async throws -> LogTaskContext? {
+        let reply = try await ARLClient(home: home, app: "settings").rpc(
+            "settings.log_details.v1", params: ["sequence": .number(Double(sequence)), "session_id": .string(sessionID)],
+            timeout: 3)
+        return try LogTaskContext.decode(JSONEncoder().encode(reply), sequence: sequence, session: sessionID)
+    }
     func exportLogs() async throws -> ControlLogExport {
         if demo { return try .filtered(ControlLogResponse.decode(Data(ControlFixtures.logs.utf8)).records) }
         let reply = try await ARLClient(home:home,app:"settings").settingsMetadata(.logsExport,params:["limit":.number(500)],timeout:3)

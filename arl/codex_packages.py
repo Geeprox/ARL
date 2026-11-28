@@ -2,10 +2,8 @@
 import contextlib, fcntl, hashlib, json, os, stat, uuid
 from pathlib import Path
 from .contracts import Fault
-from .codex_execution_options import selection
+from .codex_execution_options import DEFAULT_PACKAGES, PACKAGE_IDS, selection
 from .codex_context import TRANSPORT_FRAME_BYTES, INPUT_POLICY
-IDS=('low','medium','high','very_high','highest')
-TITLES=('低','中','高','很高','最高')
 def canonical(value):
     return json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':'),allow_nan=False).encode()
 def digest(value):return hashlib.sha256(canonical(value)).hexdigest()
@@ -21,7 +19,7 @@ def atomic(path,value):
     with os.fdopen(fd,'wb') as stream:stream.write(canonical(value));stream.flush();os.fsync(stream.fileno())
     os.replace(temporary,path)
 def validate_packages(packages,catalog):
-    if type(packages)!=dict or set(packages)!=set(IDS):raise Fault('invalid_package_configuration')
+    if type(packages)!=dict or packages.keys()!=PACKAGE_IDS:raise Fault('invalid_package_configuration')
     for row in packages.values():
         if type(row)!=dict or set(row) not in ({'display_name','model','reasoning_effort'},{'display_name','model','reasoning_effort','service_tier'}) or type(row['display_name'])!=str or not 1<=len(row['display_name'])<=40:raise Fault('invalid_package_configuration')
         selection(catalog,row['model'],row['reasoning_effort'],row.get('service_tier','default'))
@@ -52,7 +50,7 @@ class PackageRegistry:
         with self.locked():
             if not (self.home/'packages-v2.json').exists():
                 model=next((m for m in catalog if m['model']==current['model']),catalog[0]);efforts={e['id'] for e in model['efforts']}
-                packages={key:{'display_name':title,'model':model['model'],'reasoning_effort':effort if effort in efforts else model['default_effort'],'service_tier':'default'} for key,title,effort in zip(IDS,TITLES,('low','medium','high','xhigh','max'))}
+                packages={key:{'display_name':title,'model':model['model'],'reasoning_effort':effort if effort in efforts else model['default_effort'],'service_tier':'default'} for key,title,effort in DEFAULT_PACKAGES}
                 atomic(self.home/'packages-v2.json',{'schema_version':2,'revision':1,'catalog_version':version,'packages':packages})
             version=self.version(catalog)
             atomic(self.home/'catalog-v2.json',{'schema_version':2,'catalog_version':version,'models':catalog,'current':current,'refreshed_at_ms':__import__('time').time_ns()//1000000})

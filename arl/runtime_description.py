@@ -1,23 +1,17 @@
 """Immutable boot metadata. No process discovery, grants or private state reads."""
-import hashlib
 from pathlib import Path
 import secrets
 from . import PROTOCOL, VERSION
 from .contracts import Fault
+from .source_fingerprint import UnsafeRuntimeSource, source_fingerprint as fingerprint_tree
 
 FEATURES = {"app_sessions": 1, "control_snapshot": 2, "runtime_description": 1}
 
 def source_fingerprint():
-    digest = hashlib.sha256()
-    root = Path(__file__).parent
-    for path in sorted(root.rglob("*.py")):
-        if path.is_symlink() or "__pycache__" in path.parts:
-            raise Fault("unsafe_runtime_source")
-        name = str(path.relative_to(root)).encode()
-        raw = path.read_bytes()
-        digest.update(len(name).to_bytes(4, "big") + name)
-        digest.update(len(raw).to_bytes(8, "big") + raw)
-    return digest.hexdigest()
+    try:
+        return fingerprint_tree(Path(__file__).parent)
+    except UnsafeRuntimeSource:
+        raise Fault("unsafe_runtime_source") from None
 
 class RuntimeDescription:
     def __init__(self):

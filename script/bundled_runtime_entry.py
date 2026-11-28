@@ -116,7 +116,8 @@ def main():
         sys.path.insert(0, str(root/"code"))
         from arl.runtime_description import source_fingerprint
         if source_fingerprint() != manifest["source_sha256"]: raise ValueError("runtime_fingerprint_mismatch")
-        from arl.host import main as host_main, run, state_home
+        from arl.host import main as host_main, run
+        from arl.lifecycle import state_home
         phase='check_maintenance'
         maintenance = state_home()/"install-maintenance.json"
         if maintenance.exists():

@@ -1,5 +1,6 @@
 """Embed a hash-bound core in the app; no install or state access."""
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import plistlib
@@ -13,7 +14,6 @@ def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def inputs(private=False):
     if not private:
-        import importlib.util
         spec = importlib.util.spec_from_file_location("public_core", ROOT/"script/export_public_core.py")
         module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
         sources = {str(p) for p in module.closure()}
@@ -49,15 +49,16 @@ def stage(app, private=False):
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
         destination.chmod(0o555 if name == "build/PeerSignatureHelper" else 0o444)
-    digest = hashlib.sha256()
-    root = target/"code/arl"
-    for path in sorted(root.rglob("*.py")):
-        name = str(path.relative_to(root)).encode(); raw = path.read_bytes()
-        digest.update(len(name).to_bytes(4,"big")+name); digest.update(len(raw).to_bytes(8,"big")+raw)
+    # Preflight can load this packager for another worktree in the same process.
+    # Resolve the implementation from these inputs, independently of sys.modules.
+    spec = importlib.util.spec_from_file_location("arl_source_fingerprint", ROOT/"arl/source_fingerprint.py")
+    fingerprint = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fingerprint)
+    source_sha256 = fingerprint.source_fingerprint(target/"code/arl")
     version = next(ast.literal_eval(n.value) for n in ast.parse((ROOT/"arl/__init__.py").read_text()).body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="VERSION" for t in n.targets))
     manifest = {"version":version, "schema":1,"protocol":"arl/1","store_version":4,
         "profile":"local-compatibility" if private else "public-core-zero-grants",
-        "source_sha256":digest.hexdigest(), "files":{str(p.relative_to(target)):sha(p) for p in target.rglob("*") if p.is_file()}}
+        "source_sha256":source_sha256, "files":{str(p.relative_to(target)):sha(p) for p in target.rglob("*") if p.is_file()}}
     (target/"manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2)+"\n")
     (target/"manifest.json").chmod(0o444)
     # Files were already read-only; directories must also reject creation of
@@ -67,10 +68,10 @@ def stage(app, private=False):
     info_path = Path(app)/"Contents/Info.plist"
     info = plistlib.loads(info_path.read_bytes())
     info["ARLCoreRuntimeManifestSHA256"] = sha(target/"manifest.json")
-    info["ARLCoreRuntimeSourceSHA256"] = digest.hexdigest()
+    info["ARLCoreRuntimeSourceSHA256"] = source_sha256
     mode = info_path.stat().st_mode & 0o777; info_path.chmod(mode|0o200)
     info_path.write_bytes(plistlib.dumps(info)); info_path.chmod(mode)
     if before != {name:sha(ROOT/name) for name in sources}: raise ValueError("core_source_changed")
     return {"profile":manifest["profile"], "manifest_sha256":info["ARLCoreRuntimeManifestSHA256"],
-        "source_sha256":digest.hexdigest(), "files":len(manifest["files"]), "activation_required":True,
+        "source_sha256":source_sha256, "files":len(manifest["files"]), "activation_required":True,
         "installed":False, "grants_changed":False}

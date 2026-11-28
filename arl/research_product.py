@@ -227,8 +227,7 @@ def revoke(home):
 
 def main(argv=None):
     import argparse
-    from .host import state_home
-    from .lifecycle import private_home
+    from .lifecycle import private_home, state_home
     parser = argparse.ArgumentParser(description='Local Tisra Research authorization')
     parser.add_argument('command', choices=('status', 'grant', 'revoke'))
     parser.add_argument('--model', help='Exact existing Codex model for grant')

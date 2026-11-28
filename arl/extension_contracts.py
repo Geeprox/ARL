@@ -1,9 +1,8 @@
 """Optional trusted code composition; public defaults have no product grants."""
-from importlib import import_module
-from .contracts import AppPolicy, Fault
-from .overview import TASK_ATTENTION_METHOD
+from .contracts import Fault
+from .control import metadata_policies as control_metadata_policies
 try:
-    compatibility=import_module('.private_compat',__package__)
+    import arl.private_compat as compatibility
 except ModuleNotFoundError as error:
     if error.name != __package__+'.private_compat':raise
     compatibility=None
@@ -13,9 +12,7 @@ def default_policies(local_enabled=False):
     return metadata_policies()
 
 def metadata_policies():
-    if compatibility:return compatibility.metadata_policies()
-    return {'settings':AppPolicy(frozenset(),frozenset(),0,0,0,
-        methods=frozenset({'health','ready','overview','settings.snapshot','settings.logs','settings.logs_export','settings.logs.v3','settings.log_details.v1','settings.logs.recent.v1','settings.modules_snapshot',TASK_ATTENTION_METHOD}),public_metadata=True)}
+    return control_metadata_policies(local_status=compatibility is not None)
 
 def managed_app_ids():
     return compatibility.managed_app_ids() if compatibility else frozenset()

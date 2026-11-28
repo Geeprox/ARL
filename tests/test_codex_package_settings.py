@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from arl.codex_execution_options import DEFAULT_PACKAGES
 from arl.codex_packages import PackageRegistry, validate_packages
 ROOT=Path(__file__).resolve().parents[1]
 @unittest.skipUnless(sys.platform=='darwin' and shutil.which('xcrun'),'macOS Swift required')
@@ -19,6 +20,8 @@ class CodexPackageSettingsTests(unittest.TestCase):
             result=subprocess.run([str(binary),str(home)],capture_output=True,text=True,timeout=15)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn('PASS package settings',result.stdout)
+            self.assertEqual(json.loads(result.stdout.splitlines()[-1]),
+                             [[identifier, title] for identifier, title, _ in DEFAULT_PACKAGES])
             config=PackageRegistry(home).load();catalog=json.loads((home/'catalog-v2.json').read_text())
             validate_packages(config['packages'],catalog['models'])
             self.assertEqual(config['packages']['medium']['model'],'synthetic-b')

@@ -2,7 +2,7 @@
 import hashlib,json,os,stat
 from pathlib import Path
 from .contracts import AppPolicy,Fault,encode
-from .friday_planning import NAME,FridayRemovalPlanner,checked_request
+from .friday_planning import MODEL, NAME, FridayRemovalPlanner, PlanningAdmission, checked_request
 from .supervisor import LaunchSpec
 from .identity import RegisteredPeerVerifier
 from .supervisor import ControlledSupervisor
@@ -12,7 +12,6 @@ from .providers import MockProvider
 class NoExternalTools:
  transport=None
  def tools(self):return []
-MODEL='gpt-6.1-sol'
 
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def planning_spec(candidate,manifest_sha,review_sha):
@@ -71,14 +70,6 @@ def planning_spec(candidate,manifest_sha,review_sha):
      closure_mutable_directory='state' if m.get('schema_version')==2 else None)
  spec.validate()
  return spec,req
-
-class PlanningAdmission:
- def __init__(self,request):
-  self.args={'model':MODEL,'request_json':encode(request).decode()}
- def __call__(self,owner,name,args):
-  if name!=NAME:return
-  if owner!='friday' or args!=self.args:raise Fault('planning_review_not_authorized')
-  checked_request(args['request_json'])
 
 def compose_isolated(candidate,manifest_sha,review_sha,*,adapter=None,priority_config=None):
  """Source integration only. Default has no task grants/worker; no CLI/env switch.

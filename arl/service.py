@@ -12,7 +12,7 @@ from .capabilities import AppleAdapter, build_tools
 from .contracts import AppPolicy, Cancelled, Fault, encode, object_schema, string, validate
 from .control import ControlPlane
 from .app_connections import AppConnections, METHODS as CONNECTION_METHODS
-from .application_platform import TASK_METHODS
+from .application_contract import TASK_METHODS
 from .application_models import ApplicationModels, METHODS as APPLICATION_METHODS
 from .messages_receive import MessagesReceive, METHODS as MESSAGES_RECEIVE_METHODS
 from .diagnostics import CODES, log_schema, log_v3_schema
@@ -528,7 +528,7 @@ class Runtime:
             if platform is not None and self.codex_service is not None:
                 if time.monotonic()-platform.last_settings >= 5: platform.refresh_settings()
                 with self.store.lock:
-                    active = self.store.db.execute("SELECT COUNT(*) FROM jobs WHERE state='running' AND tool=?", (self.codex_service.name,)).fetchone()[0]
+                    active = self.store.running_jobs(self.codex_service.name)
                     row = self.store.claim(scope=self.work_scope) if active < platform.concurrency else None
             else:
                 row = self.store.claim(scope=self.work_scope) if self.work_scope is not None else self.store.claim()

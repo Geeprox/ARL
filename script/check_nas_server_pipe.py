@@ -8,8 +8,11 @@ import plistlib
 import shutil
 import stat
 import subprocess
+import sys
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from script.local_build_area import project_cache_root
 
 def main():
     parser=argparse.ArgumentParser()
@@ -18,7 +21,7 @@ def main():
     parser.add_argument('--compression-sdk',required=True)
     args=parser.parse_args()
     out=Path(args.output).resolve();support=Path(args.compression_sdk).resolve()
-    cache=Path.home()/'Library/Caches/CodexBuilds.noindex'/(ROOT.name+'-'+hashlib.sha256(str(ROOT.resolve()).encode()).hexdigest()[:12])
+    cache=project_cache_root(ROOT)
     assert (out.is_relative_to(ROOT/'build') or out.is_relative_to(cache)) and not out.exists()
     out.mkdir(mode=0o700)
     sdk=subprocess.check_output(['/usr/bin/xcrun','--sdk','macosx','--show-sdk-path'],text=True).strip()
