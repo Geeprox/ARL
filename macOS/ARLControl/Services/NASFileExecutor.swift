@@ -113,8 +113,8 @@ import ARLCredentialOnboarding
         try Task.checkCancellation()
         guard !paused,port.allowed() else {throw CancellationError()}
     }
-    /// Aggregate only the already reviewed range-reader; never introduce a
-    /// second SMB identity, reconnect, or bypass its authority, revision or per-request bounds.
+    /// The native range reader checks scope, epoch and revision on every page.
+    /// Revalidate the live context at the spool boundary and before delivery.
     private func performDownload(tool:String,args input:Data) async throws->Data {
         let args=try OwnerReadJSON.object(input,limit:OwnerReadWire.requestLimit)
         try NASDownloadCapability.validate(tool:tool,args:args)
@@ -150,7 +150,8 @@ import ARLCredentialOnboarding
             let size=NASCapability.integer(args["size"])!,id=args["operation_id"] as! String
             let data=try Spool(); var digest=SHA256()
             repeat {
-                try await context(args)
+                try Task.checkCancellation()
+                guard !paused,port.allowed() else {throw CancellationError()}
                 let length=max(1,min(NASDownloadCapability.sourceRangeBytes,size-data.count)),offset=data.count
                 var read:[String:Any]=[:]
                 for key in ["source_ref","config_generation","connection_epoch","object_ref","revision"] {read[key]=args[key]}
@@ -167,8 +168,8 @@ import ARLCredentialOnboarding
                       offset+bytes.count==size ? page["next_offset"] is NSNull:NASCapability.integer(page["next_offset"])==offset+bytes.count
                 else {throw OwnerReadFault.invalid}
                 try data.append(bytes); digest.update(data: bytes)
-                try await context(args)
             } while data.count<size
+            try await context(args)
             guard now().isFinite,now()<instant+120 else {throw NASRuntimeFailure.expired}
             var manifest=args
             manifest.merge(["schema_version":1,"operation":"download","transfer_ref":UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased()+UUID().uuidString.replacingOccurrences(of:"-",with:"").lowercased(),
