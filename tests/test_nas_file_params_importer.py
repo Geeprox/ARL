@@ -258,9 +258,35 @@ class Checks(unittest.TestCase):
 
     def test_private_dns_mixed_answers_and_mapped_ips_rejected(self):
         for ips in (("127.0.0.1",),("169.254.169.254",),("10.0.0.1",),("::1",),
-                    ("8.8.8.8","10.1.1.1"),("::ffff:8.8.8.8",),()):
+                    ("8.8.8.8","10.1.1.1"),("::ffff:8.8.8.8",),("::ffff:0:808:808",),
+                    ("198.18.0.85","10.1.1.1"),("198.18.0.85","8.8.8.8"),()):
             with self.transport(response(),ips=ips):
                 self.fault("attachment_dns_rejected",lambda:self.fetch())
+        self.assertFalse(self.connections)
+
+    def test_synthetic_dns_uses_only_the_configured_loopback_proxy(self):
+        host = "files.oaiusercontent.com"
+        with self.transport(response(b"original"), ips=("198.18.0.85", "::ffff:0:c612:55")), \
+                patch.object(imp.url_request, "getproxies_macosx_sysconf",
+                             return_value={"https":"http://127.0.0.1:1082"}, create=True), \
+                patch.object(imp.url_request, "proxy_bypass_macosx_sysconf", return_value=False, create=True), \
+                patch.object(imp.http.client.HTTPSConnection, "connect", autospec=True) as connect:
+            raw = FakeSocket(response(b"original"))
+            connect.side_effect = lambda connection: setattr(connection, "sock", raw)
+            self.assertEqual(self.fetch().data, b"original")
+            connection = connect.call_args.args[0]
+            self.assertEqual((connection.host, connection.port), ("127.0.0.1", 1082))
+            self.assertEqual((connection._tunnel_host, connection._tunnel_port), (host, 443))
+            self.assertTrue(connection._context.check_hostname)
+            self.assertIn(b"Host: files.oaiusercontent.com", b"".join(raw.sent))
+
+    def test_synthetic_dns_rejects_missing_remote_or_credentialed_proxy(self):
+        for proxy in ("", "http://192.0.2.5:1082", "http://user:pass@127.0.0.1:1082"):
+            with self.transport(response(), ips=("198.18.0.85",)), \
+                    patch.object(imp.url_request, "getproxies_macosx_sysconf",
+                                 return_value={"https":proxy}, create=True), \
+                    patch.object(imp.url_request, "proxy_bypass_macosx_sysconf", return_value=False, create=True):
+                self.fault("attachment_dns_rejected", lambda: self.fetch())
         self.assertFalse(self.connections)
 
     def test_real_http_parser_request_no_proxy_auth_cookies_or_redirect(self):

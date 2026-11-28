@@ -20,6 +20,7 @@ import re
 import socket
 import ssl
 import time
+from urllib import request as url_request
 from urllib.parse import parse_qs, urlsplit
 import uuid
 
@@ -30,6 +31,8 @@ from integrations.nas.attachment_bridge import (
 TOOL_NAME = "mio_nas_import_attachment"
 MAX_URL_BYTES = 16384
 DOWNLOAD_SECONDS = 20.0
+SYNTHETIC_IPV4 = ipaddress.IPv4Network("198.18.0.0/15")
+TRANSLATED_IPV4 = ipaddress.IPv6Network("::ffff:0:0:0/96")
 
 
 def fail(code):
@@ -235,12 +238,41 @@ def _addresses(host):
             ip = ipaddress.ip_address(address[0])
         except ValueError:
             fail("attachment_dns_rejected")
-        if (family not in (socket.AF_INET, socket.AF_INET6) or socktype != socket.SOCK_STREAM
-                or not ip.is_global or getattr(ip, "ipv4_mapped", None) is not None):
+        if family not in (socket.AF_INET, socket.AF_INET6) or socktype != socket.SOCK_STREAM:
             fail("attachment_dns_rejected")
-        if str(ip) not in ips:
-            ips.append(str(ip))
-    return ips
+        ips.append(ip)
+    # A local VPN can synthesize both a benchmark IPv4 address and its macOS
+    # IPv4-translated IPv6 counterpart. Never connect to these IPs directly.
+    if all(ip in SYNTHETIC_IPV4 or (ip in TRANSLATED_IPV4 and
+           ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF) in SYNTHETIC_IPV4) for ip in ips):
+        return []
+    if any(not ip.is_global or getattr(ip, "ipv4_mapped", None) is not None or
+           ip in TRANSLATED_IPV4 for ip in ips):
+        fail("attachment_dns_rejected")
+    return list(dict.fromkeys(map(str, ips)))
+
+
+def _loopback_https_proxy(host, timeout):
+    """Use the explicit macOS HTTPS proxy for an entirely synthetic DNS answer."""
+    system_proxies = getattr(url_request, "getproxies_macosx_sysconf", None)
+    try:
+        if system_proxies is None or url_request.proxy_bypass_macosx_sysconf(host):
+            fail("attachment_dns_rejected")
+        proxy = urlsplit(system_proxies().get("https", ""))
+        address = ipaddress.ip_address(proxy.hostname or "")
+        port = proxy.port
+    except (OSError, ValueError):
+        fail("attachment_dns_rejected")
+    if (proxy.scheme != "http" or not address.is_loopback or not port or
+            proxy.username is not None or proxy.password is not None or
+            proxy.path or proxy.query or proxy.fragment):
+        fail("attachment_dns_rejected")
+    # CONNECT carries only the origin hostname. http.client validates that name
+    # inside the tunnel before it sends the signed resource path.
+    connection = http.client.HTTPSConnection(str(address), port, timeout=timeout,
+                                             context=ssl.create_default_context())
+    connection.set_tunnel(host, port=443)
+    return connection
 
 
 def fetch(source, *, verify, clock=time.monotonic, receipt_only=False, output=None):
@@ -280,7 +312,7 @@ def fetch(source, *, verify, clock=time.monotonic, receipt_only=False, output=No
     except (OSError, ValueError):
         fail("attachment_dns_rejected")
     remaining = live()
-    connection = _PinnedHTTPS(host, ips[0], remaining)  # never retry another address
+    connection = _PinnedHTTPS(host, ips[0], remaining) if ips else _loopback_https_proxy(host, remaining)
     response = None
     try:
         target = parsed.path + ("?"+parsed.query if parsed.query else "")
