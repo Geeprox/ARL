@@ -58,6 +58,7 @@ import CoreFoundation
         let all=Data((0..<(3*1048576+17)).map{UInt8($0%251)}),f=Fixture(all),input=args(size:all.count)
         let manifest=try await f.call("mio_nas_download",input)
         try expect(f.calls==25 && f.connections==0,"25 native ranges for the three-MiB file, never reconnect")
+        try expect(f.contexts==2,"the native range reader owns each page, with live context checked at both spool boundaries")
         try expect(manifest["name"] as? String=="中文原始文件.txt" && manifest["sha256"] as? String==NASDownloadCapability.hash(all),"Unicode output basename and whole SHA")
         try expect(manifest["object_ref"] as? String==ref && manifest["revision"] as? String==revision,"manifest binds exact source object/revision")
         try expect(OwnerReadWire.falseBoolean(manifest["downloadable_artifact"]),"never invent downloadable artifact")

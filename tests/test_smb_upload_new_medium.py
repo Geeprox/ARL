@@ -18,6 +18,7 @@ class Server:
         self.files={"approved":{"directory":True,"data":bytearray(),"index":1,"change":1}}
         self.opens=[];self.writes=[];self.flushes=[];self.renames=[]
         self.fail_directory_flush=False;self.race=False;self.fail_postrename=False
+        self.delayed_write_time=False
         self.revoked=False
         self.swap_on_child_open=False;self.swaps=[];self.outside=False
         self.deny_traverse=False;self.requests=[]
@@ -80,7 +81,11 @@ class Open:
     def write(self,data,*,offset,write_through):
         assert write_through;s=self.server;s.writes.append((offset,len(data)))
         self.row["data"][offset:offset+len(data)]=data;self.row["change"]+=1;return len(data)
-    def read(self,offset,count):return bytes(self.row["data"][offset:offset+count])
+    def read(self,offset,count):
+        if self.server.delayed_write_time and self.path.endswith(".stage"):
+            self.row["change"]+=1
+            self.server.delayed_write_time=False
+        return bytes(self.row["data"][offset:offset+count])
     def close(self):self.connected=False
 class Tests(unittest.TestCase):
     def setUp(self):
@@ -112,6 +117,12 @@ class Tests(unittest.TestCase):
         self.assertEqual(len(self.server.renames),1);self.assertEqual(self.consumed,1)
         self.assertGreaterEqual(self.server.flushes.count("approved"),2)
         self.assertTrue(self.checked>20)
+    def test_delayed_smb_stage_write_time_does_not_discard_verified_bytes(self):
+        self.server.delayed_write_time=True
+        result=self.storage.upload(self.plan,self.source,self.owner)
+        self.assertEqual((result.status,result.content_sha256),("committed",self.plan.sha256))
+        self.assertEqual(bytes(self.server.files["approved/fixture.txt"]["data"]),self.data)
+        self.assertFalse(self.server.delayed_write_time)
     def test_ancestor_swap_blocked_through_upload(self):
         self.server.root="approved/sub"
         self.server.files["approved/sub"]={"directory":True,"data":bytearray(),"index":2,"change":1}

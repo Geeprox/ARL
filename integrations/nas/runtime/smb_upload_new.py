@@ -230,9 +230,14 @@ class SMBUploadHandle:
         return self.medium._probe(self.raw)[2]
     def revision(self):
         self.check()
-        value=self.medium._probe(self.raw)
-        if value[0]!=self.identity: raise UploadFault("target_replaced")
-        return value[1]
+        identity, revision, size = self.medium._probe(self.raw)
+        if identity != self.identity:
+            raise UploadFault("target_replaced")
+        if self.writable and not self.published:
+            # SMB may update write times asynchronously. The exclusive stage
+            # handle and full digest seal its bytes until the no-replace rename.
+            return hashlib.sha256(canonical({"identity": identity, "size": size})).hexdigest()
+        return revision
     def read(self,offset,count,*,effect_check):
         if type(offset) is not int or type(count) is not int or not 0<=offset<=MAX_BYTES or not 0<count<=CHUNK_BYTES or offset+count>MAX_BYTES:
             raise UploadFault("invalid_plan")
