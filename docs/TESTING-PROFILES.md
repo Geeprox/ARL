@@ -24,6 +24,8 @@ build/check-nas-python/bin/python3 -B script/check.py --all --output build/check
 
 已有结果目录不能覆盖；为每次验收选择新目录。plan.json 记录实际选择、未选择、缺少的前提和测试源码摘要；每个模块有独立日志/结果，result.json 汇总通过、失败和阻断。运行期间测试源码改变或清单出现新模块，不会生成全绿结论。
 
+仅当所选 native 用例缺少可由源码准备的旧 Core 夹具，且其余前提齐备时，runner 才执行夹具构建。只选套餐设置等自备原生夹具的模块时，直接执行所选模块。
+
 runner 为每个 Python worker 和 command 显式传 `-B`，测试内另起的 Python 夹具也显式传 `-B`。仅设置环境变量不足以约束 `-I` 子进程；隔离模式会忽略 `PYTHONDONTWRITEBYTECODE`。实际执行测试时，runner 拒绝把 `vendor/` 发布输入直接用作解释器；`--list` 仍只读检查前提，不启动测试子进程。
 
 | 分组 | 条件与边界 |

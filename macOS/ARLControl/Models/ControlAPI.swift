@@ -155,7 +155,7 @@ struct ControlPlaneSnapshot: Codable, Sendable {
                     try WireSchema.identifier(row["id"]);_ = try WireSchema.string(row["name"],maximum:400)
                     _ = try WireSchema.string(row["task_kind"],maximum:100)
                     try WireSchema.choice(row["priority"],["interactive","explicit","background"])
-                    try WireSchema.choice(row["package_id"],["low","medium","high","very_high","highest"])
+                    try WireSchema.choice(row["package_id"], CodexModelPackage.idSet)
                     guard (1000...180000).contains(try WireSchema.integer(row["deadline_ms"])),(128...32768).contains(try WireSchema.integer(row["max_output_bytes"])) else{throw ARLError(code:"invalid_response")}
                 }
             }

@@ -8,7 +8,6 @@ library/grant mapping, never a CLI display role or request field.
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 import re
 import uuid
@@ -16,6 +15,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from .contracts import Fault, encode
+from .wire import decode_json
 
 NAME = 'tisra.capture.link.v1'
 REQUEST_PURPOSE = 'tisra.capture.request.v1'
@@ -123,18 +123,8 @@ def parse_outer(raw):
     """Strict complete JSON decoding for the bounded outer request/receipt."""
     if type(raw) is not bytes or not 1 <= len(raw) <= MAX_OUTER_BYTES:
         raise Fault('capture_outer_too_large')
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError('duplicate key')
-            result[key] = value
-        return result
-    def invalid_constant(value):
-        raise ValueError('nonfinite constant')
     try:
-        value = json.loads(raw.decode('utf-8', errors='strict'),
-                           object_pairs_hook=pairs, parse_constant=invalid_constant)
+        value = decode_json(raw.decode('utf-8'))
         _utf8_tree(value)
     except (ValueError, UnicodeError, RecursionError):
         raise Fault('capture_invalid_arguments') from None

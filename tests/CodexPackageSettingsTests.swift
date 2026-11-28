@@ -16,7 +16,7 @@ struct ARLError: Error { let code: String }
             efforts:[.init(id:"low",description:"")],fast_available:false,fast_description:"")
         var catalog = CodexPackagesCatalog(schema_version:2,catalog_version:"catalog-1",models:[a,b],
             refreshed_at_ms:Int64(Date().timeIntervalSince1970*1000),current:.init(model:a.model,reasoning_effort:"high",service_tier:"default"))
-        let original = Dictionary(uniqueKeysWithValues:CodexPackageSettingsStore.ids.map { ($0,CodexPackageRow(display_name:$0,model:a.model,reasoning_effort:"high",service_tier:nil)) })
+        let original = Dictionary(uniqueKeysWithValues:CodexModelPackage.ids.map { ($0,CodexPackageRow(display_name:$0,model:a.model,reasoning_effort:"high",service_tier:nil)) })
         try write("catalog-v2.json",catalog)
         try write("packages-v2.json",CodexPackagesFile(schema_version:2,revision:1,catalog_version:catalog.catalog_version,packages:original))
         let settings = CodexPackageSettingsStore(home:home,enabled:true)
@@ -67,5 +67,7 @@ struct ARLError: Error { let code: String }
         let disabled = CodexPackageSettingsStore(home:disabledHome,enabled:false);disabled.reload()
         precondition(disabled.catalog == nil && !disabled.save() && !FileManager.default.fileExists(atPath:disabledHome.path))
         print("PASS package settings: independent choices, provider models/efforts, private atomic save, CAS conflict, stale catalog, draft preservation, removed models, disabled isolation")
+        let packageContract = CodexModelPackage.allCases.map { [$0.rawValue, $0.defaultTitle] }
+        print(String(decoding: try JSONEncoder().encode(packageContract), as: UTF8.self))
     }
 }

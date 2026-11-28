@@ -9,10 +9,32 @@ import uuid
 from dataclasses import dataclass
 
 from . import PROTOCOL, VERSION
-from .contracts import Fault, encode
+from .contracts import AppPolicy, Fault, encode
 from .diagnostics import Diagnostics, MAX_AGE_MS
 from .metrics import ResourceSampler
-from .overview import label
+from .overview import TASK_ATTENTION_METHOD, label
+
+_SETTINGS_READ_METHODS = frozenset({
+    'health', 'ready', 'overview', 'settings.snapshot', 'settings.logs',
+    'settings.logs_export', 'settings.logs.v3', 'settings.log_details.v1',
+    'settings.logs.recent.v1', 'settings.modules_snapshot',
+})
+_LOCAL_STATUS_METHODS = frozenset({
+    'settings.scheduler.v1', 'codex.service.status.v1', 'settings.app_icon.v1',
+})
+
+
+def settings_policy(extra_methods=()):
+    """Read-only same-UID control metadata. Grants no tools or providers."""
+    return AppPolicy(frozenset(), frozenset(), 0, 0, 0,
+                     methods=_SETTINGS_READ_METHODS.union(extra_methods), public_metadata=True)
+
+
+def metadata_policies(*, local_status=False):
+    methods = {TASK_ATTENTION_METHOD}
+    if local_status:
+        methods.update(_LOCAL_STATUS_METHODS)
+    return {'settings': settings_policy(methods)}
 
 def bounded_text(value, limit=200):
     return (type(value) is str and 0 < len(value) <= limit and

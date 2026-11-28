@@ -32,6 +32,14 @@ with tempfile.TemporaryDirectory(prefix='arl-legacy-race-', dir='/tmp') as direc
     try:
         assert runtime.ready.wait(5), 'host_not_ready'
         diagnostics = runtime.control.diagnostics
+        diagnostics.emit('model_task_queued', app='settings', context={'package_id': 'high'})
+        versioned = subprocess.run([str(HARNESS), str(home), 'versioned-logs'],
+                                   capture_output=True, text=True, timeout=15)
+        assert versioned.returncode == 0, 'swift_versioned_log_harness_failed'
+        versioned_result = json.loads(versioned.stdout)
+        assert versioned_result == {'ok': True, 'page_has_event': True, 'package': 'high',
+                                    'package_title': '高', 'elapsed_ms': versioned_result['elapsed_ms']}, versioned_result
+        print(json.dumps({'passed': True, 'versioned_log_endpoints': 4}, sort_keys=True))
         original_query = diagnostics.query
         def no_v3(params):
             raise Fault('unknown_method')
@@ -72,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='arl-scope-check-', dir='/tmp') as direc
     scopes = json.loads(result.stdout)
     assert scopes['ok'] and set(scopes['ids']) == {'messages.receive.v1', 'messages.send.v1'}, scopes
     assert len(set(scopes['titles'])) == 2, scopes
-    assert set(scopes['kinds']) == {'所需文件访问', '系统自动化'}, scopes
+    assert set(scopes['kinds']) == {'文件访问', '应用控制'}, scopes
     print(json.dumps({'passed':True,'messages_permission_scopes':scopes['ids']},sort_keys=True))
 
 with tempfile.TemporaryDirectory(prefix='arl-disconnect-', dir='/tmp') as directory:

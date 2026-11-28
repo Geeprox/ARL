@@ -14,7 +14,7 @@ from .priority import (PriorityAuthority,ResourcePolicy,TaskPolicy,AppProfilePol
 from .codex_server import CodexTextAdapter
 from . import codex_server
 from .codex_research import CodexResearchEngine
-from .friday_planning import FridayRemovalPlanner,checked_request
+from .friday_planning import FridayRemovalPlanner, PlanningAdmission, checked_request
 from .providers import OllamaProvider,MockProvider
 
 def digest(value):return hashlib.sha256(encode(value)).hexdigest()
@@ -313,7 +313,6 @@ class RegisteredRouteProducer:
             if caps['models'].get(model)!=native.model_fingerprints[model]:raise Fault('priority_route_binding_unavailable')
             fingerprint=caps['models'][model]; grant_scope=(grant.auth_epoch,grant.contract_sha256,sorted(grant.models))
         else:
-            from .friday_profile import PlanningAdmission
             planner=domain.target; current=r.tools.get(task.tool); admission=r.admission
             if owner!='friday' or planner.adapter is not adapter or current is None or getattr(current.handler,'__self__',None) is not planner or type(admission) is not PlanningAdmission:
                 raise Fault('priority_route_binding_unavailable')

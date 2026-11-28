@@ -1,4 +1,4 @@
-"""Fixed formal Tisra peer pin for an explicitly packaged ARL host.
+"""Signed peer admission for an explicitly packaged ARL host.
 
 This is a read-only identity boundary. It does not select a model, grant a
 research method, start an app, or enroll an RPC caller.
@@ -11,6 +11,8 @@ from pathlib import Path
 import stat
 import subprocess
 
+from .contracts import Fault
+from .identity import RegisteredPeerVerifier
 from .supervisor import SignedPeerVerifier
 
 TISRA_APP = Path('/Applications/Tisra.app')
@@ -19,6 +21,27 @@ TISRA_EXECUTABLE_SHA256 = 'a50cb1c02e7d2eac8a3be7ed4c75d3231e50ece0042e2db0c9b3c
 TISRA_REQUIREMENT = 'cdhash H"3be74e1372d40b213ce4233632cd19ec09e9d21e"'
 HELPER_SHA256 = 'f76ac5dcd2cd3378364774a2d3885ed53ced3badc6b8c67629c88247d21c5a76'
 ENV = {'PATH': '/usr/bin:/bin:/usr/sbin:/sbin', 'LANG': 'C', 'LC_ALL': 'C', 'TMPDIR': '/tmp'}
+
+
+class CodexCallerPeer:
+    """Require both a signed peer and a registered kernel process."""
+    def __init__(self, caller, registered, signed):
+        if (type(registered) is not RegisteredPeerVerifier or type(signed) is not SignedPeerVerifier
+                or caller not in registered.app_ids or caller not in signed.requirements):
+            raise Fault('codex_caller_unverified')
+        self.caller, self.registered, self.signed = caller, registered, signed
+
+    def __call__(self, connection, app):
+        if app == self.caller and self.registered(connection, app) == app and self.signed(connection, app) == app:
+            return app
+        return None
+
+    def session_binding(self, connection, app):
+        if self(connection, app) != app:
+            raise Fault('app_identity_unverified')
+        registered, registered_current = self.registered.session_binding(connection, app)
+        signed, signed_current = self.signed.session_binding(connection, app)
+        return hashlib.sha256((registered + signed).encode()).hexdigest(), lambda: registered_current() and signed_current()
 
 
 def exact_file(path: Path, expected: str) -> bool:
@@ -43,7 +66,6 @@ class FormalTisraPeer:
         return self.signed(connection, claimed_app)
 
     def session_binding(self, connection, app):
-        from .contracts import Fault
         if self(connection, app) != app:raise Fault('app_identity_unverified')
         key, current = self.signed.session_binding(connection, app)
         return key, lambda: (exact_file(self.helper, HELPER_SHA256) and

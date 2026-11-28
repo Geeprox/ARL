@@ -114,7 +114,6 @@
       "macOS/ARLControl/Views/EditorialStyle.swift",
       "macOS/ARLControl/Views/HouseholdView.swift",
       "macOS/ARLControl/Views/IconResolutionCache.swift",
-      "macOS/ARLControl/Views/LogScrollTrigger.swift",
       "macOS/ARLControl/Views/LogsView.swift",
       "macOS/ARLControl/Views/MetricExplanationView.swift",
       "macOS/ARLControl/Views/MetricsView.swift",

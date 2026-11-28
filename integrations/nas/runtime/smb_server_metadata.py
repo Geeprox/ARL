@@ -6,7 +6,7 @@ https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-srvs/c4a98e7b-d
 import struct
 import uuid
 from homeplane.nas_connection.contracts import NASConnectionError, relative_path
-from homeplane.nas_connection.adapters import Reader, SMBReader
+from homeplane.nas_connection.adapters import Reader, SMBReader, connect_smb
 
 SRVSVC = uuid.UUID('4b324fc8-1670-01d3-1278-5a47bf6ee188').bytes_le
 NDR = uuid.UUID('8a885d04-1ceb-11c9-9fe8-08002b104860').bytes_le
@@ -83,14 +83,12 @@ def body(raw, kind, call):
 
 class EncryptedServer:
     def __init__(self, endpoint, username, password):
-        from smbprotocol.connection import Connection
         from smbprotocol.session import Session
         self.connection = self.session = self.ipc = self.pipe = None
         self.host = endpoint['host']; self.timeout = endpoint['timeout_seconds']
         self.previews = {}
         try:
-            self.connection = Connection(uuid.uuid4(), self.host, endpoint['port'], require_signing=True)
-            self.connection.connect(timeout=self.timeout)
+            self.connection = connect_smb(self.host, endpoint['port'], self.timeout)
             self.session = Session(self.connection, username=username, password=password, require_encryption=True, auth_protocol='ntlm')
             self.session.connect()
             if not self.session.encrypt_data or not self.session.session_key:

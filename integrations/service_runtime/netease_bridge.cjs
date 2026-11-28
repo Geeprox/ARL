@@ -20,8 +20,9 @@ const MAX_READ_CLI_OUTPUT = 1048576;
 // Do not apply the HTTP byte limit again to normalized CLI text. This existing
 // 35,651,617-byte formatting/work ceiling is local policy, not a provider limit.
 const MAX_READ_CLI_FORMATTED = MAX_READ_CLI_OUTPUT + (MAX_READ_CLI_OUTPUT+1)*(1+2*16);
+const TOKEN_FILE = '.config/ncm-cli/tokens.enc.json';
 const persistent = new Set(['.netease_mcp_device.json','.config/ncm-cli/config.json',
-  '.config/ncm-cli/credentials.enc.json','.config/ncm-cli/tokens.enc.json']);
+  '.config/ncm-cli/credentials.enc.json',TOKEN_FILE]);
 const CLI_SHA = '0d586c070cbe90a60132056a42ae8fd565b73294353faf4842cd10f9e634bb88';
 const operationArgs = {prepare:['--help'], status:['login','--check','--output','json'], login:['login','--output','json']};
 let finished = false;
@@ -237,6 +238,12 @@ const writeOperations = new Set(['playlist_create','playlist_append','playlist_c
 const batchValues=(operation,args)=>({playlistId:args.playlist_id,[operation==='playlist_update_tags'?'tags':operation==='playlist_reorder'?'trackIds':'songIdList']:operation==='playlist_update_tags'?args.tags:args.song_ids});
 const metadataValues=(operation,args)=>({playlistId:args.playlist_id,[operation==='playlist_update_name'?'name':'desc']:args.value});
 const REFRESH_PATH = '/openapi/music/basic/user/oauth2/token/refresh/v2';
+function refreshFailure(status, response) {
+  const code=Number(response?.code);
+  if([status,code].some(value=>value===408||value===429||(value>=500&&value<=599)))return 'provider_unavailable';
+  if(status===401||code===401||response?.error==='invalid_grant')return 'refresh_rejected';
+  return 'provider_rejected';
+}
 const COVER_TOKEN_PATH = '/openapi/whale/nos/upload/token/docid';
 const COVER_PATH = '/openapi/music/basic/playlist/cover/update';
 const MANIFEST_PATH = '/openapi/v1/ncm/cli/manifest';
@@ -501,7 +508,7 @@ function store(name, bytes) {
   check(total <= MAX, 'private_state_limit');
   files.get(name)?.fill(0); files.set(name,value);
   if((readContext||diagnostic)&&persistent.has(name))rememberPrivateState();
-  if(name==='.config/ncm-cli/tokens.enc.json')diagnostic?.record('token_store','succeeded');
+  if(name===TOKEN_FILE)diagnostic?.record('token_store','succeeded');
 }
 function installMemoryHome() {
   process.env.HOME = HOME; process.env.XDG_CONFIG_HOME = HOME+'/.config';
@@ -827,9 +834,11 @@ function installNetworkBoundary(allowed) {
         throw fault('provider_resource_missing');
       }
       if(readContext&&(!response.ok||object(parsed)&&(Object.hasOwn(parsed,'code')&&(!Number.isSafeInteger(parsed.code)||![0,200].includes(parsed.code))||parsed.success===false))) {
-        const refresh=new URL(url).pathname===REFRESH_PATH;
-        if(refresh)readContext.refreshRejected=true;
-        readFailure(refresh?'refresh_rejected':'provider_rejected',{reason:refresh?'refresh_rejected':'provider_rejected',stage:refresh?'session':'provider_response',httpStatus,...(!refresh&&!readContext.isWrite?{providerStatus:providerBusinessStatus(parsed)}:{})});
+        const refresh=target.pathname===REFRESH_PATH;
+        const failure=refresh?refreshFailure(httpStatus,parsed):'provider_rejected';
+        if(failure==='refresh_rejected')readContext.refreshRejected=true;
+        readFailure(failure,{reason:failure,stage:failure==='refresh_rejected'?'session':'provider_response',httpStatus,
+          ...(!refresh&&!readContext.isWrite?{providerStatus:providerBusinessStatus(parsed)}:{})});
       }
       if(readContext&&target.pathname===MANIFEST_PATH&&response.ok&&!readContext.failure) {
         observeCloudCatalog(parsed);
@@ -1260,7 +1269,7 @@ function validateManifests(cache) {
   return selected;
 }
 function inspectSession() {
-  const stored=files.get('.config/ncm-cli/tokens.enc.json');
+  const stored=files.get(TOKEN_FILE);
   if(!stored)return {present:false,refreshable:false};
   const device=strictJSON(files.get('.netease_mcp_device.json')).deviceId;
   const value=strictJSON(stored),key=crypto.createHash('sha256').update(device).digest();
@@ -1736,7 +1745,7 @@ function installReadCommandBoundary(commander) {
   const original=commander.Command.prototype.parseAsync;
   commander.Command.prototype.parseAsync=async function(argv,...rest) {
     const session=inspectSession();
-    if(!session.present){readFailure(readContext.refreshRejected?'refresh_rejected':'login_required');return this;}
+    if(!session.present){readFailure(readContext.priorToken?'provider_unavailable':'login_required');return this;}
     if(readContext.failure)return this;
     check(readContext.manifests,'missing_dynamic_manifest');
     const invoke=async(stage,offset=0,cloudLimit=50)=>{
@@ -1944,6 +1953,12 @@ function finish(request) {
   }
   const stored={};
   for(const name of persistent)if(files.has(name))stored[name]=files.get(name).toString('base64');
+  if(readContext?.priorToken && !readContext.refreshRejected &&
+     !['present','refreshed'].includes(readResult.session)) {
+    // The CLI can remove its token file after a failed attempt. Keep the last
+    // refreshable envelope unless the provider confirmed the grant was rejected.
+    stored[TOKEN_FILE]=readContext.priorToken.toString('base64');
+  }
   const envelope={schema:1,storage:'official',files:stored};
   const encoded=Buffer.from(JSON.stringify(envelope));check(encoded.length<=MAX,'state_limit');
   try {
@@ -1986,7 +2001,7 @@ function finish(request) {
     }
     else frame({schema:1,call_id:request.call_id,event:'complete',state,credential:encoded.toString('base64')});
     finished=true;
-  } finally { encoded.fill(0); }
+  } finally { encoded.fill(0);readContext?.priorToken?.fill(0); }
   readContext?.cover?.image?.fill(0);
   encoded.fill(0);for(const bytes of files.values())bytes.fill(0);files.clear();privatePatterns.clear();privatePatternBytes=0;
 }
@@ -2072,6 +2087,7 @@ try {
   }
   if(isRead) {
     let session;try{session=inspectSession();}catch{readFailure('contract_rejected',{reason:'session_state_invalid',stage:'session'});}
+    if(session?.present||session?.refreshable)readContext.priorToken=Buffer.from(files.get(TOKEN_FILE));
     if(!session||!session.present&&!session.refreshable) {
       if(session)readFailure('login_required');finish(request);process.exitCode=0;
     }

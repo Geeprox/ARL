@@ -7,6 +7,7 @@ from .codex_selected import SelectedExplanationAdapter, SelectedRerankAdapter
 from .codex_selected_engine import SelectedExplanationEngine, SelectedRerankEngine, SelectedReviewProducer
 from . import codex_selected_contract as rank
 from . import codex_sourced_contract as sourced
+from .extension_contracts import metadata_policies
 from .formal_peer import FormalTisraPeer, exact_file, HELPER_SHA256, TISRA_EXECUTABLE, TISRA_EXECUTABLE_SHA256
 from .formal_research_host import BothPeers, FormalResearchRuntime
 from .identity import RegisteredPeerVerifier
@@ -74,7 +75,6 @@ def compose_selected_research(home, *, operation, grant, authorization, signed_p
     engine_type = SelectedExplanationEngine if operation == 'explain' else SelectedRerankEngine
     native = native_type(grant.models, text_adapter=text_adapter)
     engine = engine_type({'tisra': grant}, {'codex_app_server': native}, review)
-    from .host import metadata_policies
     policies = metadata_policies()
     policies['tisra'] = AppPolicy(frozenset({engine.name}), frozenset(), 0, 16, 100,
         methods=frozenset({'health', 'ready', 'capabilities', 'priority.negotiate.v2'}) | METHODS,

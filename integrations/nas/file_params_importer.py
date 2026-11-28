@@ -5,8 +5,8 @@ The owner must verify its original caller/request/scope before every IO phase;
 file_id, this schema and a CDN URL do not mint an owner permit. No cookies,
 API keys, proxy credentials, NAS credentials, upload/move/mkdir, or new service.
 
-ChatGPT serves file uploads from oaiusercontent.com subdomains. Use the exact
-HTTPS origin of the signed URL, without following redirects or adding credentials.
+ChatGPT uses oaiusercontent.com and Azure Blob for attachment downloads. Use
+the exact HTTPS origin, without following redirects or adding credentials.
 Signed URLs live only in this request and never appear in receipts.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ import re
 import socket
 import ssl
 import time
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 import uuid
 
 from integrations.nas.attachment_bridge import (
@@ -34,6 +34,19 @@ DOWNLOAD_SECONDS = 20.0
 
 def fail(code):
     raise BridgeFault(code)
+
+
+def attachment_origin(parsed):
+    host = parsed.hostname or ""
+    if re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+oaiusercontent\.com", host):
+        return True
+    if not re.fullmatch(r"[a-z0-9]{3,24}\.blob\.core\.windows\.net", host):
+        return False
+    # Azure validates the SAS itself. Only accept signed individual blob reads.
+    fields = parse_qs(parsed.query, keep_blank_values=True)
+    return (fields.get("sr") == ["b"] and fields.get("sp") == ["r"]
+            and all(len(fields.get(key, [])) == 1 and fields[key][0] for key in ("sig", "se"))
+            and re.fullmatch(r"/[^/]+/.+", parsed.path) is not None)
 
 
 @dataclass(frozen=True)
@@ -64,10 +77,9 @@ def file_param(value):
         fail("attachment_origin_unsupported")
     host = parsed.hostname or ""
     if (not valid_size or parsed.scheme != "https" or port not in (None, 443)
-            or not re.fullmatch(r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+oaiusercontent\.com", host)
             or parsed.netloc.lower() not in (host, host + ":443") or parsed.fragment
             or not parsed.path.startswith("/") or "\\" in url
-            or any(ord(c) <= 32 or ord(c) == 127 for c in url)):
+            or any(ord(c) <= 32 or ord(c) == 127 for c in url) or not attachment_origin(parsed)):
         fail("attachment_origin_unsupported")
     name, mime = value.get("file_name"), value.get("mime_type")
     if "file_name" in value:

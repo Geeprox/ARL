@@ -91,6 +91,19 @@ class Fixture(unittest.TestCase):
         self.assertEqual(filtered['selected_case_count'], 0)
         self.assertTrue(all(r['reason']=='explicit_module_filter' for r in filtered['not_selected']))
 
+    def test_native_fixture_build_requires_a_selected_case_it_can_unblock(self):
+        self.catalog['requirements']['swift_smoke'] = {'kind': 'path', 'value': 'build/SwiftSmoke'}
+        native = self.catalog['modules']['tests.test_fixture']['overrides']['Native']
+        for requirements, build in (([], False), (['swift_smoke', 'missing_source'], False),
+                                    (['swift_smoke'], True)):
+            with self.subTest(requirements=requirements):
+                native['requires'] = requirements
+                catalog, files = self.load()
+                plan = check.plan(catalog, files, {'native'}, root=self.root)
+                self.assertEqual(check.needs_native_fixture_build(plan), build)
+        filtered = check.filter_modules(plan, {'tests.another_test'})
+        self.assertFalse(check.needs_native_fixture_build(filtered))
+
     def test_stale_partition_and_unknown_requirement_fail_closed(self):
         original = copy.deepcopy(self.catalog)
         self.catalog['modules']['tests.test_fixture']['overrides']['NoSuchClass'] = {'profile': 'private'}

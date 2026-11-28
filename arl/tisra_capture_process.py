@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import math
 import os
 import socket
@@ -24,6 +23,7 @@ from pathlib import Path
 
 from .contracts import Fault, encode
 from .identity import RegisteredPeerVerifier, process_identity
+from .wire import decode_json
 from .tisra_capture_contract import (
     CaptureBinding, CaptureCodec, CommitConfirmation, MAX_OUTER_BYTES,
     MAX_REQUEST_BYTES, MAX_RESULT_BYTES, RECEIPT_KEYS, parse_outer,
@@ -69,15 +69,6 @@ def _frame(raw):
         raise Fault('capture_channel_invalid')
     if b'\n' in raw[:-1]:
         raise Fault('capture_channel_invalid')
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError('duplicate field')
-            result[key] = value
-        return result
-    def constant(_):
-        raise ValueError('nonfinite constant')
     def tree(value, depth=0):
         if depth > 64:
             raise ValueError('excess depth')
@@ -92,8 +83,7 @@ def _frame(raw):
         elif type(value) is float:
             raise ValueError('channel numbers must be integers')
     try:
-        value = json.loads(raw[:-1].decode('utf-8', errors='strict'),
-                           object_pairs_hook=pairs, parse_constant=constant)
+        value = decode_json(raw[:-1].decode('utf-8'))
         tree(value)
     except (ValueError, UnicodeError, RecursionError):
         raise Fault('capture_channel_invalid') from None

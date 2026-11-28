@@ -5,6 +5,7 @@ Private compatibility code, native author identities and local state are exclude
 import argparse
 import ast
 import hashlib
+from importlib.util import resolve_name
 import json
 from pathlib import Path
 import shutil
@@ -20,8 +21,20 @@ def module_path(name):
     base=ROOT/Path(*name.split('.'))
     return base.with_suffix('.py') if base.with_suffix('.py').is_file() else base/'__init__.py'
 
+def import_targets(path, name):
+    """Yield concrete candidates for static imports, including function-local imports."""
+    package = name if path.name == '__init__.py' else name.rpartition('.')[0]
+    for node in ast.walk(ast.parse(path.read_bytes(), filename=str(path))):
+        if isinstance(node, ast.Import):
+            yield from (alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            module = resolve_name('.' * node.level + (node.module or ''), package)
+            yield module
+            yield from (f'{module}.{alias.name}' for alias in node.names if alias.name != '*')
+
 def closure():
-    todo=['arl.host','arl.client','arl.__main__','arl.supervisor'];seen=set();paths=set()
+    # ApplicationPlatform is also an in-process composition entry used by SDK consumers.
+    todo=['arl.host','arl.client','arl.__main__','arl.supervisor','arl.application_platform'];seen=set();paths=set()
     while todo:
         name=todo.pop()
         if name in seen or name in PRIVATE:continue
@@ -31,15 +44,10 @@ def closure():
         parts=name.split('.')
         for count in range(1,len(parts)):
             init=ROOT/Path(*parts[:count])/'__init__.py'
-            if init.is_file():paths.add(init.relative_to(ROOT))
-        package=name.split('.') if path.name=='__init__.py' else name.split('.')[:-1]
-        for node in ast.walk(ast.parse(path.read_text())):
-            if isinstance(node,ast.ImportFrom) and node.level:
-                prefix=package[:len(package)-node.level+1]
-                target='.'.join(prefix+((node.module or '').split('.') if node.module else []))
-                candidates=[target] if node.module else ['.'.join(prefix+[a.name]) for a in node.names]
-                for candidate in candidates:
-                    if candidate.startswith('arl.') and module_path(candidate).is_file() and candidate not in PRIVATE:todo.append(candidate)
+            if init.is_file():todo.append('.'.join(parts[:count]))
+        for candidate in import_targets(path, name):
+            if candidate.startswith('arl.') and candidate not in PRIVATE and module_path(candidate).is_file():
+                todo.append(candidate)
     return paths
 
 def package(output,license_file=None):

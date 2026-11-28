@@ -4,7 +4,8 @@ import threading
 from typing import Callable
 
 from .contracts import AppPolicy, Fault
-from .identity import RegisteredPeerVerifier
+from .extension_contracts import metadata_policies
+from .identity import PeerComposition, RegisteredPeerVerifier
 from .service import Runtime
 from .supervisor import ControlledSupervisor, LaunchSpec
 from .tisra_capture_composition import CaptureProcessComposition
@@ -47,7 +48,6 @@ class CaptureHostAttachment:
         self._started = self._stopping = self._closed = False
 
     def make_runtime(self, home):
-        from .host import metadata_policies, PeerComposition
         with self._lock:
             if self.runtime is not None or self._closed:
                 raise Fault('capture_host_unconfigured')

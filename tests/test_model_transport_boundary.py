@@ -1,5 +1,6 @@
 """Model execution stays with local/LAN clients; Mio service policy is separate."""
 import unittest
+from unittest.mock import patch
 
 from arl.extension_contracts import CODEX_METHODS, RESPONSES_METHODS, default_policies, metadata_policies
 
@@ -26,6 +27,21 @@ class ModelTransportBoundaryTests(unittest.TestCase):
         self.assertNotIn("mio",policies)
         self.assertEqual(set(policies),{"settings"})
         self.assertFalse(policies["settings"].tools)
+
+    def test_settings_method_sets_follow_the_host_profile(self):
+        development = default_policies()["settings"]
+        local = metadata_policies()["settings"]
+        with patch('arl.extension_contracts.compatibility', None):
+            public = metadata_policies()["settings"]
+        self.assertEqual(public.methods, development.methods | {"settings.task_attention.v1"})
+        self.assertEqual(local.methods, public.methods | {
+            "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1",
+        })
+        for policy in (development, local, public):
+            self.assertTrue(policy.public_metadata)
+            self.assertFalse(policy.tools)
+            self.assertFalse(policy.providers)
+            self.assertEqual((policy.max_pending, policy.max_calls), (0, 0))
 
 
 

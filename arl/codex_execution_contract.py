@@ -6,10 +6,11 @@ envelope3 and receipt2; they are never inferred on restore or silently removed.
 """
 import copy
 from . import codex_sourced_contract as base
-from .application_models import ApplicationModels, PACKAGES
-from .codex_execution_options import identifier, selection
+from .application_models import ApplicationModels
+from .codex_execution_options import PACKAGE_IDS, identifier, selection
 from .contracts import Fault, encode
 from .research import exact, integer, digest, sha
+from .scheduling import BANDS
 
 CONTRACT = 'tisra.codex.execution.v1'
 MAX_OPTIONS_BYTES = 1024
@@ -38,8 +39,8 @@ def options(value):
     if value['contract'] != CONTRACT or value['contract_sha256'] != CONTRACT_SHA256:
         raise Fault('unsupported_execution_contract')
     digest(value['catalog_version'])
-    if (type(value['package_id']) is not str or value['package_id'] not in {p[0] for p in PACKAGES} or
-            type(value['priority']) is not str or value['priority'] not in {'background','explicit','interactive'} or
+    if (type(value['package_id']) is not str or value['package_id'] not in PACKAGE_IDS or
+            type(value['priority']) is not str or value['priority'] not in BANDS or
             type(value['allow_degradation']) is not bool):
         raise Fault('invalid_execution_options')
     identifier(value['thinking_effort'], 40)

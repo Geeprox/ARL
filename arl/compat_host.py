@@ -6,10 +6,8 @@ The installed entry uses this fixed composition and a fixed account state home.
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
-import pwd
 import re
 import signal
 import stat
@@ -17,103 +15,13 @@ import threading
 import time
 from pathlib import Path
 
-from . import VERSION
 from .contracts import AppPolicy, Fault
-from .lifecycle import private_home
-from .overview import TASK_ATTENTION_METHOD
+from .control import metadata_policies as _control_metadata_policies
+from .diagnostics import MetadataLog
+from .formal_peer import CodexCallerPeer
+from .identity import PeerComposition
+from .lifecycle import private_home, state_home
 from .service import Runtime
-
-
-def account_home():
-    return Path(pwd.getpwuid(os.geteuid()).pw_dir)
-
-
-def state_home():
-    return account_home()/"Library/Application Support/ARL"
-
-
-def metadata_policies():
-    return {"settings": AppPolicy(frozenset(), frozenset(), 0, 0, 0,
-        methods=frozenset({"health", "ready", "overview", "settings.snapshot", "settings.logs", "settings.logs_export", "settings.logs.v3", "settings.log_details.v1", "settings.logs.recent.v1", "settings.modules_snapshot", "settings.scheduler.v1", "codex.service.status.v1", "settings.app_icon.v1", TASK_ATTENTION_METHOD}), public_metadata=True)}
-
-
-class PeerComposition:
-    """Trusted in-process composition; default rejects every task-app identity.
-
-    Approved product host code can supply SignedPeerVerifier and a controlled
-    supervisor's peer_verifier. That still requires explicit AppPolicy grants;
-    verifier acceptance alone never opens tools. Installed metadata profile
-    passes no verifiers and exposes no config/registration RPC or env switch.
-    """
-    def __init__(self, verifiers=()):
-        self.verifiers = tuple(verifiers)
-
-    def __call__(self, connection, app):
-        for verifier in self.verifiers:
-            try:
-                accepted = verifier(connection, app)
-            except Exception:
-                continue
-            if accepted == app:
-                return accepted
-        return None
-
-    def session_binding(self, connection, app):
-        for verifier in self.verifiers:
-            if verifier(connection, app) == app:
-                binder = getattr(verifier, 'session_binding', None)
-                if binder is not None:
-                    return binder(connection, app)
-        raise Fault('app_identity_unverified')
-
-
-class MetadataLog:
-    """Bounded 64 KiB private log, fixed machine fields, no exception messages."""
-    def __init__(self, home):
-        self.path = home/"host.log"
-
-    def event(self, event, code=None):
-        if event not in {"starting", "ready", "stopped", "disabled", "error"}:
-            raise ValueError("unknown_log_event")
-        record = {"at": int(time.time()), "event": event, "version": VERSION}
-        if code and re.fullmatch(r"[a-z_]{1,80}", code):
-            record["code"] = code
-        raw = (json.dumps(record, sort_keys=True)+"\n").encode()
-        fd = os.open(str(self.path), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-        try:
-            info = os.fstat(fd)
-            if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
-                raise Fault("unsafe_log")
-            fcntl.flock(fd, fcntl.LOCK_EX)
-            if os.fstat(fd).st_size + len(raw) > 65536:
-                os.ftruncate(fd, 0)
-            os.lseek(fd, 0, os.SEEK_END)
-            os.write(fd, raw)
-        finally:
-            os.close(fd)
-
-
-class CodexCallerPeer:
-    """Reuse the existing signed peer and registered kernel-process verifier."""
-    def __init__(self, caller, registered, signed):
-        from .identity import RegisteredPeerVerifier
-        from .supervisor import SignedPeerVerifier
-        if (type(registered) is not RegisteredPeerVerifier or type(signed) is not SignedPeerVerifier or
-                caller not in registered.app_ids or caller not in signed.requirements):
-            raise Fault('codex_caller_unverified')
-        self.caller, self.registered, self.signed = caller, registered, signed
-
-    def __call__(self, connection, app):
-        if app == self.caller and self.registered(connection, app) == app and self.signed(connection, app) == app:
-            return app
-        return None
-
-    def session_binding(self, connection, app):
-        if self(connection, app) != app:raise Fault('app_identity_unverified')
-        a, current_a = self.registered.session_binding(connection, app)
-        b, current_b = self.signed.session_binding(connection, app)
-        import hashlib
-        return hashlib.sha256((a+b).encode()).hexdigest(), lambda: current_a() and current_b()
 
 
 def compose_codex_service(home, *, service, peer_verifier, isolated=False, service_portal=None, formal_tisra_peer=None,
@@ -144,17 +52,18 @@ def compose_codex_service(home, *, service, peer_verifier, isolated=False, servi
         if formal_tisra_peer is not None:
             from .control import AppDescriptor
             runtime.policies['tisra'] = application_metadata_policy()
-            runtime.identity_verifier = PeerComposition((peer_verifier, formal_tisra_peer))
+            runtime.identity_verifier = PeerComposition((peer_verifier, formal_tisra_peer), settings_metadata_only=False)
             runtime.control.apps.register(AppDescriptor('tisra', 'Tisra', 'sf:text.book.closed'))
         return runtime
-    policies = metadata_policies()
+    policies = _control_metadata_policies(local_status=True)
     if formal_tisra_peer is not None:policies['tisra'] = application_metadata_policy()
     if service.caller in policies:raise Fault('codex_caller_conflict')
     policies[service.caller] = AppPolicy(frozenset({service.name}), frozenset(), 0, 1, service.max_calls,
         methods=frozenset({'health','ready','capabilities','submit','get','cancel','heartbeat'}),
         max_deadline_ms=30000)
     runtime = Runtime(home, policies=policies, providers={}, local_enabled=False,
-        extra_tools=[service.tool()], identity_verifier=PeerComposition((peer_verifier,) + ((formal_tisra_peer,) if formal_tisra_peer is not None else ())),
+        extra_tools=[service.tool()], identity_verifier=PeerComposition((peer_verifier,) + ((formal_tisra_peer,) if formal_tisra_peer is not None else ()),
+                                          settings_metadata_only=False),
         execute_jobs=True, codex_service=service, admission=service.admit,
         work_scope=frozenset({(service.caller, service.name)}), service_portal=service_portal,
         application_catalog=(lambda app: service.status().get('execution_catalog')) if formal_tisra_peer is not None else None)
@@ -313,13 +222,14 @@ def make_runtime(home, *, capture_attachment=None, service_portal=None, formal_t
         from .formal_research_host import compose_formal_research
         return local_receive(compose_formal_research(home, research_activation, service_portal=service_portal))
     # No replay/mutation of historical pending tasks in the metadata-only host.
-    policies = metadata_policies()
+    policies = _control_metadata_policies(local_status=True)
     if formal_tisra_peer is not None:
         from .formal_peer import FormalTisraPeer
         if type(formal_tisra_peer) is not FormalTisraPeer:raise Fault('app_identity_unverified')
         policies['tisra'] = application_metadata_policy()
     runtime = Runtime(home, policies=policies, local_enabled=False,
-                   identity_verifier=PeerComposition((formal_tisra_peer,) if formal_tisra_peer is not None else ()), execute_jobs=False,
+                   identity_verifier=PeerComposition((formal_tisra_peer,) if formal_tisra_peer is not None else (),
+                                                     settings_metadata_only=False), execute_jobs=False,
                    service_portal=service_portal,
                    # An explicitly empty canonical-source snapshot permits metadata/icon
                    # handshake without a model cache; it never invents rows or
